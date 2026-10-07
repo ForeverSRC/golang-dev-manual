@@ -40,6 +40,12 @@ gdm-cli check ./some/package  # 执行可自动化的检测
 
 条款数据已编入二进制，装好的 `gdm-cli` 不需要 clone 仓库。
 
+配套 skill `skills/gdm-workflows/` 把 CLI 包装成 Agent 工作流，可用 `npx skills` 安装：
+
+```bash
+npx skills add ForeverSRC/golang-dev-manual
+```
+
 ## 从源码构建
 
 贡献者从签出的仓库出发：

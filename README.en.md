@@ -40,6 +40,12 @@ gdm-cli check ./some/package  # run the automatable checks
 
 The clause data is embedded in the binary, so the installed `gdm-cli` needs no checkout.
 
+The companion skill `skills/gdm-workflows/` wraps the CLI into agent workflows and installs with `npx skills`:
+
+```bash
+npx skills add ForeverSRC/golang-dev-manual
+```
+
 ## Building from source
 
 Contributors work from a checkout:
