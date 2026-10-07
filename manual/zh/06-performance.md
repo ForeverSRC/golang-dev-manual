@@ -1,0 +1,305 @@
+# 六、性能规约
+
+### 【MUST】PERF-004 元素数量已知或可估算时，用 make 指定切片容量。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+
+用 `make([]T, 0, n)` 初始化准备 append 的切片，n 取已知长度或合理上界。数量完全不可估、切片通常很小或生命周期很短时不强求。
+
+**为什么**
+
+> If your guess for the number of tasks was a good one, then there's only one allocation site in this program. The make call allocates a slice backing store of the correct size, and append never has to do any reallocation.
+>
+> —— https://go.dev/blog/allocation-optimizations
+
+不指定容量时 append 从容量 1 开始逐次扩容，每轮分配新底层数组、拷贝旧元素，旧数组随即变成垃圾。容量给准后只剩一次分配，扩容与拷贝都省掉；容量为常量时，Go 1.26 起这个分配还能落在栈上，连堆分配和对应的 GC 负担也一并免掉。
+
+**正例**
+
+```go
+tasks := make([]task, 0, len(items))
+for _, it := range items {
+	tasks = append(tasks, toTask(it))
+}
+```
+
+**反例**
+
+```go
+var tasks []task
+for _, it := range items {
+	tasks = append(tasks, toTask(it))
+}
+```
+
+**依据**
+
+- https://go.dev/blog/allocation-optimizations
+- https://github.com/uber-go/guide/blob/master/style.md#prefer-specifying-container-capacity
+
+**检测**：人工核对（核对 append 目标切片的 make 是否带了容量参数）
+
+### 【MUST】PERF-005 元素数量已知或可估算时，给 make(map) 传容量提示。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+
+用 `make(map[K]V, n)`，n 取已知元素数或合理上界。数量未知、或 map 通常只有几个元素时不强求。元素集合固定时用 map 字面量一次写完，不先 make 再逐条赋值。
+
+**为什么**
+
+> Providing a capacity hint to `make()` tries to right-size the map at initialization time, which reduces the need for growing the map and allocations as elements are added to the map.
+>
+> —— https://github.com/uber-go/guide/blob/master/style.md#prefer-specifying-container-capacity
+
+map 增长要重新分桶并把已有键值搬进新桶，一次扩容的分配与搬运量大于切片。容量提示让初始桶数贴近实际规模，减少增长次数。Uber 原文同时说明它只是近似、不保证一次分配到位，因此规模明显不可估时不必硬填。
+
+**正例**
+
+```go
+m := make(map[string]int, len(items))
+for _, it := range items {
+	m[it.Name] = it.Count
+}
+```
+
+**反例**
+
+```go
+m := make(map[string]int)
+for _, it := range items {
+	m[it.Name] = it.Count
+}
+```
+
+**依据**
+
+- https://github.com/uber-go/guide/blob/master/style.md#prefer-specifying-container-capacity
+
+**检测**：人工核对（核对逐条写入的 map 是否带容量提示）
+
+### 【SHOULD】PERF-001 优化前先用基准测试或 profile 定位热点，不凭直觉改动。
+
+- 归属：性能规约
+- 起始版本：Go 1.24
+
+改动性能相关代码前，先用 `go test -bench`、`go tool pprof` 或 `runtime/pprof` 拿到数据，确认热点落在哪一段。没有数据支撑的改写不进入代码：它可能改在不常走的路径上，也可能为极少数情况牺牲通用路径的可读性。
+
+**为什么**
+
+> These tools can help you to identify various types of hotspots (CPU, IO, memory), hotspots are the places that you need to concentrate on in order to significantly improve performance.
+>
+> —— https://go.dev/wiki/Performance
+
+性能问题只在运行时暴露，读代码判断不出哪一段真正被执行得多。凭直觉优化常落进自认为慢、实际很少走的路径，改动白做，还留下为优化牺牲可读性的代码。benchmark 与 profile 给出各函数的耗时与分配占比，把有限的改动集中到真正的热点。
+
+**正例**
+
+```go
+func BenchmarkRender(b *testing.B) {
+	for b.Loop() {
+		_ = render(m)
+	}
+}
+
+// go test -bench=. -cpuprofile=cpu.out
+// go tool pprof -top cpu.out
+```
+
+**反例**
+
+```go
+// no measurement at all, guessed 'this should be slow' and rewrote render's loop into a hand-written buffer
+```
+
+**依据**
+
+- https://go.dev/wiki/Performance
+
+**检测**：人工核对（核对性能改动是否附基准测试结果或 profile 结论）
+
+### 【SHOULD】PERF-002 原始类型与字符串互转使用 strconv，不用 fmt。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+
+int、uint、float、bool 与字符串之间的转换走 `strconv` 的 `Itoa`、`Atoi`、`FormatInt`、`ParseFloat`、`FormatBool` 等函数。`fmt.Sprintf` 只在确有多值与复杂格式（如 `%v` 组合、宽度与精度）需要时才用。
+
+**为什么**
+
+> When converting primitives to/from strings, `strconv` is faster than `fmt`.
+>
+> —— https://github.com/uber-go/guide/blob/master/style.md#prefer-strconv-over-fmt
+
+fmt 的格式化要经接口与反射走通用解析路径，比 strconv 的专用函数多分配、多判断。Uber 的基准里同一转换 `fmt.Sprint` 是 143 ns/op 两次分配，`strconv.Itoa` 是 64.2 ns/op 一次分配；放在高频路径上按调用次数累加，差距会被放大。
+
+**正例**
+
+```go
+s := strconv.Itoa(n)
+```
+
+**反例**
+
+```go
+s := fmt.Sprint(n)
+```
+
+**依据**
+
+- https://github.com/uber-go/guide/blob/master/style.md#prefer-strconv-over-fmt
+
+**检测**：人工核对（核对单一原始类型与字符串互转处是否用了 fmt）
+
+### 【SHOULD】PERF-003 固定字符串转 []byte 在循环外转换一次后复用。
+
+- 归属：性能规约
+- 起始版本：Go 1.22
+
+循环或热点路径里反复把同一个字符串字面量或变量转成 `[]byte` 时，把转换提到循环外，一次转换的结果反复使用。字符串内容每轮都变、或需要可独立改写的切片时，仍在循环内转换。
+
+**为什么**
+
+> Do not create byte slices from a fixed string repeatedly. Instead, perform the conversion once and capture the result.
+>
+> —— https://github.com/uber-go/guide/blob/master/style.md#avoid-repeated-string-to-byte-conversions
+
+string 与 []byte 互转要新分配内存并逐字节拷贝。写在循环里的固定字符串，每轮产生一份立刻丢弃的切片，分配次数与循环次数同阶，同时给 GC 增加同量垃圾。Uber 的基准里每轮转换 22.2 ns/op，提到循环外后降到 3.25 ns/op。
+
+**正例**
+
+```go
+data := []byte("Hello world")
+for range n {
+	w.Write(data)
+}
+```
+
+**反例**
+
+```go
+for range n {
+	w.Write([]byte("Hello world"))
+}
+```
+
+**依据**
+
+- https://github.com/uber-go/guide/blob/master/style.md#avoid-repeated-string-to-byte-conversions
+
+**检测**：人工核对（核对循环内是否有对固定字符串的 string 与 []byte 互转）
+
+### 【SHOULD】PERF-006 循环或多次拼接字符串用 strings.Builder，容量可预估时先 Grow。
+
+- 归属：性能规约
+- 起始版本：Go 1.10
+
+按片段逐步构建字符串（循环内、多分支、次数不定）时用 `strings.Builder`，结果长度可预估时先调用 `Grow`。少量、写法固定的行内拼接继续用 `+`。需要读写缓冲或 `Bytes` 访问时用 `bytes.Buffer`。
+
+**为什么**
+
+> A Builder is used to efficiently build a string using Builder.Write methods. It minimizes memory copying. The zero value is ready to use. Do not copy a non-zero Builder.
+>
+> —— https://pkg.go.dev/strings#Builder
+
+字符串不可变，每次 += 都要新建字符串并整段拷贝已累积的内容，循环里按累计长度重复搬运，总拷贝量接近平方级。Builder 写进同一块可变缓冲，只在取值时产出一次结果；先 Grow 再写，连缓冲扩容也省掉。
+
+**正例**
+
+```go
+var b strings.Builder
+b.Grow(total)
+for _, part := range parts {
+	b.WriteString(part)
+}
+s := b.String()
+```
+
+**反例**
+
+```go
+var s string
+for _, part := range parts {
+	s += part
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/strings#Builder
+
+**检测**：人工核对（核对循环内是否有字符串 += 拼接）
+
+### 【SHOULD】PERF-007 长期保留大切片的一小段时，用 slices.Clone 切断底层数组引用。
+
+- 归属：性能规约
+- 起始版本：Go 1.21
+
+`s[i:j]` 与原切片共享底层数组，子切片还被引用时整个数组无法回收。子切片生命周期长、或原切片远大于所需片段时，用 `slices.Clone`（Go 1.21 起）或 `make` 加 `copy` 复制出独立切片。子切片随函数结束即释放、或本就覆盖大部分元素时，直接切即可。
+
+**为什么**
+
+> As mentioned earlier, re-slicing a slice doesn't make a copy of the underlying array. The full array will be kept in memory until it is no longer referenced. Occasionally this can cause the program to hold all the data in memory when only a small piece of it is needed.
+>
+> —— https://go.dev/blog/slices-intro#a-possible-gotcha
+
+从大文件或大响应里截出一小段并长期保存时，子切片仍指向原底层数组，GC 认为整块数组仍被引用，进程常驻内存远大于实际所需。Clone 复制出只含所需元素的独立数组，原数组失去引用后即可回收。
+
+**正例**
+
+```go
+line := slices.Clone(buf[start:end])
+return line
+```
+
+**反例**
+
+```go
+line := buf[start:end]
+return line
+```
+
+**依据**
+
+- https://go.dev/blog/slices-intro#a-possible-gotcha
+
+**检测**：人工核对（核对从大缓冲区截取并长期保存的子切片是否做了复制）
+
+### 【SHOULD】PERF-008 函数只用解引用读取参数时按值传参，不为省几次字节传指针。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+
+string、接口值、小结构体本身就只有机器字大小，传值与传指针的拷贝代价相当。函数体内只用 `*p` 读取、从不改写时按值传参。需要改写调用方数据、或结构体明显偏大时传指针。
+
+**为什么**
+
+> Don't pass pointers as function arguments just to save a few bytes. If a function refers to its argument x only as *x throughout, then the argument shouldn't be a pointer.
+>
+> —— https://go.dev/wiki/CodeReviewComments#pass-values
+
+string 与接口值是固定大小的头，拷贝成本等于传指针，还少一次解引用。为省钱传 `*string`、`*io.Reader` 多了层间接，指针走出函数时还可能把数据推到堆上，反而增加分配。
+
+**正例**
+
+```go
+func printName(name string) {
+	fmt.Println(name)
+}
+```
+
+**反例**
+
+```go
+func printName(name *string) {
+	fmt.Println(*name)
+}
+```
+
+**依据**
+
+- https://go.dev/wiki/CodeReviewComments#pass-values
+
+**检测**：人工核对（核对只做解引用读取的参数是否用了指针）
+

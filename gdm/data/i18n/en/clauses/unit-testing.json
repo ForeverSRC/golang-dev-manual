@@ -1,0 +1,109 @@
+{
+  "TEST-001": {
+    "summary": "Pure function tests use the native testing package, and component tests use the testify suite.",
+    "details": "For functions that only map input to output, with no object under test or dependencies to construct, write func TestXxx(t *testing.T) plus assertions directly, organizing multiple inputs into a table with t.Run; for components that encapsulate behavior per type, need a constructor to produce the object under test, or need dependencies assembled and a shared fixture prepared, embed suite.Suite, put the object under test and its dependencies into struct fields assembled once in SetupSuite, and run everything through a single entry function that calls suite.Run.",
+    "rationale": "Pure functions have no dependencies and no state shared across cases, so wrapping them in a suite only adds three layers of boilerplate — the struct, the embedding, and the run entry point — and reading one case means jumping across three places; a component's object under test and dependencies are reused across many cases, and constructing them separately inside each case is repetitive and easy to miss when dependencies grow, while the suite's fields and SetupSuite are exactly where this is held centrally.",
+    "detect_note": "Check whether pure function cases are wrapped in a suite, and whether component cases assemble the object under test centrally with a suite."
+  },
+  "TEST-002": {
+    "summary": "Unit tests and integration tests are stored separately.",
+    "details": "Tests whose input is constructed by the case itself and which neither read nor write real files or the network are unit tests, written directly inside that package; tests that need real files, real dependencies, or an end-to-end path are integration tests, named with the _it_test.go suffix, in the same package as the unit tests, and executed together by go test. Integrity checks on real data belong to integration tests.",
+    "rationale": "A failure in the two kinds of tests means different things: a red unit test is a logic error, while a red integration test may be an environment or data problem. Mixed together, environment fluctuation is taken for a code defect, and the investigation heads in the wrong direction from the start.",
+    "detect_note": "Check whether tests that read real files, the network, or a database end with _it_test.go."
+  },
+  "TEST-003": {
+    "summary": "Compare the complete result in one shot; do not break it apart field by field or trim it into a subset.",
+    "details": "Write the expected value in one shot, as a literal or through an independent constructor, spelling out fields expected to be zero values as well, and then compare it against the method's complete return value: if it returns a slice, compare the slice itself, neither mapping it first into a subset such as a list of IDs, nor splitting it into one assertion per field. Only when the result contains uncontrollable content (timestamps, random IDs, floating-point precision loss) or fields that do not support equality comparison should you assert field by field or switch to a dedicated comparison helper. When multiple values are returned, compare them one by one; there is no need to wrap them into a struct first.",
+    "rationale": "Once assertions are broken apart or narrowed, the missing part is invisible from the code: with per-field assertions, a newly added field does not turn old cases red, and once projected into a subset, fields such as level and category drop out of the comparison entirely, so cases still pass even when the code under test returns wrong content; comparing the whole result exposes the omission on the spot and brings field additions and removals into scope automatically.",
+    "detect_note": "Check whether assertions are split field by field, or whether the result is trimmed into a subset before comparison."
+  },
+  "TEST-004": {
+    "summary": "Bulky test inputs and expected data go into the testdata directory.",
+    "details": "When the input payload or the expected result is long, write it as a separate file under testdata/, kept apart from the code; the case embeds the file into the test binary with //go:embed and then reads it, rather than locating the file by joining paths from the working directory. When cases need to be driven in bulk by file name, embed an embed.FS and walk it with fs.Glob. When the object under test itself takes a file path as input (a file loader or a directory scanner, for example), pass the relative path under testdata directly. When expected results change intentionally along with the implementation, inject a -update flag to overwrite the expected file with the actual output, then review it by hand via git diff.",
+    "rationale": "A large block of JSON written inside a Go string drowns the case logic in data, and changing one piece of data means touching the code; once it becomes a paired file, the data is readable and diffable. Reading a file by joining paths from the working directory makes it unfindable from another working directory (running the case directly in the IDE or starting go test from the repository root are both such cases); //go:embed pins the content into the binary at compile time, so the read result does not vary with the runtime environment.",
+    "detect_note": "Check whether cases read testdata by joining paths from the working directory."
+  },
+  "TEST-005": {
+    "summary": "Test files use external package tests, with the package name ending in _test.",
+    "details": "A test file declares the package as \"the package under test_test\", writes cases only against the public API, does not access package-internal members, and does not drag internal implementation into tests just to pad coverage. Unexported logic is covered indirectly by cases exercising the package's public entry points.",
+    "rationale": "Same-package tests can reach unexported members, so cases get written tightly against the current implementation and a change to the internal structure turns the tests red first; external package tests force the public entry points, so what is tested is the outward contract, and room for refactoring is preserved."
+  },
+  "TEST-006": {
+    "summary": "Test business logic and boundaries, and do not chase coverage numbers.",
+    "details": "Cases target business rules, branch boundaries, and error paths, and coverage numbers are not an acceptance condition. Utility types and pure algorithm types are required to reach 100% coverage, still achieved through external package tests, without accessing package-internal members because of the coverage requirement.",
+    "rationale": "Aiming at a coverage number produces cases that only call code without asserting, and tests written as copies of the implementation just to bring internals into coverage; the test itself is the explanation of that logic, and cases assembled to pad a number convey no business semantics, so the number rises while fewer real errors are caught.",
+    "detect_note": "Check whether cases assert and whether they target business semantics; coverage numbers are not the basis for judgment."
+  },
+  "TEST-007": {
+    "summary": "Assert on an error only by whether it is non-nil; do not compare error message text.",
+    "details": "On a failure path, first assert whether an error was returned; when the kind of error needs to be distinguished, use errors.Is for sentinels and errors.As for error types, rather than string comparison of the message, and do not construct an identical error for value comparison. Only when the error message itself is part of the contract under test (for example, it must carry the input parameter name) should you assert on the message as a string, and only on such properties as are unaffected by wording.",
+    "rationale": "Error messages are meant for humans; judging the kind of error by string comparison makes the case turn red the moment the wording changes, and such a case catches no real error; to distinguish kinds of errors, the code under test must expose sentinel errors or error types, and the test then judges with errors.Is / errors.As.",
+    "detect_note": "Check whether cases judge the kind of error by error message text, and whether sentinels and error types are checked with errors.Is / errors.As."
+  },
+  "TEST-008": {
+    "summary": "Test case names preferably follow the should-plus-outcome, when-plus-condition pattern.",
+    "details": "Write the subtest name given to t.Run and the name field in a table as should followed by the expected outcome and when followed by the triggering condition, for example should return error when file is missing. When the scenario is clear at a glance, a short Chinese or English description works just as well; do not stretch the name just to fit the pattern.",
+    "rationale": "Subtest names go straight into go test output, and people judge which one failed from the name alone; upstream only requires the name to be readable, and putting the expected outcome and the triggering condition into the name is a stable way to achieve readability, so a failure can be located without rereading the case code.",
+    "detect_note": "Check whether t.Run names and table name fields state the expected outcome and the triggering condition clearly."
+  },
+  "TEST-010": {
+    "summary": "Only cases that share the same check logic go into the same table.",
+    "details": "When multiple inputs share one set of check logic (build the input, call, compare the result), write it as a table walk, where adding a case means adding one row of data. When some cases are checked differently, split them into multiple test functions; only when the setup is the same but the checks differ may you write them as a sequence of flat subtests inside a single test function. Do not distinguish kinds of cases with conditional branches in the loop body.",
+    "rationale": "The benefit of table-driven tests is that the check logic is written once. Cases with different checks forced into one table make the loop body decide which set of assertions to run by branching, forcing a reader to jump back and forth between data and logic for a single case, and changing one piece of logic means confirming which rows it affects.",
+    "detect_note": "Check whether a single loop body switches check logic with conditional branches."
+  },
+  "TEST-011": {
+    "summary": "The table holds only the fields that vary per case.",
+    "details": "Keep only the triggering condition and the expected outcome as table fields; move request parameters shared by all cases and common setup operations out into variables outside the loop. When a few cases need different stub behavior, carry that difference in a field holding a closure, rather than adding a branch in the loop body or copying the whole stub configuration into every row.",
+    "rationale": "Repeating the same parameters on every row makes the table longer without adding information, and readers must compare rows one by one to find where the differences actually are; changing a shared parameter means editing row by row, and missing one row leaves a case testing something else.",
+    "detect_note": "Check whether table fields are written with the same value by every case."
+  },
+  "TEST-012": {
+    "summary": "Write expected values independently; do not produce them with the function under test.",
+    "details": "Write the expected value by hand as a literal, or assemble it with a factory unrelated to the implementation under test. Do not call the function under test itself, nor the few steps it reuses internally, to produce the expected result. When the data is too large to hand-write, put it into an expected file under testdata and fix it in advance, rather than going back to the code under test to fill it in. When a reference implementation is used for comparison, it must be a separate implementation independent of the code under test.",
+    "rationale": "Generating the expected value with the code under test makes both sides wrong together, leaving the case green forever; such a case verifies that something equals itself, changes along with a broken implementation, and catches no defect.",
+    "detect_note": "Check whether expected values are produced by functions or methods inside the package under test."
+  },
+  "TEST-013": {
+    "summary": "Create separate cases for boundaries and special inputs.",
+    "details": "Beyond the normal path, create a case for each boundary input:\n\n- empty collections and nil\n- a single element, the first and last elements\n- out-of-range indices, keys falling between two elements\n- threshold numeric values\n\nEvery branch of an error path has its own case, not just one of them. The set of cases should be able to answer which input combinations have not been thought of yet.",
+    "rationale": "Coverage shows that code was executed, not that boundaries were considered. Defects such as empty input and out-of-range access appear only at boundaries, which cases along the normal path never reach; a field left unassigned also passes silently because it equals the zero value of the expected value.",
+    "detect_note": "Check whether boundary inputs such as empty collections, single elements, the first and last elements, and out-of-range access are covered."
+  },
+  "TEST-014": {
+    "summary": "A defect fix comes with a reproducing case.",
+    "details": "When fixing a defect, add a case that reproduces it in the same commit, with input fixed to the conditions that trigger the defect, failing before the fix and passing after it. The triggering conditions stay in the case, not in a review note or a record of manual steps.",
+    "rationale": "Without a reproducing case, the triggering conditions exist only within that one investigation, and the same defect reappears in later refactoring; upstream puts it bluntly — if you didn't add a test, you didn't fix the bug.",
+    "detect_note": "Check whether a commit that fixes a defect carries a case matching the triggering conditions."
+  },
+  "TEST-015": {
+    "summary": "Mock generation uses go.uber.org/mock.",
+    "details": "Only go.uber.org/mock and its mockgen appear in go.mod and in the generated files, with no github.com/golang/mock introduced; existing old references are migrated to the uber version as well.",
+    "rationale": "github.com/golang/mock has been archived by Google and is no longer updated, no longer following Go releases; the fork Uber took over maintains API compatibility and is the version currently in use.",
+    "detect_note": "Switch the matches to go.uber.org/mock; go.mod is out of scanning scope and needs manual checking."
+  },
+  "TEST-016": {
+    "summary": "Do not call ctrl.Finish() after passing *testing.T.",
+    "details": "After gomock.NewController(t) is given a *testing.T, the controller validates expectations automatically when the test and its subtests finish, so ctrl.Finish() is no longer written in the code. When a self-built TestReporter is used, or what is passed in is not a *testing.T, you still have to ensure the validation timing yourself.",
+    "rationale": "The gomock documentation states that after passing a *testing.T there is no need to call Finish; calling it by hand is the pre-Go 1.14 way, and the duplicate validation also cuts off early before the subtests have finished.",
+    "detect_note": "Confirm at each match whether a *testing.T was passed in."
+  },
+  "TEST-017": {
+    "summary": "Do not write redundant .Times(1).",
+    "details": "A gomock expectation requires exactly one call by default, and Times(1) does not change the behavior. Write Times(0) only to guard against an unexpected call, or Times(n) when a specific multiple is required.",
+    "rationale": "Hanging a Times(1) at the end of every EXPECT forces readers to confirm one by one whether it is a deliberate constraint or added casually; the constraint already holds by default, so writing it out is only noise.",
+    "detect_note": "Delete it at each match; one call is the default."
+  },
+  "TEST-018": {
+    "summary": "Use gomock.InOrder() only when call order is genuinely required.",
+    "details": "By default gomock does not constrain the order in which expectations are called. Only in scenarios where the wrong order changes the result, such as lock, decrement, and release with their ordering dependencies, should you pin the order with InOrder or After; do not use it when the same set of expectations is called concurrently, to avoid occasional failures caused by varying scheduling order.",
+    "rationale": "Wrapping order-independent operations in InOrder makes the case turn red after a single refactor that changes no behavior; when multiple Goroutines call in, the order is decided by the scheduler, and the case goes red and green by turns.",
+    "detect_note": "Confirm at each match whether the call order affects the result."
+  },
+  "TEST-019": {
+    "summary": "Write argument values directly in expectations, avoiding wrapping in Eq and bare Any().",
+    "details": "Arguments that are not matchers match by equality, so writing the literal directly suffices, with no extra layer of gomock.Eq; use AssignableToTypeOf to constrain the type, and Cond, Len, or Nil to match by condition. Use Any() only for values that are not asserted on, such as context.Context, and state the reason for relaxing the match there.",
+    "rationale": "A bare Any() only checks that the method was called, so a wrong argument still passes; writing the argument into the expectation lets argument errors at the call site be caught, and the case shows what this call should look like. An extra layer of Eq changes no matching semantics and only adds noise.",
+    "detect_note": "Except for context.Context, switch the matches to Eq or AssignableToTypeOf."
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "STRUCT-001": {
+    "summary": "Structs containing sync.Mutex or other synchronization primitives must not be copied by value; always pass or receive them by pointer.",
+    "details": "Once a synchronization primitive is copied, the copies no longer share the same lock, and the mutual exclusion semantics silently fail. Define methods on structs that contain a lock with a pointer receiver, and state in the doc comment that they must not be copied.",
+    "rationale": "Value copies are legal at compile time, and the copylocks check in go vet is the main line of defense; once it is missed, the problem surfaces only under concurrency pressure, making it costly to track down."
+  },
+  "CTX-001": {
+    "summary": "Do not store context.Context in a struct; pass it as the first parameter of a function.",
+    "details": "A context carries the cancellation, timeout, and values of a single request, with a lifetime matching the request. When passing it across layers, make the context the first parameter and name it ctx consistently.",
+    "rationale": "Once stored in a struct, the context lifetime is detached from the request, the framework's cancellation propagation can no longer cover it, leaks easily form, and the cancellation boundary cannot be expressed on the interface.",
+    "detect_note": "The first-parameter convention requires manual verification."
+  },
+  "DI-001": {
+    "summary": "Use wire for dependency wiring, generated at compile time.",
+    "details": "Concentrate each layer's constructors and interface bindings in a single ProviderSet, and write interface-to-implementation bindings with wire.Bind; the entry point only calls the generated Initialize function. The wire version is pinned via the tool directive in go.mod; after changing the wiring, regenerate wire_gen.go with go generate.",
+    "rationale": "Runtime reflective injection defers a mistyped field name or a missing binding until startup or runtime to surface; compile-time generation reports errors directly when a binding is missing or duplicated, and the wiring relationships can also be checked line by line in the generated code.",
+    "detect_note": "Verify that the repository has wire_gen.go and that port bindings are concentrated in the ProviderSet."
+  },
+  "COMPOSE-001": {
+    "summary": "Express reusable capability through composition, not inheritance-style hierarchies.",
+    "details": "To reuse a type's capability, hold it explicitly as a field; use anonymous embedding only when its methods also need to be exposed. Naming a type Base, Abstract, or the like and then embedding it simulates an inheritance hierarchy and should be avoided. Interfaces likewise compose small interfaces by embedding, rather than building one all-encompassing interface.",
+    "rationale": "A composition relationship written on a field can be located directly for replacement, testing, and reading; Go's embedding has no override rules like Java's, and which layer a method lands on is inferred by name resolution, so simulating inheritance leaves readers unable to tell which implementation is actually called.",
+    "detect_note": "Verify whether embedded types play the role of a base class (Base / Abstract naming, multi-level embedding)."
+  },
+  "ABSTRACT-001": {
+    "summary": "Introduce abstraction according to actual need, not spread out in advance.",
+    "details": "Introduce interfaces, factories, and registries only when a second implementation appears, a test double is needed, or there is a genuine variation point to isolate; when there is only one implementation and no replacement or testing need, use a concrete type first. Layering and ports count as legitimate abstraction when there is a genuine isolation need, and this clause does not restrict them.",
+    "rationale": "Abstraction laid out in advance adds a layer of indirection and maintenance cost, and when the real requirement arrives its direction often differs from the preset, forcing the interface to be changed again; abstracting once real use cases appear lets the interface be defined by the consumer, so its shape fits.",
+    "detect_note": "Verify whether the interface or factory already has a second implementation, a replacement, or a testing need."
+  },
+  "IFACE-001": {
+    "summary": "Place interfaces according to the number of implementations: a single implementation shares the package with the implementation, while multiple implementations are defined by the consumer.",
+    "details": "Placement depends on how many implementations are expected:\n\n- Only ever a single implementation: put the interface and the implementation in the same package, with the interface adjacent to the implementation, so that reading the code does not require cross-package comparison; export the interface and the constructor, and keep the implementation struct unexported.\n- Multiple implementations expected, or replacement needed (storage, external services, notifications, and the like): put the interface in the package of the consumer, selecting only the methods the consumer actually needs; the implementation package exports the concrete type and constructor, and writes a compile-time assertion per IFACE-002 to put the promise into code.\n- The interface signature is already fixed by the standard library or a third party (io.Reader and the like): this clause does not apply, and the implementer simply satisfies it as is.",
+    "rationale": "When there is a single implementation, splitting the interface into another package forces the reader to compare the implementation's context back and forth between two packages, and a change to one method signature must be aligned in both places; keeping the interface and implementation in the same package lets a single file show the whole contract and behavior. The common upstream Go wiki statement is that \"interfaces belong to the package that uses values of the interface type\" (quoted below), which targets dependencies that will be replaced or used by multiple parties, and its orientation differs from the single-implementation branch of this clause—the single-implementation branch follows local reading habits and is this manual's own convention; the multiple-implementation branch follows the upstream statement, in which case the interface contains only the methods the consumer needs, and the implementer can add methods without going back to change the interface.",
+    "detect_note": "Verify whether the package holding the interface matches the number of implementations: for a single implementation, whether it shares the package with the implementation; for multiple implementations, whether it is in the consumer's package."
+  },
+  "IFACE-002": {
+    "summary": "Declare a type's implementation of an interface with a compile-time assertion.",
+    "details": "Write `var _ Interface = zero value of the type` near the type definition, using nil for pointers, slices, and maps, and an empty struct literal for structs. When the interface is defined by the consumer, this clause is used as a pair with IFACE-001: the consumer declares the interface and the implementation package writes the assertion, and if either is missing the practice does not hold. Applicable scenarios:\n\n- An interface defined by the consumer per IFACE-001 in a multiple-implementation scenario\n- An exported type that must implement a standard library or third-party interface per an API contract\n- A group of types that together implement the same interface\n- Failing to satisfy the interface would make callers fail to compile outright",
+    "rationale": "The assertion hands the judgment of \"whether the type satisfies the interface\" to the compiler: if the interface changes or a method signature no longer matches, the build fails on the spot and the person making the change knows immediately; without an assertion, a mismatch surfaces only when the value is assigned to the interface type somewhere, often far from the change.",
+    "detect_note": "Verify whether exported types that implement an interface per an API contract have a compile-time assertion."
+  },
+  "IFACE-003": {
+    "summary": "Do not define pointers to interfaces.",
+    "details": "Use interface values themselves for parameters, return values, and fields, not *Interface. An interface value already contains the type information and a data pointer internally, and whether the underlying data is a value or a pointer is decided by the concrete type; when methods need to modify the underlying data, the implementer expresses that with a pointer receiver.",
+    "rationale": "*Interface adds a layer of dereferencing at call sites and makes nil checks more complex: an interface value that is nil and an interface whose internal data pointer is nil are two states, and once mixed together the emptiness condition is either written wrong or guessed. Passing the interface value itself expresses the same intent with a single meaning for emptiness.",
+    "detect_note": "Verify whether function signatures and struct fields contain *interface types."
+  },
+  "COMPOSE-002": {
+    "summary": "Embedding must not change the outer type's zero value, copy semantics, or public interface.",
+    "details": "Use anonymous embedding only when the inner type's methods should become the outer type's methods; otherwise use a named field. After embedding, the outer zero value must still be usable, the copy semantics unchanged, and no unrelated methods additionally exposed. Synchronization primitives such as sync.Mutex always use a named field, since anonymous embedding hangs Lock and Unlock onto the outer API.",
+    "rationale": "Once embedding picks an exported type, any method added to the inner type later becomes a public method of the outer type, and replacing the outer type or swapping the inner one is a breaking change; embedding a pointer type also makes the outer zero value panic as soon as it is called. A named field exposes only the set of methods you want to expose, and the outer shape is yours to decide.",
+    "detect_note": "Verify whether embedding changes the outer zero value, copy semantics, or exposed unrelated methods (especially for synchronization primitives)."
+  },
+  "DI-002": {
+    "summary": "Pass dependencies in explicitly through constructors, and do not read or write package-level mutable variables.",
+    "details": "Dependencies such as time sources, random sources, clients, and configuration are passed in as constructor parameters or fields, and package-level variables hold only read-only constants. When a test needs to replace behavior, pass a double rather than changing global state. The same applies to function pointers and values of other types.",
+    "rationale": "Mutable globals hide dependencies outside the call chain: reading the code does not reveal which time source or client this logic uses, a test must save the old value before replacing it and restore it afterward, and parallel test cases interfere with each other. Passed in as a parameter, the dependency is written on the constructor signature, making replacement and reading direct.",
+    "detect_note": "Verify whether package-level variables are ever assigned and whether dependencies are passed in through constructors."
+  },
+  "CTX-002": {
+    "summary": "Do not pass a nil context to a function; use context.TODO() as a placeholder.",
+    "details": "When the upstream context is not available yet, pass context.TODO(); use context.Background() at program entry, in initialization, and in tests. Do not treat nil as the expression of \"no context\".",
+    "rationale": "nil is a legal interface value and passes at compile time; the recipient panics outright as soon as it calls Done or Value, and whether it panics depends on its internal implementation, which is invisible from the function signature. Passing context.TODO() has the same semantics and is always safe, and static analysis can also use it to find such omissions.",
+    "detect_note": "SA1012 detects calls that pass a nil context to a function."
+  },
+  "CTX-003": {
+    "summary": "Use an unexported custom type for context.Value keys.",
+    "details": "Each package defines an unexported type such as `type key int` and unexported constants for its own value retrieval, then provides type-safe accessor functions so that callers do not touch the key directly. Do not use built-in types such as string or int as keys.",
+    "rationale": "When a built-in type is used as the key, different packages collide into the same slot as long as they use the same string or integer value, overwriting each other's reads and writes with no compile-time hint; an unexported type can only be constructed by its own package, so cross-package collisions are impossible, values can only be retrieved through functions the package provides, and the returned type is guaranteed by that function.",
+    "detect_note": "SA1029 detects the use of a built-in type as a context key."
+  },
+  "CTX-004": {
+    "summary": "Put only request-scoped data in context.Value, not optional parameters.",
+    "details": "Only request data that transits processes and APIs, such as user identity, tracing information, and deadlines, goes into the context; a function's own optional parameters and configuration items go through explicit parameters or an options struct.",
+    "rationale": "A parameter stuffed into the context disappears from the function signature, so reading the signature does not reveal which inputs the function depends on; a caller who omits it only gets nil at runtime, and the point of failure is far from the real cause. With explicit parameters or an options struct, dependencies are written on the signature, and both the compiler and reviewers can check them on the spot.",
+    "detect_note": "Verify whether what is put in context.Value is request-scoped data."
+  },
+  "STRUCT-002": {
+    "summary": "For structs that should not support comparison, use an incomparable field to block == at compile time.",
+    "details": "For structs that contain internal state, caches, or pointer fields and whose == cannot compare business identity, embed a helper type named `[0]func()`; from then on, both == and using it as a map key no longer compile. This affects only comparison syntax and takes no extra memory.",
+    "rationale": "When all fields are comparable, == is legal at compile time and compares field-by-field content; such comparison is incidental rather than intentional and holds only under certain data combinations. After embedding an incomparable field, misuse fails to compile outright, at the cost of a zero-length array that does not change the struct's size or the meaning of its fields.",
+    "detect_note": "Verify whether exported structs that intentionally prohibit comparison have embedded an incomparable field."
+  }
+}

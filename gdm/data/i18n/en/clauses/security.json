@@ -1,0 +1,67 @@
+{
+  "SEC-001": {
+    "summary": "SQL statements pass parameters through placeholders; do not concatenate parameter values into the statement.",
+    "details": "Parameter values for queries and writes are passed through `database/sql` placeholders, not concatenated into the SQL text. Identifiers that placeholders cannot cover, such as table names, column names, and sort fields, are validated against a whitelist before being concatenated.",
+    "rationale": "Once parameters are handed to the sql package, the driver sends the statement and the parameters separately, so parameter values are not parsed as SQL syntax. Switching to fmt.Sprintf to concatenate values into the statement before handing it to Query means the whole SQL text is already formed, and fragments supplied by the caller take part in the syntax directly; passing `1 OR 1=1` as `id` bypasses the condition, and the official documentation marks this usage as a SECURITY RISK.",
+    "detect_note": "At each hit, confirm whether the parameter value comes from external input."
+  },
+  "SEC-002": {
+    "summary": "Pass the executable and arguments of external commands to exec separately; do not build a command string.",
+    "details": "When using `exec.Command` or `exec.CommandContext`, pass the executable and each argument as separate arguments, and do not build a complete command line through `sh -c` or `cmd /c`. When glob expansion or pipelines are needed, use `filepath.Glob` or implement them in the program; when the shell cannot be avoided, escape the concatenated external input first.",
+    "rationale": "os/exec starts a process with an argument array and does not go through the shell, so `;`, `|`, and `&&` in arguments are treated as ordinary characters. Once changed to concatenation with sh -c, external input re-enters shell syntax, and a fragment of `; rm -rf` can change the command actually executed; the official documentation also warns, in the glob expansion section, to be careful about escaping external input when invoking the shell directly.",
+    "detect_note": "At each hit, confirm whether external input was concatenated into the command string."
+  },
+  "SEC-003": {
+    "summary": "User-controllable file paths are confined to an allowed directory.",
+    "details": "When external input takes part in constructing a file path, first use `os.OpenRoot` to open an `*os.Root` on the allowed root directory, then access files through its `Open`, `Create`, `ReadFile` and other methods. When os.Root does not apply, at least run `filepath.Clean` and verify that the result still falls within the root directory prefix, and handle symbolic links separately.",
+    "rationale": "`../` in a path and symbolic links pointing outside can lead `os.Open` out of the intended directory, reading or overwriting files outside the root directory. os.Root takes the root directory as its boundary and validates the final resolved result on every operation, reporting an error immediately for out-of-bounds paths; a hand-written check must compare prefixes after Clean and also block symbolic links on its own, which easily misses cases.",
+    "detect_note": "At each hit, confirm whether the path contains external input and whether it is confined within the root directory."
+  },
+  "SEC-004": {
+    "summary": "Random numbers for security purposes come from crypto/rand, not math/rand.",
+    "details": "When generating random values related to security, such as tokens, session IDs, keys, salts, and verification codes, use `Read`, `Text` and similar functions from `crypto/rand`. `math/rand` is used only for scenarios that do not involve security, such as simulation, sampling, and shuffling.",
+    "rationale": "The output of math/rand is determined by the seed and can be inferred; the official documentation states explicitly that it is unsuitable for security purposes and points out that the sequence is easy to guess. Using it to generate tokens lets an attacker derive subsequent values from a small amount of output; crypto/rand draws on the secure random source provided by the operating system, and its output is unpredictable.",
+    "detect_note": "A math/rand call is hit; confirm whether it is used in a security scenario."
+  },
+  "SEC-005": {
+    "summary": "Do not set InsecureSkipVerify to skip TLS certificate verification.",
+    "details": "Keep `tls.Config` at its default certificate chain and host name verification, with `InsecureSkipVerify` left false. For self-signed certificate scenarios, add the CA to `RootCAs`, or use `VerifyPeerCertificate` or `VerifyConnection` for custom verification. It may be enabled temporarily in test environments and one-off verification scripts, with the reason stated.",
+    "rationale": "Certificate verification is the basis on which TLS confirms the identity of the peer; once it is turned off, the client accepts any certificate and any host name, and a machine-in-the-middle can decrypt or tamper with traffic with a self-signed certificate. When verification is skipped to connect to a production service, the encrypted channel only guards against passive eavesdropping, and active attacks are no longer impeded.",
+    "detect_note": "At each hit, confirm whether non-test code still skips verification."
+  },
+  "SEC-006": {
+    "summary": "Do not use broken algorithms such as MD5, SHA-1, DES, and RC4 for security purposes.",
+    "details": "Security scenarios such as password hashing, signatures, message authentication, and key derivation must not introduce `crypto/md5`, `crypto/sha1`, `crypto/des`, `crypto/rc4`, `golang.org/x/crypto/md4`, or `golang.org/x/crypto/ripemd160`. These algorithms remain usable in non-security scenarios, such as file checksums and content addressing.",
+    "rationale": "The documentation of each of these packages states that the algorithm has been broken and should no longer be used in security contexts. Practical collision constructions exist for MD5 and SHA-1, so two different inputs can hash to the same value; when they are used for integrity checks or signatures, content that has been replaced still passes. The key space and keystream weaknesses of DES and RC4 can be broken in practice."
+  },
+  "SEC-007": {
+    "summary": "Do not hard-code keys, passwords, or tokens in source code.",
+    "details": "Sensitive values such as keys, passwords, access tokens, and connection strings are injected through environment variables, configuration files, or a secret management service, not written as literals in source code. Test credentials go into test fixtures, clearly distinguished, and do not enter production code or the version repository.",
+    "rationale": "Credentials written into source code enter version history with the commit, so anyone who reads the repository can obtain them; rotating a key requires changing code and releasing again, which in practice often does not happen for a long time, and the impact of a single leak keeps expanding. gosec's G101 identifies such assignments by identifier name and literal entropy, and each hit should be changed to injection from outside.",
+    "detect_note": "At each hit, confirm whether it is a real credential; for a false positive, annotate the reason with #nosec G101."
+  },
+  "SEC-008": {
+    "summary": "Grant only the required permissions when creating files and directories; do not use globally writable values.",
+    "details": "The permission arguments of `os.OpenFile`, `os.WriteFile`, `os.Mkdir`, and `os.MkdirAll` are chosen as the minimum needed; do not use values such as `0777` and `0666` that open write permission to all users, and use `0600` for files containing sensitive data. When exact permissions are needed, set them explicitly with `Chmod` after creation; the process umask filters the passed value first.",
+    "rationale": "Granting 0777 at creation makes the file writable by all users, so other accounts on the machine or processes in a shared environment can replace the content; when it is written into a temporary directory, or read as configuration or a script, this can be used for privilege escalation or injection. gosec's G301, G302, and G306 target these creation and permission-change calls, and the thresholds can be tightened per project.",
+    "detect_note": "The thresholds can be tightened as needed in the gosec configuration in .golangci.yml."
+  },
+  "SEC-009": {
+    "summary": "Use html/template, not text/template, to output HTML.",
+    "details": "When generating text that requires escaping, such as HTML, XML, and JS, use `html/template`, which escapes automatically according to the context the data appears in. `text/template` is used only for plain text output; when HTML can only be produced with text/template, escape the data yourself before output.",
+    "rationale": "text/template writes data into the output as-is, so a `<script>` fragment in the data is executed by the browser as a tag, constituting cross-site scripting. html/template applies the corresponding escaping according to whether the data falls in a tag, an attribute, a URL, or a JS string, with the template code unchanged; switching the package blocks the injection.",
+    "detect_note": "A hit on G203 writes unescaped data into an HTML template."
+  },
+  "SEC-010": {
+    "summary": "HTTP services explicitly set the read header, read, and write timeouts.",
+    "details": "`http.Server` should at least set `ReadHeaderTimeout`, and configure `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` according to the business needs. When using convenience functions without timeouts such as `http.ListenAndServe`, switch to a custom `http.Server`.",
+    "rationale": "If a connection does not finish sending its request headers after being established, the server keeps holding that connection waiting; once concurrent connections accumulate, normal requests cannot get through, forming a slow attack. ReadHeaderTimeout sets an upper bound on reading request headers, and the official documentation states that when this value is zero and ReadTimeout is also zero there is no timeout — leaving the zero value unset falls into that state.",
+    "detect_note": "G112 detects a missing ReadHeaderTimeout; G114 detects a serve function without timeout support."
+  },
+  "SEC-011": {
+    "summary": "Compare passwords, tokens, and MACs with constant-time functions, not comparisons that return early.",
+    "details": "When verifying secret values such as MACs, tokens, and signatures, use `hmac.Equal`, or `ConstantTimeCompare` from `crypto/subtle`. `bytes.Equal`, `==`, and `strings.Compare` return early at the first difference and are not used for secret comparison.",
+    "rationale": "An ordinary comparison returns at the first differing byte, letting an attacker probe byte by byte: a correct prefix takes longer, so filtering by elapsed time can recover the secret within a limited number of attempts. ConstantTimeCompare takes time related only to length, cutting off this timing side channel.",
+    "detect_note": "Check whether secret comparison sites use a constant-time function."
+  }
+}

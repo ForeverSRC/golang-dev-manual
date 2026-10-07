@@ -1,0 +1,132 @@
+[
+  {
+    "id": "TOOL-004",
+    "level": "SHOULD",
+    "chapter": "tooling",
+    "section": "command-line",
+    "since_go": "1.0",
+    "summary": "命令行程序用 cobra 组织子命令。",
+    "details": "根命令下挂子命令，业务逻辑写进各命令的 RunE；输出写 cmd.OutOrStdout()，错误写 cmd.ErrOrStderr()。",
+    "quote": {
+      "text": "Cobra is a library providing a simple interface to create powerful modern CLI interfaces similar to git & go tools. ... Easy subcommand-based CLIs: app server, app fetch, etc.",
+      "source": "https://github.com/spf13/cobra"
+    },
+    "rationale": "手写 os.Args 分发要在子命令、全局 flag、帮助文本上重复造轮子；cobra 把输出与参数注入命令，命令可直接在测试里执行。",
+    "examples": {
+      "good": "cmd := &cobra.Command{\n\tUse: \"list\",\n\tRunE: func(cmd *cobra.Command, _ []string) error {\n\t\t_, err := fmt.Fprintln(cmd.OutOrStdout(), \"ok\")\n\t\treturn err\n\t},\n}",
+      "bad": "switch os.Args[1] {\ncase \"list\":\n\tfmt.Println(\"ok\")\n}"
+    },
+    "sources": [
+      "https://github.com/spf13/cobra"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对是否以 cobra 组织子命令"
+    }
+  },
+  {
+    "id": "TOOL-008",
+    "level": "SHOULD",
+    "chapter": "tooling",
+    "section": "command-line",
+    "since_go": "1.26",
+    "summary": "升级 Go 工具链后用 go fix 应用现代化改写。",
+    "details": "把构建切到更新的 Go 版本后，在干净的 git 工作区跑 go fix ./...，改动单独成一个提交，便于逐处复核。\n\n- 只看不改用 go fix -diff ./... 预览补丁\n- 默认跑全部分析器；拆分改动时用 -<分析器> 只跑一个（如 -any），写 -<分析器>=false 则排除它\n- 落在生成文件上的改写会被丢弃，这类改动要改的是生成器本身\n- 按 GOOS / GOARCH 各跑一次，覆盖不同构建标签下的代码\n- 包作者迁移自己的 API 时，在被替换的函数上写 //go:fix inline，由 inline 分析器落地\n\nmodernize 检查与本节工具指向同一批分析器，区别是 golangci-lint 在评审期提示，go fix 直接生成补丁。",
+    "rationale": "语言与标准库每版都在补新写法，旧代码不改就逐版变成技术债；靠人工记忆与评审提出，没被想到的地方无人知道。go fix 把这批改写收成一条可复现的命令，跟着工具链升级跑一次即可。",
+    "quote": {
+      "text": "Fix is a tool executed by \"go fix\" to update Go programs that use old features of the language and library and rewrite them to use newer ones. After you update to a new Go release, fix helps make the necessary changes to your programs.",
+      "source": "https://pkg.go.dev/cmd/fix"
+    },
+    "examples": {
+      "good": "$ go fix -diff ./...   # preview the patch first\n$ go fix ./...          # then apply it",
+      "bad": "$ go vet ./...\n# after upgrading the toolchain only static checks ran, so old idioms were never rewritten in bulk",
+      "lang": "console"
+    },
+    "sources": [
+      "https://pkg.go.dev/cmd/fix",
+      "https://go.dev/blog/gofix",
+      "https://go.dev/doc/go1.26"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对升级 Go 版本后是否跑过 go fix"
+    }
+  },
+  {
+    "id": "TOOL-005",
+    "level": "MUST",
+    "chapter": "tooling",
+    "section": "testing-tools",
+    "since_go": "1.0",
+    "summary": "测试断言统一使用 testify。",
+    "details": "断言用 assert 或 require，按失败是否终止用例选择：前置条件用 require，其余检查用 assert。测试文件里不手写 if 加 t.Errorf、t.Fatalf 做比较。",
+    "quote": {
+      "text": "The assert package provides some helpful methods that allow you to write better test code in Go. Prints friendly, easy to read failure descriptions.",
+      "source": "https://github.com/stretchr/testify#assert-package"
+    },
+    "rationale": "手写比较的失败信息只有自定义文案，缺少期望与实际对照；testify 统一格式化差异并带出调用位置，排查时不必重读源码。",
+    "examples": {
+      "good": "assert.Equal(t, want, got)",
+      "bad": "if got != want {\n\tt.Errorf(\"got %v, want %v\", got, want)\n}"
+    },
+    "sources": [
+      "https://github.com/stretchr/testify#assert-package"
+    ],
+    "detect": {
+      "tool": "grep",
+      "pattern": "\\bt\\.(Errorf|Fatalf)\\(",
+      "note": "命中处应改用 testify 断言"
+    }
+  },
+  {
+    "id": "TOOL-010",
+    "level": "MUST",
+    "chapter": "tooling",
+    "section": "code-generation",
+    "since_go": "1.4",
+    "summary": "生成物不手工编辑，只由生成器产出。",
+    "details": "生成器与输入源是唯一可改的地方，改完重新生成，不在生成物上直接改。生成器自带 // Code generated ... DO NOT EDIT. 一类标记行时保留它，不删改；生成器不输出标记的，不必补造，识别交给 TOOL-011 的文件名约定。本仓库的 gdm/cmd/gdm-cli/wire/wire_gen.go 与 manual/ 都属此类，生成命令走 make generate 与 make gen。",
+    "quote": {
+      "text": "To convey to humans and machine tools that code is generated, generated source should have a line that matches the following regular expression (in Go syntax): ^// Code generated .* DO NOT EDIT\\.$",
+      "source": "https://pkg.go.dev/cmd/go#hdr-Generate_Go_files_by_processing_source"
+    },
+    "rationale": "生成物是输入源与生成器的投影，直接改就与这个关系脱钩：下一次生成把改动覆盖掉，或者生成物与输入源长期不一致，成了一截不敢动的代码。官方给 Go 生成源码的识别手段是文件内标记行（下面引文），但标记要生成器主动输出，模板渲染、文档生成一类不写标记，这类生成物改靠文件名识别，见 TOOL-011。",
+    "examples": {
+      "good": "// gdm/di/wire.go: the wiring change goes into the input source, then run make generate\nvar ProviderSet = wire.NewSet(jsonfile.New)",
+      "bad": "// gdm/cmd/gdm-cli/wire/wire_gen.go: the change is made on the generated file and is overwritten on the next run\nrepository := jsonfile.New()"
+    },
+    "sources": [
+      "https://pkg.go.dev/cmd/go#hdr-Generate_Go_files_by_processing_source"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对改动是否落在生成器或输入源上"
+    }
+  },
+  {
+    "id": "TOOL-011",
+    "level": "MUST",
+    "chapter": "tooling",
+    "section": "code-generation",
+    "since_go": "1.0",
+    "summary": "生成文件命名带 gen 前缀或后缀，优先用后缀。",
+    "details": "生成器允许指定输出文件名时，文件名带 gen 前缀或后缀：\n\n- 后缀优先，形如 wire_gen.go、order_repo_gen.go，按名称排序时与同类文件相邻。\n- 前缀写成 gen_，形如 gen_version.go。\n- 分隔符只用下划线，不写连字符。\n- 文件名由生成器自己固定（wire 输出 wire_gen.go）或由平台决定时，按生成器默认走，不必改名。",
+    "quote": {
+      "text": "The name of the output file is created by replacing the .proto extension with .pb.go.",
+      "source": "https://protobuf.dev/reference/go/go-generated/"
+    },
+    "rationale": "protoc 给生成文件加 .pb.go 后缀，wire 输出 wire_gen.go，都是在文件名上标明这是个生成物。名字由调用方指定时不加约定，生成物与手写文件混在同一层目录里，评审要逐个打开才知道哪个能改，改之前还得先翻生成命令。统一到 gen 前后缀后，目录列表本身就能作答；推荐后缀是因为它不打断原有的命名顺序，检索、排序与相邻关系仍按业务名前缀走。分隔符取自己的文件名约定，Go 工具链认的 `_test.go`、`source_windows_amd64.go` 都用下划线，标准库带连字符的文件只出现在 testdata 一类测试数据里。",
+    "examples": {
+      "good": "// generated file names: wire_gen.go, mock_gen.go, clause_repo_gen.go\npackage wire",
+      "bad": "// generated file names: wire.go, mocks.go, clause_repo.go\npackage wire"
+    },
+    "sources": [
+      "https://protobuf.dev/reference/go/go-generated/",
+      "https://pkg.go.dev/cmd/go#hdr-Build_constraints"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对生成物文件名是否带 gen 前缀或后缀"
+    }
+  }
+]

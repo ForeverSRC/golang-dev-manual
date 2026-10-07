@@ -1,0 +1,22 @@
+[
+  {
+    "id": "NAMING-001",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "naming",
+    "since_go": "1.0",
+    "summary": "包名使用小写单词连写。",
+    "details": "包名全小写、无分隔符，多个单词直接连写。",
+    "rationale": "包名出现在每个外部引用点，命名不一致会持续抬高阅读成本。",
+    "examples": {
+      "good": "package orderbook",
+      "bad": "package order_book"
+    },
+    "sources": ["https://go.dev/wiki/CodeReviewComments#package-names"],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "stylecheck(ST1003)",
+      "note": "检查包名标识符"
+    }
+  }
+]

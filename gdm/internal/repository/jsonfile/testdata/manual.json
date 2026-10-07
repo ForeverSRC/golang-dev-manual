@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "go_baseline": "1.27.1",
+  "toc": [
+    {
+      "id": "programming-conventions",
+      "name": "编程规约",
+      "sections": [
+        { "id": "naming", "name": "命名规约" }
+      ]
+    },
+    {
+      "id": "performance",
+      "name": "性能规约"
+    }
+  ]
+}

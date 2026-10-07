@@ -1,0 +1,136 @@
+{
+  "NAMING-001": {
+    "summary": "Package names use lowercase words written together, without underscores, camel case, or plurals.",
+    "details": "The package name is the prefix that callers use to reference identifiers, so only all-lowercase with no separators stays consistent. Write multiple words together, without underscores or camel case, and do not add plurals.",
+    "rationale": "The package name appears at every external reference point, so inconsistent naming keeps raising the reading cost; tools such as stylecheck have established conventions for package names, and following them lets deviations be detected automatically.",
+    "detect_note": "Check the package name identifier"
+  },
+  "NAMING-002": {
+    "summary": "Identifiers do not use underscores to separate words.",
+    "details": "Variables, constants, types, functions, and package names all use MixedCaps, without underscores separating words. There are only three exceptions:\n\n- Package names used only by generated code\n- Test, Benchmark, and Example function names in test files, where underscores may group cases\n- Low-level libraries that interact with the operating system or cgo and reuse existing identifiers",
+    "rationale": "Underscore naming comes from the habits of other languages, while the Go convention is MixedCaps; mixing the two styles in one repository gives the same kind of identifier two forms, adding a step to searching and reading.",
+    "detect_note": "Check the identifier naming style"
+  },
+  "NAMING-003": {
+    "summary": "Initialisms keep a consistent case within identifiers.",
+    "details": "Initialisms such as URL, ID, and HTTP are either all uppercase or all lowercase, never written as Url or Id. The case follows how the initialism is written in English (such as iOS and gRPC), and the first letter is uppercased when the identifier must be exported.",
+    "rationale": "Mixed case makes one concept appear under several spellings such as URL, Url, and url, so searching and replacing by name both miss hits; tools have established rules for this kind of naming, and following the convention lets them be detected automatically."
+  },
+  "NAMING-004": {
+    "summary": "The length of a name is proportional to the size of its scope.",
+    "details": "A loop index or method receiver used within one or two lines needs only a single letter; a variable that spans an entire function or package-level scope uses a full word. When several similar concepts live in the same scope, add a qualifier to tell them apart.",
+    "rationale": "A short name saves noise in a short scope, but in a long scope it makes readers forget what it refers to by the time they reach the end; sizing the name to the scope keeps readers from having to scroll back to the declaration.",
+    "detect_note": "Decide by hand whether name length matches the scope"
+  },
+  "NAMING-005": {
+    "summary": "Names do not repeat the type or the surrounding context.",
+    "details": "The declaration already gives the type, and the package name, method name, and file name already provide context, so the name does not repeat them; add a qualifier only when the type genuinely needs disambiguation.\n\n- Use users, not userSlice or numUsers\n- In the report package use Report, not ReportReport\n- In a UserCount method use count, not userCount",
+    "rationale": "The repeated type and context add no discriminating power; they only lengthen the name and the code lines, and more lines wrap as a result. Once the redundancy is removed, the name still uniquely points to the intended value.",
+    "detect_note": "Check whether the name repeats the type or the surrounding context"
+  },
+  "NAMING-006": {
+    "summary": "Receiver names use a short abbreviation of the type name and stay consistent within the same type.",
+    "details": "A receiver name is usually one or two letters taken from an abbreviation of the type name, and every method of the same type uses the same receiver name. Do not use this or self, and do not leave a placeholder name when the receiver is unused.",
+    "rationale": "The methods of one type are spread across several files, and using a different receiver name in each makes readers think they refer to different objects; this and self are habits carried over from other languages and are not the Go convention.",
+    "detect_note": "Check whether receiver names are consistent within the same type and whether this / self is used"
+  },
+  "CONST-001": {
+    "summary": "Constant names use MixedCaps, not all uppercase or a k prefix.",
+    "details": "An exported constant starts with an uppercase letter and an unexported one with a lowercase letter, with each word capitalized in between. Do not use all-uppercase forms such as MAX_LENGTH, and do not use the k prefix of kMaxLength.",
+    "rationale": "All-uppercase names and the k prefix come from other languages, while every identifier in Go shares one MixedCaps convention; giving constants their own style puts two naming styles in the same repository."
+  },
+  "CONST-002": {
+    "summary": "Constants are named by their role, not by their value.",
+    "details": "A constant name says what it stands for, not what it equals; when a value has no meaning beyond the number itself, there is no need to define it as a constant. When the same value serves different roles, name each one separately.",
+    "rationale": "Naming by value (Twelve = 12, ThreeSeconds = 3) makes the name wrong once the value changes, and it says nothing about the purpose at the call site; naming by role is what carries the intent at the call site.",
+    "detect_note": "Check whether the constant name merely restates the value"
+  },
+  "CONST-003": {
+    "summary": "Enumeration values that increase from one source are generated with iota.",
+    "details": "A set of enumerations from one source that increase in order is generated with iota, avoiding hand-written numbers that are forgotten when a value is inserted midway. The value of iota depends on its line number within the const block, so inserting a line into the block means rechecking the following values.",
+    "rationale": "With hand-written numbers, inserting an enumeration value in the middle means renumbering every later entry, and missing one produces a duplicate; iota generates values by line, so an inserted line never conflicts with existing values.",
+    "detect_note": "Check whether enumerations that increase from one source use hand-written numbers"
+  },
+  "STYLE-001": {
+    "summary": "Use any instead of interface{}.",
+    "details": "Go 1.18 introduced any as an alias for interface{}, and the two are entirely equivalent. New code writes any uniformly; when touching an interface{} in old code, replace it along the way.",
+    "rationale": "any is the officially recommended form, its meaning is direct, and it matches the form used in generic constraints.",
+    "detect_note": "The same analyzer can rewrite it directly with go fix"
+  },
+  "MODERN-001": {
+    "summary": "Common operations on slices and maps prefer the slices and maps standard library packages over hand-written loops.",
+    "details": "slices and maps provide high-frequency operations such as Contains, Sort, Clone, and Keys. When the standard library can express the operation, stop writing loops by hand, which reduces boundary mistakes and unifies the style.",
+    "rationale": "Hand-written loops tend to go wrong on empty slices, duplicate elements, and sort stability, and the standard library already covers these boundaries.",
+    "detect_note": "go fix also suggests the equivalent modern form"
+  },
+  "DATA-001": {
+    "summary": "Declare empty slices with var to get a nil slice.",
+    "details": "Empty slices are uniformly declared with var, and a non-nil empty slice is used only when genuinely needed: in JSON serialization a nil slice outputs null while an empty slice outputs []. In interface design, do not treat a nil slice and a non-nil empty slice as two states.",
+    "rationale": "Both have len and cap of 0, so they are functionally equivalent yet written two ways; settling on nil means readers need not stop to work out why the other form was used.",
+    "detect_note": "Outputting a JSON array [] is an exception"
+  },
+  "DATA-002": {
+    "summary": "Struct literals are initialized with field names rather than listed by position.",
+    "details": "A literal writes field name: value for each field. Small private structs with few fields and a stable order, and test table data, may be exceptions; a struct from another package always uses field names, because adding, removing, or reordering fields silently misplaces positional entries.",
+    "rationale": "The positional form turns field order into an implicit contract, so after the other side adjusts the struct, positions of the same type are silently mismatched with no compile error; the field name form binds each value to its field so the change surfaces at once. The composites check in go vet covers positional literals from another package.",
+    "detect_note": "govet covers only positional literals from another package, and the composites check must be enabled"
+  },
+  "FUNC-001": {
+    "summary": "Exported functions and methods come at the front of a file, unexported ones at the back.",
+    "details": "Within one file, exported functions come before unexported functions, and the exported methods of a type come before its unexported methods. This clause governs only the relative order of exported and unexported, not where types and constructors go.",
+    "rationale": "Reading a file from top to bottom, what the package offers comes first and implementation details unfold only when needed; when the public API sits between private helpers, readers must skip past implementations they do not care about to find the entry point. With a fixed order, both review and tooling can decide it directly."
+  },
+  "FUNC-002": {
+    "summary": "Use named results when the meaning of the return values is not self-evident.",
+    "details": "When an unnamed result already conveys the meaning, do not add a name; when several values of the same type are returned, or the meaning of a result cannot be seen from the signature, name the result parameters so that the signature and godoc explain themselves. The test is whether the meaning is clear, independent of function length.\n\n- Name them when returning two float64 values: `(lat, long float64, err error)`\n- Do not name them when the type already conveys the meaning: `(*Manual, error)`",
+    "rationale": "When two values of the same type are returned, the signature alone cannot tell which is which, so readers must dig into the implementation or documentation; naming lets the signature state the meaning itself. Naming a result whose meaning is already clear only adds noise to godoc.",
+    "detect_note": "Check whether results are named when their meaning is not self-evident"
+  },
+  "COMMENT-001": {
+    "summary": "Comments record only what the code cannot express and never restate what the code does.",
+    "details": "What naming and structure already make clear needs no comment. Only these cases are worth a comment:\n\n- The reason the code is written this way cannot be seen from the code itself\n- The code implements a well-known algorithm\n- The code applies a mathematical formula\n\nA comment explains why it is done this way and does not restate what the code does.",
+    "rationale": "The code itself already reads as what it does, so writing it again means maintaining two explanations that can diverge at any time, and readers must decide which one is correct. Reserving comments for what the code cannot say is what makes comments worth trusting.",
+    "detect_note": "Check whether a comment restates what the code itself already shows"
+  },
+  "COMMENT-002": {
+    "summary": "A doc comment begins with the name being described and is written as a full sentence.",
+    "details": "When a doc comment is needed (package comments, and exported identifiers that genuinely warrant explanation), it begins with the name followed by one sentence and ends with a period. This clause governs only how a doc comment is written; it does not require a comment on every exported identifier, and whether to write one is decided by the stance of COMMENT-001.",
+    "rationale": "When a comment begins with the name, the summary is a full sentence on the godoc index page and the name link is recognized correctly; without the name the summary reads like half a sentence and the link is easily missed.",
+    "detect_note": "Check whether a doc comment begins with the name and forms a full sentence"
+  },
+  "CONC-001": {
+    "summary": "Before starting a goroutine, make its exit timing clear, and let the starter wait for it to finish.",
+    "details": "Before writing go, settle three things: when it ends, who waits for it to end, and who handles an error. The starter gathers it with sync.WaitGroup or errgroup in the same function, and uses errgroup when the subtask can return an error. Do not write a fire-and-forget with no waiter.",
+    "rationale": "A blocked goroutine is not reclaimed by garbage collection and keeps holding memory together with the references on its stack; with no waiter, the errors and panics of a background task have no owner and surface only in production.",
+    "detect_note": "Check that each go statement has a matching waiter and exit path"
+  },
+  "CONC-002": {
+    "summary": "A channel is closed only by the sender, never by the receiver.",
+    "details": "The close is bound to the producer's exit path, usually right after all sends complete. With multiple producers, do not close the data channel directly; use a separate stop signal together with context to coordinate. Cancellation always goes through context, and closing a channel is not used to signal cancellation.",
+    "rationale": "Sending on a closed channel panics, and closing from the receiver side or closing twice blows up at run time; keeping the right to close with the sender, so whoever writes is responsible for wrapping up, makes the boundary unique.",
+    "detect_note": "Check that every close is on the sender side"
+  },
+  "CONC-003": {
+    "summary": "A public API keeps synchronous semantics and leaves concurrency to the caller.",
+    "details": "Internally it may start several goroutines to fetch concurrently, but it gathers them before returning and hands back ordinary results and an error rather than a channel that leaves the caller to wait.",
+    "rationale": "An API returning a channel pushes scheduling and lifecycle management onto every caller, who each rewrite the waiting and cancellation and easily miss something; a synchronous interface keeps the concurrency inside the implementation so callers use it like an ordinary function.",
+    "detect_note": "Check whether a public function returns a channel that leaves the caller waiting"
+  },
+  "CONC-004": {
+    "summary": "Shared state and the lock protecting it live in the same struct and are read and written only through methods.",
+    "details": "The protected field is unexported, reads and writes go through locked methods, and the lock is not exposed outside the struct. Choose a lock or a channel by scenario: use sync.Mutex to protect shared data such as a cache or state, and use a channel to transfer data ownership, distribute tasks, or pass asynchronous results.",
+    "rationale": "When the state and the lock are separate, a caller can bypass the method and change the field directly, leaving the lock useless; once they are together, the only entry for reads and writes is the method, and the protected range can be checked line by line.",
+    "detect_note": "Check whether the lock-protected field is exported and whether it is reachable only through methods"
+  },
+  "CTRL-001": {
+    "summary": "Handle errors and edge cases first and return early, keeping the normal path unindented.",
+    "details": "Rewrite the form that wraps the success branch of an if in an else into one that checks for the error and returns, with the normal logic following; when an if with a short variable declaration defines a variable still used later, move the declaration before the if.",
+    "rationale": "The normal path is the part readers look at most, and wrapping it in an else adds one indent level and one negation of the condition; with an early return, the normal path stays at the far left and reads straight through from top to bottom.",
+    "detect_note": "Check whether the normal path is indented by an else"
+  },
+  "CTRL-002": {
+    "summary": "Do not explicitly copy the loop variable any longer.",
+    "details": "Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing v := v or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.",
+    "rationale": "The explicit copy was the way to avoid a shared variable before Go 1.22, and keeping it after the language was fixed only makes readers think protection is still needed here; letting copyloopvar detect it cleans it up uniformly."
+  }
+}

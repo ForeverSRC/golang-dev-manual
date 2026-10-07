@@ -1,0 +1,753 @@
+# 三、单元测试规约
+
+## （一）测试命名与结构
+
+### 【MUST】TEST-005 测试文件用包外测试，包名以 _test 结尾。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+
+测试文件声明为「被测包名_test」，只通过公开 API 编写用例，不访问包内成员，不为凑覆盖率把内部实现拉进测试。未导出的逻辑由包内公开入口的用例间接覆盖。
+
+**为什么**
+
+> Test files that declare a package with the suffix "_test" will be compiled as a separate package, and then linked and run with the main test binary.
+>
+> —— https://pkg.go.dev/cmd/go#hdr-Test_packages
+
+同包测试能碰到未导出成员，用例会贴着当前实现写，一改内部结构测试先红；包外测试强制走公开入口，测下来的是对外契约，重构空间留得住。
+
+**正例**
+
+```go
+package jsonfile_test
+
+import "github.com/ForeverSRC/golang-dev-manual/gdm/internal/repository/jsonfile"
+```
+
+**反例**
+
+```go
+package orderbook
+
+func TestMatch(t *testing.T) {
+	// in-package tests can construct the unexported matcher directly
+	m := &matcher{}
+	_ = m
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/cmd/go#hdr-Test_packages
+
+**检测**：golangci-lint testpackage
+
+### 【SHOULD】TEST-001 纯函数测试用原生 testing，组件测试用 testify suite。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.24
+
+只做输入输出映射、没有需要构造的被测对象与依赖的函数，直接写 func TestXxx(t *testing.T) 加断言，多组输入用 t.Run 组织成表；以类型为单位封装行为、需要经构造函数产生被测对象，或需要组装依赖、准备共享 fixture 的组件，用 suite.Suite 嵌入，把被测对象与依赖放进结构体字段、在 SetupSuite 里组装一次，由一个入口函数调用 suite.Run 统一运行。
+
+**为什么**
+
+> The suite package provides functionality that you might be used to from more common object-oriented languages. With it, you can build a testing suite as a struct, build setup/teardown methods and testing methods on your struct, and run them with 'go test' as per normal.
+>
+> —— https://github.com/stretchr/testify#suite-package
+
+纯函数没有依赖与跨用例状态，套 suite 只会多出结构体、嵌入与运行入口三层样板，读一个用例要跨三处；组件的被测对象与依赖要在多个用例间复用，散在每个用例里各自构造既重复，依赖增加时又容易漏改，suite 的字段与 SetupSuite 正好集中承载这件事。
+
+**正例**
+
+```go
+type RepositorySuite struct {
+	suite.Suite
+
+	underTest *jsonfile.Repository
+}
+
+func (s *RepositorySuite) SetupSuite() {
+	s.underTest = jsonfile.New()
+}
+
+func (s *RepositorySuite) TestLoad() {
+	got, err := s.underTest.Load(s.T().Context(), "testdata/manual.json")
+	s.Require().NoError(err)
+	s.NotNil(got)
+}
+
+func TestRepositorySuite(t *testing.T) {
+	suite.Run(t, new(RepositorySuite))
+}
+```
+
+**反例**
+
+```go
+func TestLoad(t *testing.T) {
+	got, err := jsonfile.New().Load(t.Context(), "testdata/manual.json")
+	require.NoError(t, err)
+	assert.NotNil(t, got)
+}
+
+func TestLoadError(t *testing.T) {
+	_, err := jsonfile.New().Load(t.Context(), "missing.json")
+	require.Error(t, err)
+}
+```
+
+**依据**
+
+- https://github.com/stretchr/testify#suite-package
+- https://pkg.go.dev/github.com/stretchr/testify/suite
+
+**检测**：人工核对（核对纯函数用例是否套了 suite、组件用例是否用 suite 集中组装被测对象）
+
+### 【SHOULD】TEST-002 单元测试与集成测试分开存放。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.24
+
+输入由用例自己构造、不读写真实文件与网络的属单元测试，直接写在该包内；需要真实文件、真实依赖或端到端链路的属集成测试，文件名以 _it_test.go 结尾，与单元测试同包，由 go test 一并执行。真实数据的完整性校验归集成测试。
+
+**为什么**
+
+> Go test recompiles each package along with any files with names matching the file pattern "*_test.go".
+>
+> —— https://pkg.go.dev/cmd/go#hdr-Test_packages
+
+两类测试失败的含义不同：单元测试红了是逻辑错，集成测试红了可能是环境或数据问题。混在一起，环境波动会被当成代码缺陷，排查方向从一开始就偏。
+
+**正例**
+
+```go
+// unit test: input lives in testdata, no external resources
+func TestLoad(t *testing.T) {
+	got, err := jsonfile.New().Load(t.Context(), filepath.Join("testdata", "manual.json"))
+	require.NoError(t, err)
+}
+```
+
+**反例**
+
+```go
+// reading real repo data in a unit test file, result depends on the working directory
+func TestLoad(t *testing.T) {
+	got, err := jsonfile.New().Load(t.Context(), "../../../data/manual.json")
+	require.NoError(t, err)
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/cmd/go#hdr-Test_packages
+
+**检测**：人工核对（核对读取真实文件、网络或数据库的测试是否以 _it_test.go 结尾）
+
+### 【MAY】TEST-008 测试用例名优先写成 should 接结果、when 接条件的句式。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+
+t.Run 的子测试名与表格里的 name 字段，写成 should 接期望结果、when 接触发条件，例如 should return error when file is missing。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。
+
+**为什么**
+
+> When you use t.Run to create a subtest, the first argument is used as a descriptive name for the test. To ensure that test results are legible to humans reading the logs, choose subtest names that will remain useful and readable after escaping.
+>
+> —— https://go.dev/wiki/TestComments#choose-human-readable-subtest-names
+
+子测试名会直接进 go test 的输出，人只看名字判断哪条失败；上游只要求名字可读，把期望结果与触发条件写进名字是达成可读的一种稳定写法，失败时不用回读用例代码就能定位。
+
+**正例**
+
+```go
+{name: "should return error when file is missing"}
+```
+
+**反例**
+
+```go
+{name: "error branch"}
+```
+
+**依据**
+
+- https://go.dev/wiki/TestComments#choose-human-readable-subtest-names
+
+**检测**：人工核对（核对 t.Run 与表格 name 是否写清期望结果与触发条件）
+
+## （二）表驱动与用例设计
+
+### 【MUST】TEST-012 期望值独立写出，不用被测函数生成。
+
+- 归属：单元测试规约/表驱动与用例设计
+- 起始版本：Go 1.0
+
+期望值用字面量手写，或由与被测实现无关的工厂组装。不调用被测函数本身，也不调用它内部复用的那几步来产出期望结果。数据量大到无法手写时，写进 testdata 期望文件预先固定，不回头调用被测代码补上。要用参考实现做对照时，参考实现必须是与被测代码独立的另一份实现。
+
+**为什么**
+
+> Instead, construct the struct that you're expecting your function to return, and compare in one shot using diffs or deep comparisons.
+>
+> —— https://go.dev/wiki/TestComments#compare-full-structures
+
+用被测代码生成期望值，两边一起错，用例始终是绿的；这种用例验证的是自己等于自己，实现被改坏它也跟着变，拦不下任何缺陷。
+
+**正例**
+
+```go
+want := []domain.Clause{
+	{ID: "NAMING-001", Level: domain.LevelMust, Category: "Programming Conventions/Naming"},
+}
+assert.Equal(t, want, manual.Filter([]string{"MUST"}, "Programming Conventions"))
+```
+
+**反例**
+
+```go
+want := manual.MustClauses() // another function in the package under test
+assert.Equal(t, want, manual.Filter([]string{"MUST"}, "Programming Conventions"))
+```
+
+**依据**
+
+- https://go.dev/wiki/TestComments#compare-full-structures
+- https://research.swtch.com/testing
+
+**检测**：人工核对（核对期望值是否由被测包内的函数或方法产出）
+
+### 【SHOULD】TEST-010 检查逻辑相同的用例才进同一张表。
+
+- 归属：单元测试规约/表驱动与用例设计
+- 起始版本：Go 1.24
+
+多组输入共用一套检查逻辑（构造输入、调用、比对结果）时，写成表格遍历，加用例只加一行数据。部分用例的检查方式不同时，拆成多个测试函数；只有前置准备相同、检查方式不同时，才在同一条测试函数里写成顺序排列的平铺子测试。不靠循环体里的条件分支区分用例类型。
+
+**为什么**
+
+> When some test cases need to be checked using different logic from other test cases, it is more appropriate to write multiple test functions. ... If they have different logic but identical setup, a sequence of subtests within a single test function might also make sense.
+>
+> —— https://go.dev/wiki/TestComments#table-driven-tests-vs-multiple-test-functions
+
+表驱动的收益是检查逻辑只写一次。检查方式不同的用例硬塞进一张表，循环体里得靠判断决定走哪套断言，读一条用例要在数据与逻辑之间来回看，改一处逻辑还要确认影响到哪些行。
+
+**正例**
+
+```go
+func TestLoadMissingFile(t *testing.T) {
+	_, err := jsonfile.New().Load(t.Context(), "missing.json")
+	require.Error(t, err)
+}
+
+func TestLoadInvalidJSON(t *testing.T) {
+	_, err := jsonfile.New().Load(t.Context(), "invalid.json")
+	require.Error(t, err)
+}
+```
+
+**反例**
+
+```go
+func TestLoad(t *testing.T) {
+	for _, path := range []string{"missing.json", "invalid.json"} {
+		_, err := jsonfile.New().Load(t.Context(), path)
+		if path == "missing.json" {
+			require.True(t, os.IsNotExist(err))
+			continue
+		}
+		require.Error(t, err)
+	}
+}
+```
+
+**依据**
+
+- https://go.dev/wiki/TestComments#table-driven-tests-vs-multiple-test-functions
+- https://research.swtch.com/testing
+
+**检测**：人工核对（核对同一循环体内是否用条件分支切换检查方式）
+
+### 【SHOULD】TEST-011 表格只放随用例变化的字段。
+
+- 归属：单元测试规约/表驱动与用例设计
+- 起始版本：Go 1.0
+
+表格字段只保留触发条件与期望结果；所有用例相同的请求参数、公共前置操作提到循环体外的变量里。个别用例需要不同的桩行为时，用一个返回闭包的字段承载这段差异，不在循环体里加判断，也不把整套桩配置抄进每一行。
+
+**为什么**
+
+> Separate test cases from test logic.
+>
+> —— https://research.swtch.com/testing
+
+每行重复写同样的参数，表格变长但信息量不增，读的人要逐行比对差异到底在哪；改一处公共参数得逐行改，漏一行就有一条用例测的不是同一件事。
+
+**正例**
+
+```go
+query := &domain.Query{Category: "Programming Conventions"} // shared by all cases
+
+tests := []struct {
+	name  string
+	level string
+	want  int
+}{
+	{name: "should return all clauses when level is empty", level: "", want: 24},
+	{name: "should return must clauses when level is MUST", level: "MUST", want: 12},
+}
+```
+
+**反例**
+
+```go
+tests := []struct {
+	name  string
+	query *domain.Query
+	level string
+	want  int
+}{
+	{name: "should return all clauses when level is empty", query: &domain.Query{Category: "Programming Conventions"}, level: "", want: 24},
+	{name: "should return must clauses when level is MUST", query: &domain.Query{Category: "Programming Conventions"}, level: "MUST", want: 12},
+}
+```
+
+**依据**
+
+- https://research.swtch.com/testing
+- https://go.dev/wiki/TableDrivenTests
+
+**检测**：人工核对（核对表格字段是否被所有用例写成同一份值）
+
+### 【SHOULD】TEST-013 边界与特殊输入单独建用例。
+
+- 归属：单元测试规约/表驱动与用例设计
+- 起始版本：Go 1.0
+
+正常路径之外，为边界输入各建用例：
+
+- 空集合与 nil
+- 单元素、首尾元素
+- 越界下标、落在两个元素之间的键
+- 临界数值
+
+错误路径的每个分支各有用例，不只挑其中一条。用例集合要能回答出还有哪些输入组合没被想到。
+
+**为什么**
+
+> Look for special cases.
+>
+> —— https://research.swtch.com/testing
+
+覆盖率说明代码被执行过，不说明边界被想过。空输入与越界这类缺陷只在边界出现，正常路径的用例跑不到；漏赋值的字段还会因为与期望值的零值相等而静默通过。
+
+**正例**
+
+```go
+tests := []struct {
+	name   string
+	levels []string
+}{
+	{name: "should return empty when levels is nil", levels: nil},
+	{name: "should return empty when levels is empty", levels: []string{}},
+	{name: "should match single element when levels has one", levels: []string{"MUST"}},
+}
+```
+
+**反例**
+
+```go
+tests := []struct {
+	name   string
+	levels []string
+}{
+	{name: "should match levels", levels: []string{"MUST", "SHOULD"}},
+}
+```
+
+**依据**
+
+- https://research.swtch.com/testing
+
+**检测**：人工核对（核对是否覆盖空集合、单元素、首尾与越界等边界输入）
+
+### 【SHOULD】TEST-014 修缺陷的改动附上复现用例。
+
+- 归属：单元测试规约/表驱动与用例设计
+- 起始版本：Go 1.0
+
+修复缺陷时，同一提交里加入能复现该缺陷的用例，输入固定为缺陷的触发条件，修复前失败、修复后通过。触发条件留在用例里，不靠评审说明或手工步骤记录。
+
+**为什么**
+
+> If you didn't add a test, you didn't fix the bug.
+>
+> —— https://research.swtch.com/testing
+
+没有复现用例，触发条件只存在于这一次的排查过程里，同一个缺陷在后续重构中会再出现；上游的说法很直白——没加测试就不算修好了缺陷。
+
+**正例**
+
+```go
+// bug: case mismatch when filtering by id caused a missed match
+func TestFilterByID(t *testing.T) {
+	want := []domain.Clause{{ID: "NAMING-001"}}
+	assert.Equal(t, want, manual.FilterByID("naming-001"))
+}
+```
+
+**反例**
+
+```go
+// the test input also passed before the fix, the trigger condition was not pinned down
+func TestFilterByID(t *testing.T) {
+	assert.NotEmpty(t, manual.FilterByID("NAMING-001"))
+}
+```
+
+**依据**
+
+- https://research.swtch.com/testing
+
+**检测**：人工核对（核对修缺陷的提交是否带上触发条件对应的用例）
+
+## （三）断言与测试数据
+
+### 【SHOULD】TEST-003 一次比对完整结果，不逐字段拆散或裁剪成子集。
+
+- 归属：单元测试规约/断言与测试数据
+- 起始版本：Go 1.0
+
+期望值用字面量或独立构造器一次写出，预期为零值的字段也显式写出，再与方法的完整返回值比对：返回切片就比切片本身，不先映射成 ID 列表一类子集，也不拆成每个字段各断一次。结果里含不可控内容（时间戳、随机 ID、浮点精度损失）或不支持相等比较的字段时，才逐字段断言或改用专门的比较 helper。返回多个值时逐个比对，不必先包成结构体。
+
+**为什么**
+
+> If your function returns a struct, don't write test code that performs an individual comparison for each field of the struct. Instead, construct the struct that you're expecting your function to return, and compare in one shot using diffs or deep comparisons. The same rule applies to arrays and maps.
+>
+> —— https://go.dev/wiki/TestComments#compare-full-structures
+
+断言拆散或收窄后，漏掉的部分从代码上看不出来：逐字段断言时新增字段不会让旧用例变红，投影成子集后等级、归属这些字段整体退出比对范围，被测代码返回内容出错也照样通过；整结果比对让遗漏当场暴露，字段增删自动进入范围。
+
+**正例**
+
+```go
+got := manual.Filter([]string{"MUST"}, "Programming Conventions")
+want := []domain.Clause{{ID: "A-001", Level: domain.LevelMust, Category: "Programming Conventions/Naming"}}
+assert.Equal(t, want, got)
+```
+
+**反例**
+
+```go
+got := manual.Filter([]string{"MUST"}, "Programming Conventions")
+assert.Len(t, got, 1)
+ids := make([]string, 0, len(got))
+for _, c := range got {
+	ids = append(ids, c.ID)
+}
+assert.Equal(t, []string{"A-001"}, ids)
+```
+
+**依据**
+
+- https://go.dev/wiki/TestComments#compare-full-structures
+
+**检测**：人工核对（核对断言是否拆成逐字段，或把结果裁剪成子集后再比）
+
+### 【SHOULD】TEST-004 庞大的测试输入与期望数据放 testdata 目录。
+
+- 归属：单元测试规约/断言与测试数据
+- 起始版本：Go 1.16
+
+输入载荷或期望结果较长时，写成 testdata/ 下的单独文件，与代码分离；用例用 //go:embed 把文件嵌入测试二进制后再读，不靠运行目录拼路径定位文件。需要按文件名批量驱动时嵌入 embed.FS，再用 fs.Glob 遍历。被测对象本身以文件路径为输入（文件加载器、目录扫描器一类）时，直接传 testdata 下的相对路径。期望结果随实现有意变更时，注入 -update flag 用实际输出覆盖期望文件，再由 git diff 人工复核。
+
+**为什么**
+
+> Go source files that import "embed" can use the //go:embed directive to initialize a variable of type string, []byte, or FS with the contents of files read from the package directory or subdirectories at compile time.
+>
+> —— https://pkg.go.dev/embed
+
+大段 JSON 写在 Go 字符串里，用例逻辑被数据淹没，改一处数据要动代码；放成对文件后数据可读、可 diff。用运行目录拼路径读文件，换一个工作目录就找不到文件（IDE 直接跑用例、从仓库根目录发起 go test 都是这种情况）；//go:embed 在编译期把内容固定进二进制，读取结果不随运行环境变。
+
+**正例**
+
+```go
+import _ "embed"
+
+//go:embed testdata/manual.json
+var manualJSON []byte
+```
+
+**反例**
+
+```go
+raw, err := os.ReadFile(filepath.Join("testdata", "manual.json"))
+require.NoError(t, err)
+```
+
+**依据**
+
+- https://pkg.go.dev/embed
+- https://pkg.go.dev/cmd/go#hdr-Test_packages
+
+**检测**：人工核对（核对用例读取 testdata 是否靠运行目录拼路径）
+
+### 【SHOULD】TEST-007 断言错误只判是否为非 nil，不比对错误消息文本。
+
+- 归属：单元测试规约/断言与测试数据
+- 起始版本：Go 1.24
+
+失败路径先断言是否返回了错误；需要区分错误种类时，哨兵用 errors.Is、错误类型用 errors.As，不用字符串比对消息，也不新构造一个同样的错误做值比较。错误消息本身是被测契约的一部分（例如必须带上输入参数名）时，才对消息做字符串断言，且只断这类不受措辞影响的属性。
+
+**为什么**
+
+> don't use string comparison to check what type of error your function returns. ... It's OK to use string comparisons to check that error messages coming from the package under test satisfy some property, for example, that it includes the parameter name.
+>
+> —— https://go.dev/wiki/TestComments#test-error-semantics
+
+错误消息是给人看的，用字符串比对判断错误种类，措辞改一次用例就跟着红，这种用例拦不住真实错误；要能区分错误种类，得让被测代码暴露哨兵错误或错误类型，测试再用 errors.Is / errors.As 判断。
+
+**正例**
+
+```go
+_, err := jsonfile.New().Load(t.Context(), "missing.json")
+require.Error(t, err)
+```
+
+**反例**
+
+```go
+_, err := jsonfile.New().Load(t.Context(), "missing.json")
+require.ErrorContains(t, err, "load")
+```
+
+**依据**
+
+- https://go.dev/wiki/TestComments#test-error-semantics
+- https://go.dev/blog/go1.13-errors
+
+**检测**：人工核对（核对用例是否用错误消息文本判断错误种类；哨兵与错误类型是否用 errors.Is / errors.As）
+
+## （四）Mock 与测试替身
+
+### 【MUST】TEST-015 Mock 生成用 go.uber.org/mock。
+
+- 归属：单元测试规约/Mock 与测试替身
+- 起始版本：Go 1.0
+
+go.mod 与生成文件里只出现 go.uber.org/mock 与其 mockgen，不引入 github.com/golang/mock；已有的旧引用一并迁到 uber 版本。
+
+**为什么**
+
+> This project originates from Google's golang/mock repo. Unfortunately, Google no longer maintains this project, and given the heavy usage of gomock project within Uber, we've decided to fork and maintain this going forward at Uber.
+>
+> —— https://github.com/uber-go/mock
+
+github.com/golang/mock 已被 Google 归档停更，不再跟随 Go 版本更新；uber 接手维护的分支 API 兼容，是当前的使用版本。
+
+**正例**
+
+```go
+import "go.uber.org/mock/gomock"
+```
+
+**反例**
+
+```go
+import "github.com/golang/mock/gomock"
+```
+
+**依据**
+
+- https://github.com/uber-go/mock
+
+**检测**：grep 正则 github\.com/golang/mock（命中处改用 go.uber.org/mock；go.mod 不在扫描范围内，需人工核对）
+
+### 【MUST】TEST-016 传入 *testing.T 后不调用 ctrl.Finish()。
+
+- 归属：单元测试规约/Mock 与测试替身
+- 起始版本：Go 1.14
+
+用 gomock.NewController(t) 传入 *testing.T 后，控制器在测试与子测试结束时自动校验期望，代码里不再写 ctrl.Finish()。使用自建的 TestReporter、或传入的不是 *testing.T 时，仍需自己保证校验时机。
+
+**为什么**
+
+> Note: If you pass a *testing.T into NewController, you no longer need to call ctrl.Finish() in your test methods.
+>
+> —— https://pkg.go.dev/go.uber.org/mock/gomock#Controller.Finish
+
+gomock 文档写明传入 *testing.T 后无需再调用 Finish；手写调用是 Go 1.14 之前的写法，重复校验还会在子测试没跑完时提前中断。
+
+**正例**
+
+```go
+ctrl := gomock.NewController(t)
+repo := NewMockRepository(ctrl)
+```
+
+**反例**
+
+```go
+ctrl := gomock.NewController(t)
+defer ctrl.Finish()
+```
+
+**依据**
+
+- https://pkg.go.dev/go.uber.org/mock/gomock#Controller.Finish
+
+**检测**：grep 正则 \.Finish\(\)（命中处确认是否传入了 *testing.T）
+
+### 【MUST】TEST-017 不写冗余的 .Times(1)。
+
+- 归属：单元测试规约/Mock 与测试替身
+- 起始版本：Go 1.0
+
+gomock 的期望默认要求恰好调用一次，Times(1) 不改变行为。只在防御意外调用写 Times(0)、或明确要求多次时写 Times(n)。
+
+**为什么**
+
+> Times declares the exact number of times a function call is expected to be executed.
+>
+> —— https://pkg.go.dev/go.uber.org/mock/gomock#Call.Times
+
+每个 EXPECT 末尾挂一个 Times(1)，读的人得逐个确认这是刻意的约束还是随手加的；约束本已默认成立，写出来只是噪声。
+
+**正例**
+
+```go
+repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil)
+```
+
+**反例**
+
+```go
+repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil).Times(1)
+```
+
+**依据**
+
+- https://pkg.go.dev/go.uber.org/mock/gomock#Call.Times
+- https://github.com/uber-go/mock
+
+**检测**：grep 正则 \.Times\(1\)（命中处删除即可，默认即一次）
+
+### 【SHOULD】TEST-018 确有调用顺序要求时才用 gomock.InOrder()。
+
+- 归属：单元测试规约/Mock 与测试替身
+- 起始版本：Go 1.0
+
+gomock 默认不约束期望的调用顺序。只有顺序错会改变结果的场景，例如加锁、扣减、释放这类前后依赖，才用 InOrder 或 After 固定顺序；并发调用同一组期望时不用，避免调度顺序不同导致偶发失败。
+
+**为什么**
+
+> By default, expected calls are not enforced to run in any particular order. Call order dependency can be enforced by use of InOrder and/or Call.After.
+>
+> —— https://pkg.go.dev/go.uber.org/mock/gomock#InOrder
+
+顺序无关的操作套上 InOrder，一次不改变行为的重构就会让用例变红；多个 Goroutine 调用时顺序由调度决定，用例会时红时绿。
+
+**正例**
+
+```go
+repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil)
+repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
+```
+
+**反例**
+
+```go
+gomock.InOrder(
+	repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil),
+	repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil),
+)
+```
+
+**依据**
+
+- https://pkg.go.dev/go.uber.org/mock/gomock#InOrder
+
+**检测**：grep 正则 gomock\.InOrder（命中处确认调用顺序是否影响结果）
+
+### 【SHOULD】TEST-019 期望里直接写参数值，避免包裹 Eq 与裸 Any()。
+
+- 归属：单元测试规约/Mock 与测试替身
+- 起始版本：Go 1.0
+
+非匹配器的参数按相等匹配，直接写字面量即可，不再包一层 gomock.Eq；需要限制类型用 AssignableToTypeOf，需要按条件匹配用 Cond、Len、Nil。context.Context 这类不作断言的值才用 Any()，并在该处写明放宽的原因。
+
+**为什么**
+
+> A Matcher is a representation of a class of values. It is used to represent the valid or expected arguments to a mocked method. ... Any returns a matcher that always matches.
+>
+> —— https://pkg.go.dev/go.uber.org/mock/gomock#Matcher
+
+裸 Any() 只校验方法被调用过，参数传错也照样通过；把参数写进期望，调用方的传参错误才能被拦住，用例也读得出这次调用应该长什么样。再包一层 Eq 不改变匹配语义，只多一层噪声。
+
+**正例**
+
+```go
+// first arg ctx is not asserted, matching is relaxed
+repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil)
+repo.EXPECT().Save(gomock.Any(), gomock.AssignableToTypeOf(&domain.Manual{})).Return(nil)
+```
+
+**反例**
+
+```go
+repo.EXPECT().Load(gomock.Any(), gomock.Eq("a.json")).Return(manual, nil)
+repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
+```
+
+**依据**
+
+- https://pkg.go.dev/go.uber.org/mock/gomock#Matcher
+- https://github.com/uber-go/mock/blob/main/gomock/call.go
+
+**检测**：grep 正则 gomock\.Any\(\)（除 context.Context 外，命中处改用 Eq 或 AssignableToTypeOf）
+
+## （五）覆盖率的使用
+
+### 【SHOULD】TEST-006 测业务逻辑与边界，不追求覆盖率数字。
+
+- 归属：单元测试规约/覆盖率的使用
+- 起始版本：Go 1.0
+
+用例对准业务规则、分支边界与错误路径，覆盖率数字不作为验收条件。工具类与纯算法类要求 100% 覆盖，仍通过包外测试达到，不因覆盖率要求而访问包内成员。
+
+**为什么**
+
+> Use test coverage to find untested code. Coverage is no substitute for thought.
+>
+> —— https://research.swtch.com/testing
+
+以覆盖率数字为目标，会写出只调用不断言的用例，为了把内部实现纳入覆盖而把测试写成实现的副本；测试本身是这段逻辑的说明，凑出来的用例读不出业务语义，数字涨了，能拦下的错误反而更少。
+
+**正例**
+
+```go
+func TestFilter(t *testing.T) {
+	// business rule: filter by level combined with category
+	got := manual.Filter([]string{"MUST"}, "Programming Conventions")
+	want := []domain.Clause{{ID: "A-001", Level: domain.LevelMust, Category: "Programming Conventions/Naming"}}
+	assert.Equal(t, want, got)
+}
+```
+
+**反例**
+
+```go
+func TestFilter(t *testing.T) {
+	// only exercises the lines, without asserting the result
+	manual.Filter([]string{"MUST"}, "")
+	manual.Filter(nil, "Programming Conventions")
+}
+```
+
+**依据**
+
+- https://research.swtch.com/testing
+
+**检测**：人工核对（核对用例是否有断言、是否对准业务语义；覆盖率数字不作为判定依据）
+

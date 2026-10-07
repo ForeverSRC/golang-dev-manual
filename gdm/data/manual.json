@@ -1,0 +1,87 @@
+{
+  "version": "3.0",
+  "go_baseline": "1.27.1",
+  "toc": [
+    {
+      "id": "programming-conventions",
+      "name": "编程规约",
+      "sections": [
+        { "id": "naming", "name": "命名规约" },
+        { "id": "constants", "name": "常量与枚举规约" },
+        { "id": "formatting", "name": "格式化与代码风格规约" },
+        { "id": "functions", "name": "函数与方法规约" },
+        { "id": "data-structures", "name": "数据结构规约" },
+        { "id": "concurrency", "name": "并发规约" },
+        { "id": "control-flow", "name": "控制语句规约" },
+        { "id": "comments", "name": "注释规约" }
+      ]
+    },
+    {
+      "id": "errors-and-logging",
+      "name": "错误与日志",
+      "sections": [
+        { "id": "error-handling", "name": "错误处理规约" },
+        { "id": "error-codes", "name": "错误码规约" },
+        { "id": "logging", "name": "日志规约" }
+      ]
+    },
+    {
+      "id": "unit-testing",
+      "name": "单元测试规约",
+      "sections": [
+        { "id": "test-structure", "name": "测试命名与结构" },
+        { "id": "table-driven", "name": "表驱动与用例设计" },
+        { "id": "assertions", "name": "断言与测试数据" },
+        { "id": "mocks", "name": "Mock 与测试替身" },
+        { "id": "coverage", "name": "覆盖率的使用" }
+      ]
+    },
+    {
+      "id": "dependencies-and-layout",
+      "name": "依赖与工程结构",
+      "sections": [
+        { "id": "layering", "name": "分层规约" },
+        { "id": "package-organization", "name": "包组织规约" },
+        { "id": "dependency-management", "name": "依赖管理规约" },
+        { "id": "project-layout", "name": "项目布局规约" }
+      ]
+    },
+    {
+      "id": "interfaces-and-design",
+      "name": "接口与设计规约",
+      "sections": [
+        { "id": "interface-placement", "name": "接口定义与落位" },
+        { "id": "composition", "name": "组合与复用" },
+        { "id": "dependency-injection", "name": "依赖注入与装配" },
+        { "id": "context-passing", "name": "context 传递" },
+        { "id": "struct-shape", "name": "结构体安全形状" }
+      ]
+    },
+    {
+      "id": "performance",
+      "name": "性能规约"
+    },
+    {
+      "id": "security",
+      "name": "安全规约"
+    },
+    {
+      "id": "static-analysis",
+      "name": "静态检查规约",
+      "sections": [
+        { "id": "configuration", "name": "配置与运行" },
+        { "id": "required-rules", "name": "必开规则" },
+        { "id": "recommended-rules", "name": "推荐规则" }
+      ]
+    },
+    {
+      "id": "tooling",
+      "name": "工具规约",
+      "sections": [
+        { "id": "command-line", "name": "命令行" },
+        { "id": "testing-tools", "name": "测试工具" },
+        { "id": "code-generation", "name": "代码生成" }
+      ]
+    }
+  ]
+}

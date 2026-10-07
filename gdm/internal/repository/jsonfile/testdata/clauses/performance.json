@@ -1,0 +1,16 @@
+[
+  {
+    "id": "PERF-001",
+    "level": "MAY",
+    "chapter": "performance",
+    "since_go": "1.0",
+    "summary": "按已知容量预分配切片。",
+    "details": "能预知元素数量时用 make 指定容量。",
+    "rationale": "容量不足会触发多次扩容与整体复制。",
+    "examples": {
+      "good": "ids := make([]string, 0, len(clauses))",
+      "bad": "var ids []string"
+    },
+    "sources": ["https://go.dev/wiki/CodeReviewComments"]
+  }
+]

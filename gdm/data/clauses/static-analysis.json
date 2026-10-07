@@ -1,0 +1,157 @@
+[
+  {
+    "id": "TOOL-001",
+    "level": "MUST",
+    "chapter": "static-analysis",
+    "section": "configuration",
+    "since_go": "1.0",
+    "summary": "统一用 golangci-lint 做静态代码检查。",
+    "details": "全仓库只保留一份 .golangci.yml，本地与 CI 跑同一条命令；golangci-lint 版本由 go.mod 的 tool 指令固定，不依赖各机器上的全局安装。",
+    "quote": {
+      "text": "Golangci-lint is a fast linters runner for Go. It runs linters in parallel, uses caching, supports YAML configuration, integrates with all major IDEs, and includes over a hundred linters.",
+      "source": "https://golangci-lint.run/"
+    },
+    "rationale": "各人各机各版本的裸 linter 结果不一致，评审时无法对齐结论；集中一份配置再加固定版本，问题才能复现。",
+    "examples": {
+      "good": "lint:\n\tgolangci-lint run ./...",
+      "bad": "lint:\n\tgo vet ./...\n\tstaticcheck ./...",
+      "lang": "makefile"
+    },
+    "sources": [
+      "https://golangci-lint.run/"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对仓库根有 .golangci.yml 且 lint 入口调用 golangci-lint"
+    }
+  },
+  {
+    "id": "TOOL-009",
+    "level": "MUST",
+    "chapter": "static-analysis",
+    "section": "configuration",
+    "since_go": "1.0",
+    "summary": "抑制告警要指名检查器并写明理由。",
+    "details": "确认是误报后，在触发处写 //nolint:<检查器> // 理由，检查器名与理由缺一不可；不写裸 //nolint 与 //nolint:all，它们不表明被抑制的是哪条检查；也不在文件或包的顶部一次性关掉检查。配置里开启 nolintlint，用 require-specific、require-explanation、allow-unused 三项设置强制。",
+    "quote": {
+      "text": "You may add a comment explaining or justifying why a `nolint` directive is being used on the same line as the flag itself:",
+      "source": "https://golangci-lint.run/docs/linters/false-positives/#nolint-directive"
+    },
+    "rationale": "抑制是给检查器开的口子，写清检查器与理由，评审时才知道被绕过的是哪条规则、绕过的代价是什么；裸 //nolint 与 //nolint:all 把口子开在所有检查上，日后新加的分析器也一并放行，问题不再有人看见。",
+    "examples": {
+      "good": "raw, err := os.ReadFile(path) //nolint:gosec // path is specified explicitly by the caller",
+      "bad": "raw, err := os.ReadFile(path) //nolint"
+    },
+    "sources": [
+      "https://golangci-lint.run/docs/linters/false-positives/#nolint-directive",
+      "https://golangci-lint.run/docs/linters/configuration/#nolintlint"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "nolintlint",
+      "note": "配置为 require-specific + require-explanation + allow-unused，拦下不指名检查器、缺理由与已失效的抑制"
+    }
+  },
+  {
+    "id": "TOOL-002",
+    "level": "SHOULD",
+    "chapter": "static-analysis",
+    "section": "recommended-rules",
+    "since_go": "1.22",
+    "summary": "golangci-lint 中开启 modernize，跟进新版 Go 惯用法。",
+    "details": "Go 版本升级后，旧写法由 modernize 提示可简化的地方；未启用则这些惯用法只能靠人工记忆。",
+    "quote": {
+      "text": "modernize: A suite of analyzers that suggest simplifications to Go code, using modern language and library features.",
+      "source": "https://golangci-lint.run/docs/linters/configuration/#modernize"
+    },
+    "rationale": "标准库与语言特性持续补齐，旧写法逐版变成技术债；交给分析器批量提示，成本低于事后重构。",
+    "examples": {
+      "good": "for range n {\n\thandle()\n}",
+      "bad": "for i := 0; i < n; i++ {\n\thandle()\n}"
+    },
+    "sources": [
+      "https://golangci-lint.run/docs/linters/configuration/#modernize"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 .golangci.yml 的 linters.enable 含 modernize"
+    }
+  },
+  {
+    "id": "TOOL-003",
+    "level": "SHOULD",
+    "chapter": "static-analysis",
+    "section": "recommended-rules",
+    "since_go": "1.0",
+    "summary": "使用 testify 时，同步开启 testifylint。",
+    "details": "testifylint 拦下 assert.Nil 判错误、参数顺序颠倒一类高频误用；未用 testify 的项目不必启用。",
+    "quote": {
+      "text": "testify is the most popular Golang testing framework in recent years. But it has a terrible ambiguous API in places, and the purpose of this linter is to protect you from annoying mistakes.",
+      "source": "https://github.com/Antonboom/testifylint"
+    },
+    "rationale": "testify 部分 API 误用后编译期不报错，如 assert.Nil(t, err) 在 err 为接口时判断失效；交给 linter 比靠评审记忆可靠。",
+    "examples": {
+      "good": "require.NoError(t, err)",
+      "bad": "assert.Nil(t, err)"
+    },
+    "sources": [
+      "https://github.com/Antonboom/testifylint"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 .golangci.yml 的 linters.enable 含 testifylint"
+    }
+  },
+  {
+    "id": "TOOL-006",
+    "level": "MUST",
+    "chapter": "static-analysis",
+    "section": "required-rules",
+    "since_go": "1.0",
+    "summary": "至少开启 golangci-lint 的 standard 集。",
+    "details": "standard 集是 golangci-lint 默认启用的五个检查器，配置里不要关掉，也不要只留其中几个：\n\n- errcheck：未处理的错误返回值\n- govet：可疑构造，等价于 go vet\n- ineffassign：赋了值却不再读的赋值\n- staticcheck：staticcheck 的诊断规则\n- unused：未使用的标识符",
+    "quote": {
+      "text": "Golangci-lint can be used with zero configuration. By default, the following linters are enabled: errcheck, govet, ineffassign, staticcheck, unused.",
+      "source": "https://golangci-lint.run/docs/welcome/quick-start/"
+    },
+    "rationale": "这五个对准的都是能确定判定的缺陷：漏掉的错误、写错但能编译的可疑构造、算了不用的中间值、永远走不到的死代码。少开哪个就等于放弃对应类别的机器拦截，只能退回评审靠记忆。",
+    "examples": {
+      "good": "linters:\n  default: standard",
+      "bad": "linters:\n  default: none\n  enable:\n    - gocritic",
+      "lang": "yaml"
+    },
+    "sources": [
+      "https://golangci-lint.run/docs/welcome/quick-start/"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 .golangci.yml 未关闭 standard 集"
+    }
+  },
+  {
+    "id": "TOOL-007",
+    "level": "SHOULD",
+    "chapter": "static-analysis",
+    "section": "recommended-rules",
+    "since_go": "1.0",
+    "summary": "standard 集之外，推荐开启常用的补充分析器。",
+    "details": "standard 集之外，推荐开启以下分析器：\n\n- errorlint：错误链相关的写法问题\n- nilerr：判断了 err != nil 却返回 nil\n- bodyclose：HTTP 响应体未关闭\n- noctx：请求未带 context.Context\n- nolintlint：抑制告警未指名检查器、缺理由或已失效\n- gosec：安全隐患\n- gocritic：缺陷与性能诊断\n- exhaustive：枚举 switch 未穷举\n- copyloopvar：Go 1.22 起多余的循环变量拷贝\n- testpackage：同包测试\n- funcorder：导出与未导出的函数次序\n- misspell：拼写错误\n\nmodernize 与 testifylint 见同节单列条款。与项目形态不符的可以不启用，理由写进配置注释或评审记录。",
+    "quote": {
+      "text": "To see a list of supported linters and which linters are enabled/disabled: golangci-lint help linters",
+      "source": "https://golangci-lint.run/docs/linters/"
+    },
+    "rationale": "standard 集之外没有默认开启，不主动打开就等于没有。这些分析器各自对准一类具体缺陷或高频偏差，误报可控；清单只收与项目无关的通用项，项目专属检查在各自项目里另加。",
+    "examples": {
+      "good": "linters:\n  default: standard\n  enable:\n    - errorlint\n    - gosec\n    - nolintlint\n    - testpackage",
+      "bad": "linters:\n  default: standard\n  # none of the supplementary analyzers is enabled",
+      "lang": "yaml"
+    },
+    "sources": [
+      "https://golangci-lint.run/docs/linters/"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 enable 列表是否覆盖清单，未启用项是否有理由"
+    }
+  }
+]

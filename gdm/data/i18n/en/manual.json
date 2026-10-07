@@ -1,0 +1,123 @@
+{
+  "toc": {
+    "programming-conventions": {
+      "name": "Programming Conventions",
+      "sections": {
+        "naming": "Naming",
+        "constants": "Constants and Enums",
+        "formatting": "Formatting and Style",
+        "functions": "Functions and Methods",
+        "data-structures": "Data Structures",
+        "concurrency": "Concurrency",
+        "control-flow": "Control Flow",
+        "comments": "Comments"
+      }
+    },
+    "errors-and-logging": {
+      "name": "Errors and Logging",
+      "sections": {
+        "error-handling": "Error Handling",
+        "error-codes": "Error Codes",
+        "logging": "Logging"
+      }
+    },
+    "unit-testing": {
+      "name": "Unit Testing",
+      "sections": {
+        "test-structure": "Test Naming and Structure",
+        "table-driven": "Table-Driven and Case Design",
+        "assertions": "Assertions and Test Data",
+        "mocks": "Mocks and Test Doubles",
+        "coverage": "Using Coverage"
+      }
+    },
+    "dependencies-and-layout": {
+      "name": "Dependencies and Project Layout",
+      "sections": {
+        "layering": "Layering",
+        "package-organization": "Package Organization",
+        "dependency-management": "Dependency Management",
+        "project-layout": "Project Layout"
+      }
+    },
+    "interfaces-and-design": {
+      "name": "Interfaces and Design",
+      "sections": {
+        "interface-placement": "Interface Definition and Placement",
+        "composition": "Composition and Reuse",
+        "dependency-injection": "Dependency Injection and Wiring",
+        "context-passing": "Passing context",
+        "struct-shape": "Safe Struct Shape"
+      }
+    },
+    "performance": {
+      "name": "Performance"
+    },
+    "security": {
+      "name": "Security"
+    },
+    "static-analysis": {
+      "name": "Static Analysis",
+      "sections": {
+        "configuration": "Configuration and Running",
+        "required-rules": "Required Rules",
+        "recommended-rules": "Recommended Rules"
+      }
+    },
+    "tooling": {
+      "name": "Tooling",
+      "sections": {
+        "command-line": "Command Line",
+        "testing-tools": "Testing Tools",
+        "code-generation": "Code Generation"
+      }
+    }
+  },
+  "manual": {
+    "title": "Golang Development Manual",
+    "intro": "A personal Golang development manual. Clauses are graded MUST / SHOULD / MAY; the table of contents and the clauses share a single source in `gdm/data/`.",
+    "baseline_line": "Baseline: Go {v}",
+    "count_line": "Clauses: {v}",
+    "toc_heading": "Table of Contents"
+  },
+  "appendix": {
+    "slug": "appendix",
+    "title": "Appendix",
+    "index_heading": "Clause Index",
+    "sources_heading": "Sources",
+    "detect_heading": "Detection Map",
+    "index_columns": ["ID", "Level", "Category", "Summary"],
+    "detect_columns": ["ID", "Detection"]
+  },
+  "render": {
+    "number_style": "arabic",
+    "separator": ": ",
+    "empty_section": "Clauses for this section are pending.",
+    "why": "Why",
+    "good": "Good",
+    "bad": "Bad",
+    "sources": "References",
+    "category_line": "Category: {v}",
+    "since_go_line": "Since: Go {v}",
+    "detect_line": "**Detection**: {v}",
+    "quote_mark": "—",
+    "detect_grep": "grep regex {v}",
+    "detect_lint": "golangci-lint {v}",
+    "detect_manual": "manual review",
+    "detect_note": " ({v})"
+  },
+  "cli": {
+    "details": "Details",
+    "why": "Why",
+    "quote": "Quote",
+    "source": "Source",
+    "good": "Good",
+    "bad": "Bad",
+    "references": "References",
+    "detection": "Detection",
+    "category": "Category",
+    "since_go": "Since",
+    "no_hits": "No hits found.",
+    "uncovered": "Clauses without an automated check:"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "manual": {
+    "title": "Golang 开发手册",
+    "intro": "个人维护的 Golang 开发手册。条款分 MUST / SHOULD / MAY 三级，目录与条款同源于 `gdm/data/`。",
+    "baseline_line": "基准版本：Go {v}",
+    "count_line": "条款总数：{v}",
+    "toc_heading": "目录"
+  },
+  "appendix": {
+    "slug": "appendix",
+    "title": "附录",
+    "index_heading": "条款总索引",
+    "sources_heading": "依据来源",
+    "detect_heading": "检测映射",
+    "index_columns": ["编号", "级别", "归属", "一句话"],
+    "detect_columns": ["编号", "检测方式"]
+  },
+  "render": {
+    "number_style": "chinese",
+    "separator": "：",
+    "empty_section": "（本节条款待补充）",
+    "why": "为什么",
+    "good": "正例",
+    "bad": "反例",
+    "sources": "依据",
+    "category_line": "归属：{v}",
+    "since_go_line": "起始版本：Go {v}",
+    "detect_line": "**检测**：{v}",
+    "quote_mark": "——",
+    "detect_grep": "grep 正则 {v}",
+    "detect_lint": "golangci-lint {v}",
+    "detect_manual": "人工核对",
+    "detect_note": "（{v}）"
+  },
+  "cli": {
+    "details": "说明",
+    "why": "为什么",
+    "quote": "引文",
+    "source": "出处",
+    "good": "正例",
+    "bad": "反例",
+    "references": "依据",
+    "detection": "检测",
+    "category": "归属",
+    "since_go": "起始版本",
+    "no_hits": "未发现命中。",
+    "uncovered": "以下条款没有自动检测："
+  }
+}

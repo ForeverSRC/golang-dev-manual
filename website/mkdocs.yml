@@ -1,0 +1,36 @@
+site_name: Golang 开发手册
+site_url: https://foreversrc.github.io/golang-dev-manual/
+repo_url: https://github.com/ForeverSRC/golang-dev-manual
+repo_name: ForeverSRC/golang-dev-manual
+
+docs_dir: ../manual
+site_dir: ../.site
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      languages:
+        - locale: zh
+          default: true
+          name: 中文
+        - locale: en
+          name: English
+          site_name: Golang Development Manual
+
+markdown_extensions:
+  - attr_list
+  - sane_lists
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences

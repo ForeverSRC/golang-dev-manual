@@ -1,0 +1,38 @@
+{
+  "TOOL-001": {
+    "summary": "Use golangci-lint uniformly for static code analysis.",
+    "details": "Keep a single .golangci.yml across the whole repository, and run the same command locally and in CI; the golangci-lint version is pinned by the tool directive in go.mod, not relying on a global installation on each machine.",
+    "rationale": "Bare linters of different versions on different machines by different people produce inconsistent results, so reviewers cannot reach the same conclusion; only one centralized config plus a pinned version makes problems reproducible.",
+    "detect_note": "Check that the repository root has .golangci.yml and that the lint entry point invokes golangci-lint"
+  },
+  "TOOL-009": {
+    "summary": "Name the checker and state the reason when suppressing a warning.",
+    "details": "After confirming a false positive, write //nolint:<checker> // reason at the triggering site, where the checker name and the reason are both indispensable; do not write a bare //nolint or //nolint:all, since they do not indicate which check is being suppressed; also do not turn off checks wholesale at the top of a file or package. Enable nolintlint in the configuration, enforced by the three settings require-specific, require-explanation, and allow-unused.",
+    "rationale": "A suppression is a hole opened in the checkers; writing the checker and the reason makes clear during review which rule was bypassed and what the cost of bypassing it is; a bare //nolint or //nolint:all opens the hole on all checks, so analyzers added later are also let through and no one sees the problems anymore.",
+    "detect_note": "Configured as require-specific + require-explanation + allow-unused, blocking suppressions that do not name a checker, lack a reason, or are no longer effective"
+  },
+  "TOOL-002": {
+    "summary": "Enable modernize in golangci-lint to keep up with modern Go idioms.",
+    "details": "After a Go version upgrade, modernize points out the places where old code can be simplified; without it enabled, these idioms rely solely on human memory.",
+    "rationale": "The standard library and language features keep filling in gaps, and old code becomes technical debt version by version; letting analyzers flag it in bulk costs less than refactoring after the fact.",
+    "detect_note": "Check that linters.enable in .golangci.yml includes modernize"
+  },
+  "TOOL-003": {
+    "summary": "Enable testifylint alongside testify when testify is used.",
+    "details": "testifylint blocks high-frequency misuses such as judging errors with assert.Nil and reversed argument order; projects that do not use testify need not enable it.",
+    "rationale": "Some misuse of the testify API raises no compile-time error, for example assert.Nil(t, err) fails to judge correctly when err is an interface; handing this to a linter is more reliable than relying on reviewers' memory.",
+    "detect_note": "Check that linters.enable in .golangci.yml includes testifylint"
+  },
+  "TOOL-006": {
+    "summary": "Enable at least the standard set of golangci-lint.",
+    "details": "The standard set is the five checkers enabled by default in golangci-lint; do not turn them off in the configuration, and do not keep only some of them:\n\n- errcheck: unhandled error return values\n- govet: suspicious constructs, equivalent to go vet\n- ineffassign: assignments whose value is never read again\n- staticcheck: the diagnostic rules of staticcheck\n- unused: unused identifiers",
+    "rationale": "All five target defects that can be determined with certainty: missed errors, suspicious constructs that are wrong yet still compile, intermediate values computed but never used, and dead code that can never be reached. Turning off any one of them amounts to giving up machine interception for that category of defect, falling back to review by human memory.",
+    "detect_note": "Check that .golangci.yml does not turn off the standard set"
+  },
+  "TOOL-007": {
+    "summary": "Beyond the standard set, enable the commonly used supplementary analyzers.",
+    "details": "Beyond the standard set, enable the following analyzers:\n\n- errorlint: writing problems related to error chains\n- nilerr: checking err != nil yet returning nil\n- bodyclose: an HTTP response body is not closed\n- noctx: a request carries no context.Context\n- nolintlint: a suppression does not name a checker, lacks a reason, or is no longer effective\n- gosec: security risks\n- gocritic: defect and performance diagnostics\n- exhaustive: an enum switch is not exhaustive\n- copyloopvar: redundant loop variable copies since Go 1.22\n- testpackage: same-package tests\n- funcorder: the order of exported and unexported functions\n- misspell: spelling mistakes\n\nSee the separate clauses in the same section for modernize and testifylint. Those that do not fit the shape of the project may be left disabled, with the reason written into a configuration comment or the review record.",
+    "rationale": "Nothing beyond the standard set is enabled by default; not turning it on means not having it. Each of these analyzers targets a specific class of defect or high-frequency deviation, with controllable false positives; the list includes only general items unrelated to any project, and project-specific checks are added within their own projects.",
+    "detect_note": "Check whether the enable list covers the list of analyzers and whether disabled ones have a reason"
+  }
+}
