@@ -23,62 +23,169 @@
   --md-typeset-a-color: #4dd0e1;
 }
 
+/* 正文：中文笔画比拉丁文重，字号收一档、行距放宽 */
+.md-typeset {
+  font-size: 0.75rem;
+  line-height: 1.75;
+}
+
+.md-typeset h1 {
+  color: var(--md-default-fg-color);
+  font-size: 1.75em;
+  font-weight: 400;
+}
+
 /* 正文列宽 */
 .md-grid {
-  max-width: 72rem;
+  max-width: 66rem;
+}
+
+/* 侧栏标题与首页导航项同名，宽屏下只留导航项 */
+@media screen and (min-width: 60em) {
+  .md-nav--primary > .md-nav__title {
+    display: none;
+  }
+}
+
+/* 右侧目录：条款条目标题较长，宽屏下把该列放宽，少折行 */
+@media screen and (min-width: 60em) {
+  .md-sidebar--secondary {
+    width: 16rem;
+  }
+}
+
+.md-nav--secondary .md-nav__link {
+  line-height: 1.45;
+}
+
+.md-nav--secondary .md-nav__item {
+  margin-top: 0.2em;
 }
 
 /* 行内代码 */
 [data-md-color-scheme="default"] .md-typeset :not(pre) > code {
-  background-color: rgba(0, 125, 156, 0.1);
+  background-color: rgba(0, 125, 156, 0.09);
   color: #005b73;
 }
 
 [data-md-color-scheme="slate"] .md-typeset :not(pre) > code {
-  background-color: rgba(77, 208, 225, 0.14);
+  background-color: rgba(77, 208, 225, 0.12);
   color: #8fe3f0;
 }
 
-/* 条款块：左侧色条按级别区分 */
+/* 首页目录：去掉与「一、」重复的阿拉伯序号，分两栏排 */
+.gdm-index > ol {
+  padding-left: 0;
+  list-style: none;
+  columns: 2;
+  column-gap: 3rem;
+}
+
+@media screen and (max-width: 60em) {
+  .gdm-index > ol {
+    columns: 1;
+  }
+}
+
+.gdm-index > ol > li {
+  margin-top: 1.2em;
+  break-inside: avoid;
+  font-weight: 500;
+}
+
+.gdm-index > ol > li > ul {
+  margin-top: 0.35em;
+  color: var(--md-default-fg-color--light);
+}
+
+/* 条款块：左侧细色条按级别区分 */
 .md-typeset .gdm-clause {
-  margin: 2em 0;
-  padding: 0.2em 1.2em 1em;
-  border-left: 0.2rem solid var(--md-default-fg-color--lighter);
-  border-radius: 0 0.2rem 0.2rem 0;
-}
-
-[data-md-color-scheme="default"] .md-typeset .gdm-clause {
-  background-color: rgba(0, 125, 156, 0.03);
-}
-
-[data-md-color-scheme="slate"] .md-typeset .gdm-clause {
-  background-color: rgba(255, 255, 255, 0.03);
+  margin: 2.2em 0;
+  padding: 0 1.2em;
+  border-left: 0.15rem solid var(--md-default-fg-color--lighter);
 }
 
 .md-typeset .gdm-clause > h3 {
-  margin-top: 1.2em;
-  padding-bottom: 0.3em;
+  margin-top: 0;
+  padding-bottom: 0.25em;
   border-bottom: 1px solid var(--md-default-fg-color--lightest);
-  font-size: 1.05rem;
+  font-size: 1.1em;
 }
 
 .md-typeset .gdm-clause--must {
-  border-left-color: #d1453b;
+  border-left-color: #c8503f;
 }
 
 .md-typeset .gdm-clause--should {
-  border-left-color: #d99a2b;
+  border-left-color: #c99a3f;
 }
 
 .md-typeset .gdm-clause--may {
-  border-left-color: #2e8b57;
+  border-left-color: #3f8f66;
+}
+
+/* 条款抬头：级别徽标、编号、一句话 */
+.md-typeset .gdm-level {
+  display: inline-block;
+  min-width: 4.4em;
+  margin-right: 0.4em;
+  padding: 0.1em 0.4em;
+  border-radius: 0.15rem;
+  font-size: 0.76em;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #fff;
+  background-color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .gdm-level--must {
+  background-color: #c8503f;
+}
+
+.md-typeset .gdm-level--should {
+  background-color: #c99a3f;
+}
+
+.md-typeset .gdm-level--may {
+  background-color: #3f8f66;
+}
+
+.md-typeset .gdm-id {
+  margin-right: 0.35em;
+  font-family: var(--md-code-font);
+  font-size: 0.88em;
+  color: var(--md-default-fg-color--light);
+}
+
+/* 条款元信息：归属与起始版本并成一行 */
+.md-typeset .gdm-clause > h3 + ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.6em;
+  margin: 0.5em 0 1em;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.85em;
+  color: var(--md-default-fg-color--light);
+}
+
+/* 为什么：引文与讲解收进一个浅底块 */
+.md-typeset .gdm-clause blockquote {
+  margin: 0.6em 0 1em;
+  padding: 0.6em 1em;
+  border-left: 0.15rem solid var(--md-default-fg-color--lighter);
+  border-radius: 0 0.2rem 0.2rem 0;
+  background-color: var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color--light);
 }
 
 /* 正例与反例的代码块 */
 .md-typeset .highlight.gdm-good {
-  box-shadow: inset 0.2rem 0 0 #2e8b57;
+  box-shadow: inset 0.15rem 0 0 #3f8f66;
 }
 
 .md-typeset .highlight.gdm-bad {
-  box-shadow: inset 0.2rem 0 0 #d1453b;
+  box-shadow: inset 0.15rem 0 0 #c8503f;
 }

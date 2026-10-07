@@ -1,7 +1,6 @@
 site_name: Golang 开发手册
 site_url: https://foreversrc.github.io/golang-dev-manual/
 repo_url: https://github.com/ForeverSRC/golang-dev-manual
-repo_name: ForeverSRC/golang-dev-manual
 
 docs_dir: ../manual
 site_dir: ../.site
@@ -12,8 +11,8 @@ hooks:
 theme:
   name: material
   language: zh
-  logo: assets/logo.svg
-  favicon: assets/favicon.svg
+  logo: assets/mark.svg
+  favicon: assets/mark.svg
   font: false
   palette:
     - media: "(prefers-color-scheme)"
@@ -35,12 +34,9 @@ theme:
         icon: material/brightness-4
         name: 切换到浅色
   features:
-    - navigation.tabs
-    - navigation.tabs.sticky
     - navigation.sections
     - navigation.top
     - navigation.tracking
-    - navigation.path
     - toc.follow
     - content.code.copy
     - content.tooltips

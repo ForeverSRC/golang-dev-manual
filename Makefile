@@ -23,7 +23,7 @@ check:
 	go test ./...
 
 site-assets:
-	@for dir in $(SITE_ASSET_DIRS); do mkdir -p $$dir; cp -R website/assets/. $$dir/; done
+	@for dir in $(SITE_ASSET_DIRS); do rm -rf $$dir; mkdir -p $$dir; cp -R website/assets/. $$dir/; done
 
 site: gen site-assets
 	mkdocs build -f website/mkdocs.yml
