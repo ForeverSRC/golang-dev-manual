@@ -7,7 +7,7 @@
 - Category: Tooling/Command Line
 - Since: Go 1.0
 
-Attach subcommands to the root command and put business logic in each command's RunE; write output to cmd.OutOrStdout() and errors to cmd.ErrOrStderr().
+Attach subcommands to the root command and put business logic in each command's `RunE`; write output to `cmd.OutOrStdout()` and errors to `cmd.ErrOrStderr()`.
 
 **Why**
 
@@ -15,7 +15,7 @@ Attach subcommands to the root command and put business logic in each command's 
 >
 > — https://github.com/spf13/cobra
 
-Hand-rolled os.Args dispatch has to reinvent subcommands, global flags, and help text; `cobra` injects output and arguments into commands, so commands can be executed directly in tests.
+Hand-rolled `os.Args` dispatch has to reinvent subcommands, global flags, and help text; `cobra` injects output and arguments into commands, so commands can be executed directly in tests.
 
 **Good**
 
@@ -57,7 +57,7 @@ After switching the build to a newer Go version, run `go fix ./...` in a clean g
 - Run once per GOOS / GOARCH to cover code under different build tags
 - When a package author migrates their own API, write `//go:fix inline` on the replaced function and let the inline analyzer apply it
 
-The modernize check and the tool in this section point to the same set of analyzers; the difference is that golangci-lint reports during review, while `go fix` produces the patch directly.
+The modernize check and the tool in this section point to the same set of analyzers; the difference is that `golangci-lint` reports during review, while `go fix` produces the patch directly.
 
 **Why**
 
@@ -173,7 +173,7 @@ When the generator allows specifying the output file name, name the file with a 
 - Prefer the suffix, as in wire_gen.go and order_repo_gen.go, so that name sorting keeps it next to files of the same kind.
 - Write the prefix as gen_, as in gen_version.go.
 - Use only underscores as separators, never hyphens.
-- When the file name is fixed by the generator itself (wire outputs wire_gen.go) or decided by the platform, follow the generator default and do not rename it.
+- When the file name is fixed by the generator itself (`wire` outputs wire_gen.go) or decided by the platform, follow the generator default and do not rename it.
 
 **Why**
 
@@ -181,7 +181,7 @@ When the generator allows specifying the output file name, name the file with a 
 >
 > — https://protobuf.dev/reference/go/go-generated/
 
-protoc adds the .pb.go suffix to generated files and wire outputs wire_gen.go, both marking the file name as generated. When the name is chosen by the caller with no convention, generated files and hand-written files mix in the same directory, so a reviewer must open each one to learn which can be edited and must look up the generation command before editing. With a uniform gen prefix or suffix, the directory listing itself answers that; the suffix is recommended because it does not break the existing naming order, leaving retrieval, sorting, and adjacency driven by the business-name prefix. The separator follows its own file name convention: the `_test.go` and `source_windows_amd64.go` forms recognized by the Go toolchain both use underscores, and hyphenated files in the standard library appear only in test data such as testdata.
+`protoc` adds the .pb.go suffix to generated files and `wire` outputs wire_gen.go, both marking the file name as generated. When the name is chosen by the caller with no convention, generated files and hand-written files mix in the same directory, so a reviewer must open each one to learn which can be edited and must look up the generation command before editing. With a uniform gen prefix or suffix, the directory listing itself answers that; the suffix is recommended because it does not break the existing naming order, leaving retrieval, sorting, and adjacency driven by the business-name prefix. The separator follows its own file name convention: the `_test.go` and `source_windows_amd64.go` forms recognized by the Go toolchain both use underscores, and hyphenated files in the standard library appear only in test data such as testdata.
 
 **Good**
 

@@ -8,13 +8,13 @@
   "PERF-002": {
     "summary": "Use strconv, not fmt, to convert between primitive types and strings.",
     "details": "Convert between int, uint, float, bool, and strings with `strconv` functions such as `Itoa`, `Atoi`, `FormatInt`, `ParseFloat`, and `FormatBool`. Use `fmt.Sprintf` only when multiple values and a complex format (such as a `%v` combination, width, and precision) are genuinely needed.",
-    "rationale": "fmt's formatting goes through interfaces and reflection on a general parsing path, allocating more and checking more than strconv's dedicated functions. In Uber's benchmark the same conversion costs 143 ns/op and two allocations with `fmt.Sprint`, against 64.2 ns/op and one allocation with `strconv.Itoa`; on a high-frequency path the gap is amplified as it accumulates with the call count.",
+    "rationale": "`fmt`'s formatting goes through interfaces and reflection on a general parsing path, allocating more and checking more than `strconv`'s dedicated functions. In Uber's benchmark the same conversion costs 143 ns/op and two allocations with `fmt.Sprint`, against 64.2 ns/op and one allocation with `strconv.Itoa`; on a high-frequency path the gap is amplified as it accumulates with the call count.",
     "detect_note": "Check whether conversions between a single primitive type and a string use fmt."
   },
   "PERF-003": {
     "summary": "Convert a fixed string to []byte once outside the loop and reuse the result.",
     "details": "When a loop or hot path repeatedly converts the same string literal or variable to `[]byte`, hoist the conversion out of the loop and reuse the result of that single conversion. When the string's content changes each iteration, or a slice that can be modified independently is needed, keep converting inside the loop.",
-    "rationale": "Converting between string and []byte allocates new memory and copies byte by byte. A fixed string converted inside a loop produces a slice that is discarded immediately each iteration, with allocations on the order of the loop count and the same amount of garbage added for the GC. In Uber's benchmark one conversion per iteration costs 22.2 ns/op, dropping to 3.25 ns/op once hoisted out of the loop.",
+    "rationale": "Converting between string and `[]byte` allocates new memory and copies byte by byte. A fixed string converted inside a loop produces a slice that is discarded immediately each iteration, with allocations on the order of the loop count and the same amount of garbage added for the GC. In Uber's benchmark one conversion per iteration costs 22.2 ns/op, dropping to 3.25 ns/op once hoisted out of the loop.",
     "detect_note": "Check whether the loop contains conversions between string and []byte for a fixed string."
   },
   "PERF-004": {
@@ -32,13 +32,13 @@
   "PERF-006": {
     "summary": "Use strings.Builder to concatenate strings in a loop or across many operations, and call Grow first when the capacity can be estimated.",
     "details": "Use `strings.Builder` when building a string piece by piece (inside a loop, across many branches, with an indefinite count), and call `Grow` first when the result length can be estimated. Keep using `+` for a small, fixed inline concatenation. Use `bytes.Buffer` when a read-write buffer or `Bytes` access is needed.",
-    "rationale": "Strings are immutable, so every += builds a new string and copies the whole accumulated content; inside a loop the repeated moving grows with the accumulated length, making the total copied close to quadratic. Builder writes into one mutable buffer and produces the result only once at retrieval; calling Grow before writing removes even the buffer growth.",
+    "rationale": "Strings are immutable, so every += builds a new string and copies the whole accumulated content; inside a loop the repeated moving grows with the accumulated length, making the total copied close to quadratic. `Builder` writes into one mutable buffer and produces the result only once at retrieval; calling `Grow` before writing removes even the buffer growth.",
     "detect_note": "Check whether the loop contains string concatenation with +=."
   },
   "PERF-007": {
     "summary": "When keeping a small section of a large slice for a long time, use slices.Clone to cut the reference to the backing array.",
     "details": "`s[i:j]` shares the backing array with the original slice, so while the sub-slice is still referenced the whole array cannot be reclaimed. When the sub-slice lives long, or the original slice is far larger than the section needed, use `slices.Clone` (since Go 1.21) or `make` plus `copy` to produce an independent slice. When the sub-slice is released as the function returns, or covers most of the elements anyway, slicing directly is enough.",
-    "rationale": "When a small section is cut out of a large file or large response and kept for a long time, the sub-slice still points at the original backing array, the GC treats the whole array as still referenced, and the process's resident memory far exceeds what is actually needed. Clone copies out an independent array containing only the needed elements, and the original array can be reclaimed once it loses its references.",
+    "rationale": "When a small section is cut out of a large file or large response and kept for a long time, the sub-slice still points at the original backing array, the GC treats the whole array as still referenced, and the process's resident memory far exceeds what is actually needed. `Clone` copies out an independent array containing only the needed elements, and the original array can be reclaimed once it loses its references.",
     "detect_note": "Check whether a sub-slice cut from a large buffer and kept for a long time is copied."
   },
   "PERF-008": {

@@ -48,7 +48,7 @@ func TestMatch(t *testing.T) {
 - 归属：单元测试规约/测试命名与结构
 - 起始版本：Go 1.24
 
-只做输入输出映射、没有需要构造的被测对象与依赖的函数，直接写 func TestXxx(t *testing.T) 加断言，多组输入用 t.Run 组织成表；以类型为单位封装行为、需要经构造函数产生被测对象，或需要组装依赖、准备共享 fixture 的组件，用 suite.Suite 嵌入，把被测对象与依赖放进结构体字段、在 SetupSuite 里组装一次，由一个入口函数调用 suite.Run 统一运行。
+只做输入输出映射、没有需要构造的被测对象与依赖的函数，直接写 `func TestXxx(t *testing.T)` 加断言，多组输入用 `t.Run` 组织成表；以类型为单位封装行为、需要经构造函数产生被测对象，或需要组装依赖、准备共享 fixture 的组件，用 `suite.Suite` 嵌入，把被测对象与依赖放进结构体字段、在 `SetupSuite` 里组装一次，由一个入口函数调用 `suite.Run` 统一运行。
 
 **为什么**
 
@@ -56,7 +56,7 @@ func TestMatch(t *testing.T) {
 >
 > —— https://github.com/stretchr/testify#suite-package
 
-纯函数没有依赖与跨用例状态，套 suite 只会多出结构体、嵌入与运行入口三层样板，读一个用例要跨三处；组件的被测对象与依赖要在多个用例间复用，散在每个用例里各自构造既重复，依赖增加时又容易漏改，suite 的字段与 SetupSuite 正好集中承载这件事。
+纯函数没有依赖与跨用例状态，套 `suite` 只会多出结构体、嵌入与运行入口三层样板，读一个用例要跨三处；组件的被测对象与依赖要在多个用例间复用，散在每个用例里各自构造既重复，依赖增加时又容易漏改，`suite` 的字段与 `SetupSuite` 正好集中承载这件事。
 
 **正例**
 
@@ -109,7 +109,7 @@ func TestLoadError(t *testing.T) {
 - 归属：单元测试规约/测试命名与结构
 - 起始版本：Go 1.24
 
-输入由用例自己构造、不读写真实文件与网络的属单元测试，直接写在该包内；需要真实文件、真实依赖或端到端链路的属集成测试，文件名以 _it_test.go 结尾，与单元测试同包，由 go test 一并执行。真实数据的完整性校验归集成测试。
+输入由用例自己构造、不读写真实文件与网络的属单元测试，直接写在该包内；需要真实文件、真实依赖或端到端链路的属集成测试，文件名以 _it_test.go 结尾，与单元测试同包，由 `go test` 一并执行。真实数据的完整性校验归集成测试。
 
 **为什么**
 
@@ -150,7 +150,7 @@ func TestLoad(t *testing.T) {
 - 归属：单元测试规约/测试命名与结构
 - 起始版本：Go 1.0
 
-t.Run 的子测试名与表格里的 name 字段，写成 should 接期望结果、when 接触发条件，例如 should return error when file is missing。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。
+`t.Run` 的子测试名与表格里的 name 字段，写成 should 接期望结果、when 接触发条件，例如 should return error when file is missing。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。
 
 **为什么**
 
@@ -158,7 +158,7 @@ t.Run 的子测试名与表格里的 name 字段，写成 should 接期望结果
 >
 > —— https://go.dev/wiki/TestComments#choose-human-readable-subtest-names
 
-子测试名会直接进 go test 的输出，人只看名字判断哪条失败；上游只要求名字可读，把期望结果与触发条件写进名字是达成可读的一种稳定写法，失败时不用回读用例代码就能定位。
+子测试名会直接进 `go test` 的输出，人只看名字判断哪条失败；上游只要求名字可读，把期望结果与触发条件写进名字是达成可读的一种稳定写法，失败时不用回读用例代码就能定位。
 
 **正例**
 
@@ -460,7 +460,7 @@ assert.Equal(t, []string{"A-001"}, ids)
 - 归属：单元测试规约/断言与测试数据
 - 起始版本：Go 1.16
 
-输入载荷或期望结果较长时，写成 testdata/ 下的单独文件，与代码分离；用例用 //go:embed 把文件嵌入测试二进制后再读，不靠运行目录拼路径定位文件。需要按文件名批量驱动时嵌入 embed.FS，再用 fs.Glob 遍历。被测对象本身以文件路径为输入（文件加载器、目录扫描器一类）时，直接传 testdata 下的相对路径。期望结果随实现有意变更时，注入 -update flag 用实际输出覆盖期望文件，再由 git diff 人工复核。
+输入载荷或期望结果较长时，写成 testdata/ 下的单独文件，与代码分离；用例用 //go:embed 把文件嵌入测试二进制后再读，不靠运行目录拼路径定位文件。需要按文件名批量驱动时嵌入 `embed.FS`，再用 `fs.Glob` 遍历。被测对象本身以文件路径为输入（文件加载器、目录扫描器一类）时，直接传 testdata 下的相对路径。期望结果随实现有意变更时，注入 -update flag 用实际输出覆盖期望文件，再由 git diff 人工复核。
 
 **为什么**
 
@@ -468,7 +468,7 @@ assert.Equal(t, []string{"A-001"}, ids)
 >
 > —— https://pkg.go.dev/embed
 
-大段 JSON 写在 Go 字符串里，用例逻辑被数据淹没，改一处数据要动代码；放成对文件后数据可读、可 diff。用运行目录拼路径读文件，换一个工作目录就找不到文件（IDE 直接跑用例、从仓库根目录发起 go test 都是这种情况）；//go:embed 在编译期把内容固定进二进制，读取结果不随运行环境变。
+大段 JSON 写在 Go 字符串里，用例逻辑被数据淹没，改一处数据要动代码；放成对文件后数据可读、可 diff。用运行目录拼路径读文件，换一个工作目录就找不到文件（IDE 直接跑用例、从仓库根目录发起 `go test` 都是这种情况）；//go:embed 在编译期把内容固定进二进制，读取结果不随运行环境变。
 
 **正例**
 
@@ -498,7 +498,7 @@ require.NoError(t, err)
 - 归属：单元测试规约/断言与测试数据
 - 起始版本：Go 1.24
 
-失败路径先断言是否返回了错误；需要区分错误种类时，哨兵用 errors.Is、错误类型用 errors.As，不用字符串比对消息，也不新构造一个同样的错误做值比较。错误消息本身是被测契约的一部分（例如必须带上输入参数名）时，才对消息做字符串断言，且只断这类不受措辞影响的属性。
+失败路径先断言是否返回了错误；需要区分错误种类时，哨兵用 `errors.Is`、错误类型用 `errors.As`，不用字符串比对消息，也不新构造一个同样的错误做值比较。错误消息本身是被测契约的一部分（例如必须带上输入参数名）时，才对消息做字符串断言，且只断这类不受措辞影响的属性。
 
 **为什么**
 
@@ -506,7 +506,7 @@ require.NoError(t, err)
 >
 > —— https://go.dev/wiki/TestComments#test-error-semantics
 
-错误消息是给人看的，用字符串比对判断错误种类，措辞改一次用例就跟着红，这种用例拦不住真实错误；要能区分错误种类，得让被测代码暴露哨兵错误或错误类型，测试再用 errors.Is / errors.As 判断。
+错误消息是给人看的，用字符串比对判断错误种类，措辞改一次用例就跟着红，这种用例拦不住真实错误；要能区分错误种类，得让被测代码暴露哨兵错误或错误类型，测试再用 `errors.Is` / `errors.As` 判断。
 
 **正例**
 
@@ -536,7 +536,7 @@ require.ErrorContains(t, err, "load")
 - 归属：单元测试规约/Mock 与测试替身
 - 起始版本：Go 1.0
 
-go.mod 与生成文件里只出现 go.uber.org/mock 与其 mockgen，不引入 github.com/golang/mock；已有的旧引用一并迁到 uber 版本。
+go.mod 与生成文件里只出现 `go.uber.org/mock` 与其 `mockgen`，不引入 `github.com/golang/mock`；已有的旧引用一并迁到 uber 版本。
 
 **为什么**
 
@@ -544,7 +544,7 @@ go.mod 与生成文件里只出现 go.uber.org/mock 与其 mockgen，不引入 g
 >
 > —— https://github.com/uber-go/mock
 
-github.com/golang/mock 已被 Google 归档停更，不再跟随 Go 版本更新；uber 接手维护的分支 API 兼容，是当前的使用版本。
+`github.com/golang/mock` 已被 Google 归档停更，不再跟随 Go 版本更新；uber 接手维护的分支 API 兼容，是当前的使用版本。
 
 **正例**
 
@@ -569,7 +569,7 @@ import "github.com/golang/mock/gomock"
 - 归属：单元测试规约/Mock 与测试替身
 - 起始版本：Go 1.14
 
-用 gomock.NewController(t) 传入 *testing.T 后，控制器在测试与子测试结束时自动校验期望，代码里不再写 ctrl.Finish()。使用自建的 TestReporter、或传入的不是 *testing.T 时，仍需自己保证校验时机。
+用 `gomock.NewController(t)` 传入 `*testing.T` 后，控制器在测试与子测试结束时自动校验期望，代码里不再写 `ctrl.Finish()`。使用自建的 `TestReporter`、或传入的不是 `*testing.T` 时，仍需自己保证校验时机。
 
 **为什么**
 
@@ -577,7 +577,7 @@ import "github.com/golang/mock/gomock"
 >
 > —— https://pkg.go.dev/go.uber.org/mock/gomock#Controller.Finish
 
-gomock 文档写明传入 *testing.T 后无需再调用 Finish；手写调用是 Go 1.14 之前的写法，重复校验还会在子测试没跑完时提前中断。
+`gomock` 文档写明传入 `*testing.T` 后无需再调用 `Finish`；手写调用是 Go 1.14 之前的写法，重复校验还会在子测试没跑完时提前中断。
 
 **正例**
 
@@ -604,7 +604,7 @@ defer ctrl.Finish()
 - 归属：单元测试规约/Mock 与测试替身
 - 起始版本：Go 1.0
 
-gomock 的期望默认要求恰好调用一次，Times(1) 不改变行为。只在防御意外调用写 Times(0)、或明确要求多次时写 Times(n)。
+`gomock` 的期望默认要求恰好调用一次，`Times(1)` 不改变行为。只在防御意外调用写 `Times(0)`、或明确要求多次时写 `Times(n)`。
 
 **为什么**
 
@@ -612,7 +612,7 @@ gomock 的期望默认要求恰好调用一次，Times(1) 不改变行为。只�
 >
 > —— https://pkg.go.dev/go.uber.org/mock/gomock#Call.Times
 
-每个 EXPECT 末尾挂一个 Times(1)，读的人得逐个确认这是刻意的约束还是随手加的；约束本已默认成立，写出来只是噪声。
+每个 `EXPECT` 末尾挂一个 `Times(1)`，读的人得逐个确认这是刻意的约束还是随手加的；约束本已默认成立，写出来只是噪声。
 
 **正例**
 
@@ -638,7 +638,7 @@ repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil).Times(1)
 - 归属：单元测试规约/Mock 与测试替身
 - 起始版本：Go 1.0
 
-gomock 默认不约束期望的调用顺序。只有顺序错会改变结果的场景，例如加锁、扣减、释放这类前后依赖，才用 InOrder 或 After 固定顺序；并发调用同一组期望时不用，避免调度顺序不同导致偶发失败。
+`gomock` 默认不约束期望的调用顺序。只有顺序错会改变结果的场景，例如加锁、扣减、释放这类前后依赖，才用 `InOrder` 或 `After` 固定顺序；并发调用同一组期望时不用，避免调度顺序不同导致偶发失败。
 
 **为什么**
 
@@ -646,7 +646,7 @@ gomock 默认不约束期望的调用顺序。只有顺序错会改变结果的�
 >
 > —— https://pkg.go.dev/go.uber.org/mock/gomock#InOrder
 
-顺序无关的操作套上 InOrder，一次不改变行为的重构就会让用例变红；多个 Goroutine 调用时顺序由调度决定，用例会时红时绿。
+顺序无关的操作套上 `InOrder`，一次不改变行为的重构就会让用例变红；多个 Goroutine 调用时顺序由调度决定，用例会时红时绿。
 
 **正例**
 
@@ -675,7 +675,7 @@ gomock.InOrder(
 - 归属：单元测试规约/Mock 与测试替身
 - 起始版本：Go 1.0
 
-非匹配器的参数按相等匹配，直接写字面量即可，不再包一层 gomock.Eq；需要限制类型用 AssignableToTypeOf，需要按条件匹配用 Cond、Len、Nil。context.Context 这类不作断言的值才用 Any()，并在该处写明放宽的原因。
+非匹配器的参数按相等匹配，直接写字面量即可，不再包一层 `gomock.Eq`；需要限制类型用 `AssignableToTypeOf`，需要按条件匹配用 `Cond`、`Len`、`Nil`。`context.Context` 这类不作断言的值才用 `Any()`，并在该处写明放宽的原因。
 
 **为什么**
 
@@ -683,7 +683,7 @@ gomock.InOrder(
 >
 > —— https://pkg.go.dev/go.uber.org/mock/gomock#Matcher
 
-裸 Any() 只校验方法被调用过，参数传错也照样通过；把参数写进期望，调用方的传参错误才能被拦住，用例也读得出这次调用应该长什么样。再包一层 Eq 不改变匹配语义，只多一层噪声。
+裸 `Any()` 只校验方法被调用过，参数传错也照样通过；把参数写进期望，调用方的传参错误才能被拦住，用例也读得出这次调用应该长什么样。再包一层 `Eq` 不改变匹配语义，只多一层噪声。
 
 **正例**
 

@@ -48,7 +48,7 @@ func TestMatch(t *testing.T) {
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.24
 
-For functions that only map input to output, with no object under test or dependencies to construct, write func TestXxx(t *testing.T) plus assertions directly, organizing multiple inputs into a table with t.Run; for components that encapsulate behavior per type, need a constructor to produce the object under test, or need dependencies assembled and a shared fixture prepared, embed suite.Suite, put the object under test and its dependencies into struct fields assembled once in SetupSuite, and run everything through a single entry function that calls suite.Run.
+For functions that only map input to output, with no object under test or dependencies to construct, write `func TestXxx(t *testing.T)` plus assertions directly, organizing multiple inputs into a table with `t.Run`; for components that encapsulate behavior per type, need a constructor to produce the object under test, or need dependencies assembled and a shared fixture prepared, embed `suite.Suite`, put the object under test and its dependencies into struct fields assembled once in `SetupSuite`, and run everything through a single entry function that calls `suite.Run`.
 
 **Why**
 
@@ -56,7 +56,7 @@ For functions that only map input to output, with no object under test or depend
 >
 > — https://github.com/stretchr/testify#suite-package
 
-Pure functions have no dependencies and no state shared across cases, so wrapping them in a suite only adds three layers of boilerplate — the struct, the embedding, and the run entry point — and reading one case means jumping across three places; a component's object under test and dependencies are reused across many cases, and constructing them separately inside each case is repetitive and easy to miss when dependencies grow, while the suite's fields and SetupSuite are exactly where this is held centrally.
+Pure functions have no dependencies and no state shared across cases, so wrapping them in a `suite` only adds three layers of boilerplate — the struct, the embedding, and the run entry point — and reading one case means jumping across three places; a component's object under test and dependencies are reused across many cases, and constructing them separately inside each case is repetitive and easy to miss when dependencies grow, while the `suite`'s fields and `SetupSuite` are exactly where this is held centrally.
 
 **Good**
 
@@ -109,7 +109,7 @@ func TestLoadError(t *testing.T) {
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.24
 
-Tests whose input is constructed by the case itself and which neither read nor write real files or the network are unit tests, written directly inside that package; tests that need real files, real dependencies, or an end-to-end path are integration tests, named with the _it_test.go suffix, in the same package as the unit tests, and executed together by go test. Integrity checks on real data belong to integration tests.
+Tests whose input is constructed by the case itself and which neither read nor write real files or the network are unit tests, written directly inside that package; tests that need real files, real dependencies, or an end-to-end path are integration tests, named with the _it_test.go suffix, in the same package as the unit tests, and executed together by `go test`. Integrity checks on real data belong to integration tests.
 
 **Why**
 
@@ -150,7 +150,7 @@ func TestLoad(t *testing.T) {
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.0
 
-Write the subtest name given to t.Run and the name field in a table as should followed by the expected outcome and when followed by the triggering condition, for example should return error when file is missing. When the scenario is clear at a glance, a short Chinese or English description works just as well; do not stretch the name just to fit the pattern.
+Write the subtest name given to `t.Run` and the name field in a table as should followed by the expected outcome and when followed by the triggering condition, for example should return error when file is missing. When the scenario is clear at a glance, a short Chinese or English description works just as well; do not stretch the name just to fit the pattern.
 
 **Why**
 
@@ -158,7 +158,7 @@ Write the subtest name given to t.Run and the name field in a table as should fo
 >
 > — https://go.dev/wiki/TestComments#choose-human-readable-subtest-names
 
-Subtest names go straight into go test output, and people judge which one failed from the name alone; upstream only requires the name to be readable, and putting the expected outcome and the triggering condition into the name is a stable way to achieve readability, so a failure can be located without rereading the case code.
+Subtest names go straight into `go test` output, and people judge which one failed from the name alone; upstream only requires the name to be readable, and putting the expected outcome and the triggering condition into the name is a stable way to achieve readability, so a failure can be located without rereading the case code.
 
 **Good**
 
@@ -460,7 +460,7 @@ assert.Equal(t, []string{"A-001"}, ids)
 - Category: Unit Testing/Assertions and Test Data
 - Since: Go 1.16
 
-When the input payload or the expected result is long, write it as a separate file under testdata/, kept apart from the code; the case embeds the file into the test binary with //go:embed and then reads it, rather than locating the file by joining paths from the working directory. When cases need to be driven in bulk by file name, embed an embed.FS and walk it with fs.Glob. When the object under test itself takes a file path as input (a file loader or a directory scanner, for example), pass the relative path under testdata directly. When expected results change intentionally along with the implementation, inject a -update flag to overwrite the expected file with the actual output, then review it by hand via git diff.
+When the input payload or the expected result is long, write it as a separate file under testdata/, kept apart from the code; the case embeds the file into the test binary with //go:embed and then reads it, rather than locating the file by joining paths from the working directory. When cases need to be driven in bulk by file name, embed an `embed.FS` and walk it with `fs.Glob`. When the object under test itself takes a file path as input (a file loader or a directory scanner, for example), pass the relative path under testdata directly. When expected results change intentionally along with the implementation, inject a -update flag to overwrite the expected file with the actual output, then review it by hand via git diff.
 
 **Why**
 
@@ -468,7 +468,7 @@ When the input payload or the expected result is long, write it as a separate fi
 >
 > — https://pkg.go.dev/embed
 
-A large block of JSON written inside a Go string drowns the case logic in data, and changing one piece of data means touching the code; once it becomes a paired file, the data is readable and diffable. Reading a file by joining paths from the working directory makes it unfindable from another working directory (running the case directly in the IDE or starting go test from the repository root are both such cases); //go:embed pins the content into the binary at compile time, so the read result does not vary with the runtime environment.
+A large block of JSON written inside a Go string drowns the case logic in data, and changing one piece of data means touching the code; once it becomes a paired file, the data is readable and diffable. Reading a file by joining paths from the working directory makes it unfindable from another working directory (running the case directly in the IDE or starting `go test` from the repository root are both such cases); //go:embed pins the content into the binary at compile time, so the read result does not vary with the runtime environment.
 
 **Good**
 
@@ -498,7 +498,7 @@ require.NoError(t, err)
 - Category: Unit Testing/Assertions and Test Data
 - Since: Go 1.24
 
-On a failure path, first assert whether an error was returned; when the kind of error needs to be distinguished, use errors.Is for sentinels and errors.As for error types, rather than string comparison of the message, and do not construct an identical error for value comparison. Only when the error message itself is part of the contract under test (for example, it must carry the input parameter name) should you assert on the message as a string, and only on such properties as are unaffected by wording.
+On a failure path, first assert whether an error was returned; when the kind of error needs to be distinguished, use `errors.Is` for sentinels and `errors.As` for error types, rather than string comparison of the message, and do not construct an identical error for value comparison. Only when the error message itself is part of the contract under test (for example, it must carry the input parameter name) should you assert on the message as a string, and only on such properties as are unaffected by wording.
 
 **Why**
 
@@ -506,7 +506,7 @@ On a failure path, first assert whether an error was returned; when the kind of 
 >
 > — https://go.dev/wiki/TestComments#test-error-semantics
 
-Error messages are meant for humans; judging the kind of error by string comparison makes the case turn red the moment the wording changes, and such a case catches no real error; to distinguish kinds of errors, the code under test must expose sentinel errors or error types, and the test then judges with errors.Is / errors.As.
+Error messages are meant for humans; judging the kind of error by string comparison makes the case turn red the moment the wording changes, and such a case catches no real error; to distinguish kinds of errors, the code under test must expose sentinel errors or error types, and the test then judges with `errors.Is` / `errors.As`.
 
 **Good**
 
@@ -536,7 +536,7 @@ require.ErrorContains(t, err, "load")
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
 
-Only go.uber.org/mock and its mockgen appear in go.mod and in the generated files, with no github.com/golang/mock introduced; existing old references are migrated to the uber version as well.
+Only `go.uber.org/mock` and its `mockgen` appear in go.mod and in the generated files, with no `github.com/golang/mock` introduced; existing old references are migrated to the uber version as well.
 
 **Why**
 
@@ -544,7 +544,7 @@ Only go.uber.org/mock and its mockgen appear in go.mod and in the generated file
 >
 > — https://github.com/uber-go/mock
 
-github.com/golang/mock has been archived by Google and is no longer updated, no longer following Go releases; the fork Uber took over maintains API compatibility and is the version currently in use.
+`github.com/golang/mock` has been archived by Google and is no longer updated, no longer following Go releases; the fork Uber took over maintains API compatibility and is the version currently in use.
 
 **Good**
 
@@ -569,7 +569,7 @@ import "github.com/golang/mock/gomock"
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.14
 
-After gomock.NewController(t) is given a *testing.T, the controller validates expectations automatically when the test and its subtests finish, so ctrl.Finish() is no longer written in the code. When a self-built TestReporter is used, or what is passed in is not a *testing.T, you still have to ensure the validation timing yourself.
+After `gomock.NewController(t)` is given a `*testing.T`, the controller validates expectations automatically when the test and its subtests finish, so `ctrl.Finish()` is no longer written in the code. When a self-built `TestReporter` is used, or what is passed in is not a `*testing.T`, you still have to ensure the validation timing yourself.
 
 **Why**
 
@@ -577,7 +577,7 @@ After gomock.NewController(t) is given a *testing.T, the controller validates ex
 >
 > — https://pkg.go.dev/go.uber.org/mock/gomock#Controller.Finish
 
-The gomock documentation states that after passing a *testing.T there is no need to call Finish; calling it by hand is the pre-Go 1.14 way, and the duplicate validation also cuts off early before the subtests have finished.
+The `gomock` documentation states that after passing a `*testing.T` there is no need to call `Finish`; calling it by hand is the pre-Go 1.14 way, and the duplicate validation also cuts off early before the subtests have finished.
 
 **Good**
 
@@ -604,7 +604,7 @@ defer ctrl.Finish()
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
 
-A gomock expectation requires exactly one call by default, and Times(1) does not change the behavior. Write Times(0) only to guard against an unexpected call, or Times(n) when a specific multiple is required.
+A `gomock` expectation requires exactly one call by default, and `Times(1)` does not change the behavior. Write `Times(0)` only to guard against an unexpected call, or `Times(n)` when a specific multiple is required.
 
 **Why**
 
@@ -612,7 +612,7 @@ A gomock expectation requires exactly one call by default, and Times(1) does not
 >
 > — https://pkg.go.dev/go.uber.org/mock/gomock#Call.Times
 
-Hanging a Times(1) at the end of every EXPECT forces readers to confirm one by one whether it is a deliberate constraint or added casually; the constraint already holds by default, so writing it out is only noise.
+Hanging a `Times(1)` at the end of every `EXPECT` forces readers to confirm one by one whether it is a deliberate constraint or added casually; the constraint already holds by default, so writing it out is only noise.
 
 **Good**
 
@@ -638,7 +638,7 @@ repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil).Times(1)
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
 
-By default gomock does not constrain the order in which expectations are called. Only in scenarios where the wrong order changes the result, such as lock, decrement, and release with their ordering dependencies, should you pin the order with InOrder or After; do not use it when the same set of expectations is called concurrently, to avoid occasional failures caused by varying scheduling order.
+By default `gomock` does not constrain the order in which expectations are called. Only in scenarios where the wrong order changes the result, such as lock, decrement, and release with their ordering dependencies, should you pin the order with `InOrder` or `After`; do not use it when the same set of expectations is called concurrently, to avoid occasional failures caused by varying scheduling order.
 
 **Why**
 
@@ -646,7 +646,7 @@ By default gomock does not constrain the order in which expectations are called.
 >
 > — https://pkg.go.dev/go.uber.org/mock/gomock#InOrder
 
-Wrapping order-independent operations in InOrder makes the case turn red after a single refactor that changes no behavior; when multiple Goroutines call in, the order is decided by the scheduler, and the case goes red and green by turns.
+Wrapping order-independent operations in `InOrder` makes the case turn red after a single refactor that changes no behavior; when multiple Goroutines call in, the order is decided by the scheduler, and the case goes red and green by turns.
 
 **Good**
 
@@ -675,7 +675,7 @@ gomock.InOrder(
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
 
-Arguments that are not matchers match by equality, so writing the literal directly suffices, with no extra layer of gomock.Eq; use AssignableToTypeOf to constrain the type, and Cond, Len, or Nil to match by condition. Use Any() only for values that are not asserted on, such as context.Context, and state the reason for relaxing the match there.
+Arguments that are not matchers match by equality, so writing the literal directly suffices, with no extra layer of `gomock.Eq`; use `AssignableToTypeOf` to constrain the type, and `Cond`, `Len`, or `Nil` to match by condition. Use `Any()` only for values that are not asserted on, such as `context.Context`, and state the reason for relaxing the match there.
 
 **Why**
 
@@ -683,7 +683,7 @@ Arguments that are not matchers match by equality, so writing the literal direct
 >
 > — https://pkg.go.dev/go.uber.org/mock/gomock#Matcher
 
-A bare Any() only checks that the method was called, so a wrong argument still passes; writing the argument into the expectation lets argument errors at the call site be caught, and the case shows what this call should look like. An extra layer of Eq changes no matching semantics and only adds noise.
+A bare `Any()` only checks that the method was called, so a wrong argument still passes; writing the argument into the expectation lets argument errors at the call site be caught, and the case shows what this call should look like. An extra layer of `Eq` changes no matching semantics and only adds noise.
 
 **Good**
 

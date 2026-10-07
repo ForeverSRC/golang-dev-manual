@@ -2,7 +2,7 @@
   "STRUCT-001": {
     "summary": "Structs containing sync.Mutex or other synchronization primitives must not be copied by value; always pass or receive them by pointer.",
     "details": "Once a synchronization primitive is copied, the copies no longer share the same lock, and the mutual exclusion semantics silently fail. Define methods on structs that contain a lock with a pointer receiver, and state in the doc comment that they must not be copied.",
-    "rationale": "Value copies are legal at compile time, and the copylocks check in go vet is the main line of defense; once it is missed, the problem surfaces only under concurrency pressure, making it costly to track down."
+    "rationale": "Value copies are legal at compile time, and the copylocks check in `go vet` is the main line of defense; once it is missed, the problem surfaces only under concurrency pressure, making it costly to track down."
   },
   "CTX-001": {
     "summary": "Do not store context.Context in a struct; pass it as the first parameter of a function.",
@@ -12,7 +12,7 @@
   },
   "DI-001": {
     "summary": "Use wire for dependency wiring, generated at compile time.",
-    "details": "Concentrate each layer's constructors and interface bindings in a single ProviderSet, and write interface-to-implementation bindings with wire.Bind; the entry point only calls the generated Initialize function. The wire version is pinned via the tool directive in go.mod; after changing the wiring, regenerate wire_gen.go with go generate.",
+    "details": "Concentrate each layer's constructors and interface bindings in a single ProviderSet, and write interface-to-implementation bindings with `wire.Bind`; the entry point only calls the generated `Initialize` function. The `wire` version is pinned via the tool directive in go.mod; after changing the wiring, regenerate wire_gen.go with `go generate`.",
     "rationale": "Runtime reflective injection defers a mistyped field name or a missing binding until startup or runtime to surface; compile-time generation reports errors directly when a binding is missing or duplicated, and the wiring relationships can also be checked line by line in the generated code.",
     "detect_note": "Verify that the repository has wire_gen.go and that port bindings are concentrated in the ProviderSet."
   },
@@ -30,7 +30,7 @@
   },
   "IFACE-001": {
     "summary": "Place interfaces according to the number of implementations: a single implementation shares the package with the implementation, while multiple implementations are defined by the consumer.",
-    "details": "Placement depends on how many implementations are expected:\n\n- Only ever a single implementation: put the interface and the implementation in the same package, with the interface adjacent to the implementation, so that reading the code does not require cross-package comparison; export the interface and the constructor, and keep the implementation struct unexported.\n- Multiple implementations expected, or replacement needed (storage, external services, notifications, and the like): put the interface in the package of the consumer, selecting only the methods the consumer actually needs; the implementation package exports the concrete type and constructor, and writes a compile-time assertion per IFACE-002 to put the promise into code.\n- The interface signature is already fixed by the standard library or a third party (io.Reader and the like): this clause does not apply, and the implementer simply satisfies it as is.",
+    "details": "Placement depends on how many implementations are expected:\n\n- Only ever a single implementation: put the interface and the implementation in the same package, with the interface adjacent to the implementation, so that reading the code does not require cross-package comparison; export the interface and the constructor, and keep the implementation struct unexported.\n- Multiple implementations expected, or replacement needed (storage, external services, notifications, and the like): put the interface in the package of the consumer, selecting only the methods the consumer actually needs; the implementation package exports the concrete type and constructor, and writes a compile-time assertion per IFACE-002 to put the promise into code.\n- The interface signature is already fixed by the standard library or a third party (`io.Reader` and the like): this clause does not apply, and the implementer simply satisfies it as is.",
     "rationale": "When there is a single implementation, splitting the interface into another package forces the reader to compare the implementation's context back and forth between two packages, and a change to one method signature must be aligned in both places; keeping the interface and implementation in the same package lets a single file show the whole contract and behavior. The common upstream Go wiki statement is that \"interfaces belong to the package that uses values of the interface type\" (quoted below), which targets dependencies that will be replaced or used by multiple parties, and its orientation differs from the single-implementation branch of this clause—the single-implementation branch follows local reading habits and is this manual's own convention; the multiple-implementation branch follows the upstream statement, in which case the interface contains only the methods the consumer needs, and the implementer can add methods without going back to change the interface.",
     "detect_note": "Verify whether the package holding the interface matches the number of implementations: for a single implementation, whether it shares the package with the implementation; for multiple implementations, whether it is in the consumer's package."
   },
@@ -42,13 +42,13 @@
   },
   "IFACE-003": {
     "summary": "Do not define pointers to interfaces.",
-    "details": "Use interface values themselves for parameters, return values, and fields, not *Interface. An interface value already contains the type information and a data pointer internally, and whether the underlying data is a value or a pointer is decided by the concrete type; when methods need to modify the underlying data, the implementer expresses that with a pointer receiver.",
-    "rationale": "*Interface adds a layer of dereferencing at call sites and makes nil checks more complex: an interface value that is nil and an interface whose internal data pointer is nil are two states, and once mixed together the emptiness condition is either written wrong or guessed. Passing the interface value itself expresses the same intent with a single meaning for emptiness.",
+    "details": "Use interface values themselves for parameters, return values, and fields, not `*Interface`. An interface value already contains the type information and a data pointer internally, and whether the underlying data is a value or a pointer is decided by the concrete type; when methods need to modify the underlying data, the implementer expresses that with a pointer receiver.",
+    "rationale": "`*Interface` adds a layer of dereferencing at call sites and makes nil checks more complex: an interface value that is nil and an interface whose internal data pointer is nil are two states, and once mixed together the emptiness condition is either written wrong or guessed. Passing the interface value itself expresses the same intent with a single meaning for emptiness.",
     "detect_note": "Verify whether function signatures and struct fields contain *interface types."
   },
   "COMPOSE-002": {
     "summary": "Embedding must not change the outer type's zero value, copy semantics, or public interface.",
-    "details": "Use anonymous embedding only when the inner type's methods should become the outer type's methods; otherwise use a named field. After embedding, the outer zero value must still be usable, the copy semantics unchanged, and no unrelated methods additionally exposed. Synchronization primitives such as sync.Mutex always use a named field, since anonymous embedding hangs Lock and Unlock onto the outer API.",
+    "details": "Use anonymous embedding only when the inner type's methods should become the outer type's methods; otherwise use a named field. After embedding, the outer zero value must still be usable, the copy semantics unchanged, and no unrelated methods additionally exposed. Synchronization primitives such as `sync.Mutex` always use a named field, since anonymous embedding hangs `Lock` and `Unlock` onto the outer API.",
     "rationale": "Once embedding picks an exported type, any method added to the inner type later becomes a public method of the outer type, and replacing the outer type or swapping the inner one is a breaking change; embedding a pointer type also makes the outer zero value panic as soon as it is called. A named field exposes only the set of methods you want to expose, and the outer shape is yours to decide.",
     "detect_note": "Verify whether embedding changes the outer zero value, copy semantics, or exposed unrelated methods (especially for synchronization primitives)."
   },
@@ -60,8 +60,8 @@
   },
   "CTX-002": {
     "summary": "Do not pass a nil context to a function; use context.TODO() as a placeholder.",
-    "details": "When the upstream context is not available yet, pass context.TODO(); use context.Background() at program entry, in initialization, and in tests. Do not treat nil as the expression of \"no context\".",
-    "rationale": "nil is a legal interface value and passes at compile time; the recipient panics outright as soon as it calls Done or Value, and whether it panics depends on its internal implementation, which is invisible from the function signature. Passing context.TODO() has the same semantics and is always safe, and static analysis can also use it to find such omissions.",
+    "details": "When the upstream context is not available yet, pass `context.TODO()`; use `context.Background()` at program entry, in initialization, and in tests. Do not treat nil as the expression of \"no context\".",
+    "rationale": "nil is a legal interface value and passes at compile time; the recipient panics outright as soon as it calls `Done` or `Value`, and whether it panics depends on its internal implementation, which is invisible from the function signature. Passing `context.TODO()` has the same semantics and is always safe, and static analysis can also use it to find such omissions.",
     "detect_note": "SA1012 detects calls that pass a nil context to a function."
   },
   "CTX-003": {

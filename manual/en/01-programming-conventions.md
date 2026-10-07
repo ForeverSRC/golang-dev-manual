@@ -515,7 +515,7 @@ A literal writes field name: value for each field. Small private structs with fe
 >
 > — https://github.com/uber-go/guide/blob/master/style.md#use-field-names-to-initialize-structs
 
-The positional form turns field order into an implicit contract, so after the other side adjusts the struct, positions of the same type are silently mismatched with no compile error; the field name form binds each value to its field so the change surfaces at once. The composites check in go vet covers positional literals from another package.
+The positional form turns field order into an implicit contract, so after the other side adjusts the struct, positions of the same type are silently mismatched with no compile error; the field name form binds each value to its field so the change surfaces at once. The composites check in `go vet` covers positional literals from another package.
 
 **Good**
 
@@ -544,7 +544,7 @@ user := User{"alice", 30}
 - Category: Programming Conventions/Data Structures
 - Since: Go 1.21
 
-slices and maps provide high-frequency operations such as Contains, Sort, Clone, and Keys. When the standard library can express the operation, stop writing loops by hand, which reduces boundary mistakes and unifies the style.
+`slices` and `maps` provide high-frequency operations such as `Contains`, `Sort`, `Clone`, and `Keys`. When the standard library can express the operation, stop writing loops by hand, which reduces boundary mistakes and unifies the style.
 
 **Why**
 
@@ -586,7 +586,7 @@ for _, id := range ids {
 - Category: Programming Conventions/Concurrency
 - Since: Go 1.25
 
-Before writing go, settle three things: when it ends, who waits for it to end, and who handles an error. The starter gathers it with sync.WaitGroup or errgroup in the same function, and uses errgroup when the subtask can return an error. Do not write a fire-and-forget with no waiter.
+Before writing go, settle three things: when it ends, who waits for it to end, and who handles an error. The starter gathers it with `sync.WaitGroup` or `errgroup` in the same function, and uses `errgroup` when the subtask can return an error. Do not write a fire-and-forget with no waiter.
 
 **Why**
 
@@ -711,7 +711,7 @@ func FetchAsync() <-chan Data {
 - Category: Programming Conventions/Concurrency
 - Since: Go 1.0
 
-The protected field is unexported, reads and writes go through locked methods, and the lock is not exposed outside the struct. Choose a lock or a channel by scenario: use sync.Mutex to protect shared data such as a cache or state, and use a channel to transfer data ownership, distribute tasks, or pass asynchronous results.
+The protected field is unexported, reads and writes go through locked methods, and the lock is not exposed outside the struct. Choose a lock or a channel by scenario: use `sync.Mutex` to protect shared data such as a cache or state, and use a channel to transfer data ownership, distribute tasks, or pass asynchronous results.
 
 **Why**
 
@@ -799,7 +799,7 @@ if err := save(); err == nil {
 - Category: Programming Conventions/Control Flow
 - Since: Go 1.22
 
-Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing v := v or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.
+Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing `v := v` or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.
 
 **Why**
 

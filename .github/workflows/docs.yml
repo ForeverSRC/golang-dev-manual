@@ -27,9 +27,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Generate manual
-        run: make gen
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -39,7 +36,7 @@ jobs:
         run: pip install -r website/requirements.txt
 
       - name: Build site
-        run: mkdocs build -f website/mkdocs.yml
+        run: make site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

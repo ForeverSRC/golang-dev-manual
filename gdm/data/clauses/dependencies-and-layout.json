@@ -136,12 +136,12 @@
     "section": "package-organization",
     "since_go": "1.0",
     "summary": "导出名不再重复包名，构造函数优先用 New。",
-    "details": "调用方已用包名作前缀，导出类型与方法名里重复它只增加长度。包内只有一个类型、或构造函数返回与包同名的类型时用 New；返回包内其它类型时才在名字里带上该类型。",
+    "details": "调用方已用包名作前缀，导出类型与方法名里重复它只增加长度。包内只有一个类型、或构造函数返回与包同名的类型时用 `New`；返回包内其它类型时才在名字里带上该类型。",
     "quote": {
       "text": "Since client code uses the package name as a prefix when referring to the package contents, the names for those contents need not repeat the package name. The HTTP server provided by the `http` package is called `Server`, not `HTTPServer`.",
       "source": "https://go.dev/blog/package-names"
     },
-    "rationale": "widget.NewWidget 在调用点展开就是 widget.NewWidget()，一半字符是同一信息；只有一个同名类型时用 New，名字更短，读法与 time.Now、list.New 这类标准库入口也一致。",
+    "rationale": "`widget.NewWidget` 在调用点展开就是 `widget.NewWidget()`，一半字符是同一信息；只有一个同名类型时用 `New`，名字更短，读法与 `time.Now`、`list.New` 这类标准库入口也一致。",
     "examples": {
       "good": "package manual\n\nfunc New() *Manual",
       "bad": "package manual\n\nfunc NewManual() *Manual"
@@ -213,12 +213,12 @@
     "section": "dependency-management",
     "since_go": "1.11",
     "summary": "go.mod 与 go.sum 交给 go 命令维护，提交前运行 go mod tidy。",
-    "details": "增删依赖用 go get，改 require 与 replace 用 go mod edit，整理用 go mod tidy，go.sum 只由工具写入。手工改版本号或校验和会与依赖图、模块缓存对不上。",
+    "details": "增删依赖用 `go get`，改 require 与 replace 用 `go mod edit`，整理用 `go mod tidy`，go.sum 只由工具写入。手工改版本号或校验和会与依赖图、模块缓存对不上。",
     "quote": {
       "text": "To keep your managed dependency set tidy, use the `go mod tidy` command. Using the set of packages imported in your code, this command edits your go.mod file to add modules that are necessary but missing. It also removes unused modules that don't provide any relevant packages.",
       "source": "https://go.dev/doc/modules/managing-dependencies#synchronizing"
     },
-    "rationale": "依赖图里含大量间接依赖，人手工维护只能管到直接依赖那一层；go mod tidy 按实际 import 反推，缺的补上、不再用的删掉，go.sum 随之校正，构建结果才与源码一致。",
+    "rationale": "依赖图里含大量间接依赖，人手工维护只能管到直接依赖那一层；`go mod tidy` 按实际 import 反推，缺的补上、不再用的删掉，go.sum 随之校正，构建结果才与源码一致。",
     "examples": {
       "good": "$ go get github.com/spf13/cobra@v1.10.2\n$ go mod tidy",
       "bad": "// adding a dependency: hand-write a line into both go.mod and go.sum\nrequire github.com/spf13/cobra v1.10.2"
@@ -290,7 +290,7 @@
     "section": "dependency-management",
     "since_go": "1.24",
     "summary": "工具依赖写进 go.mod 的 tool 指令，不靠全局安装。",
-    "details": "命令行工具用 tool 指令声明包路径，用 go tool <name> 运行，版本由 go.mod 与 go.sum 固定。全局 go install 得到的版本随机器与执行时间变化，CI 与本地无法对齐。",
+    "details": "命令行工具用 tool 指令声明包路径，用 `go tool <name>` 运行，版本由 go.mod 与 go.sum 固定。全局 `go install` 得到的版本随机器与执行时间变化，CI 与本地无法对齐。",
     "quote": {
       "text": "Adds a package as a dependency of the current module, and makes it available to run with `go tool` when the current working directory is within this module.",
       "source": "https://go.dev/doc/modules/gomod-ref#tool"
@@ -346,7 +346,7 @@
       "text": "Some Go projects do have a `src` folder, but it usually happens when the devs came from the Java world where it's a common pattern. If you can help yourself try not to adopt this Java pattern.",
       "source": "https://github.com/golang-standards/project-layout#directories-you-shouldnt-have"
     },
-    "rationale": "go 命令以 go.mod 所在目录为模块根，import path 由该目录往下的相对路径拼成；根下再套 src/，所有导入、go install 的包路径与文档示例都要多写一层，还与仓库实际目录对不上。",
+    "rationale": "go 命令以 go.mod 所在目录为模块根，import path 由该目录往下的相对路径拼成；根下再套 src/，所有导入、`go install` 的包路径与文档示例都要多写一层，还与仓库实际目录对不上。",
     "examples": {
       "good": "project-root/\n  go.mod\n  main.go\n  internal/",
       "bad": "project-root/\n  src/\n    go.mod\n    main.go"
@@ -398,7 +398,7 @@
       "text": "A common convention is placing all commands in a repository into a `cmd` directory; while this isn't strictly necessary in a repository that consists only of commands, it's very useful in a mixed repository that has both commands and importable packages, as we will discuss next.",
       "source": "https://go.dev/doc/modules/layout#multiple-commands"
     },
-    "rationale": "main 包混在模块根或业务目录里，import 路径与可执行文件名对不上，go install 时要先找文件所在目录；集中到 cmd/ 后，包与命令在结构上分开，每个程序的入口一目了然。",
+    "rationale": "main 包混在模块根或业务目录里，import 路径与可执行文件名对不上，`go install` 时要先找文件所在目录；集中到 cmd/ 后，包与命令在结构上分开，每个程序的入口一目了然。",
     "examples": {
       "good": "project-root/\n  cmd/\n    gdm/\n      main.go\n  internal/\n    service/",
       "bad": "project-root/\n  gdm.go\n  internal/\n    server/\n      main.go"

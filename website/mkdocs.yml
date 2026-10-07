@@ -6,13 +6,46 @@ repo_name: ForeverSRC/golang-dev-manual
 docs_dir: ../manual
 site_dir: ../.site
 
+hooks:
+  - hooks/clause_style.py
+
 theme:
   name: material
   language: zh
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  font: false
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: 跟随系统
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色
   features:
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.top
+    - navigation.tracking
+    - navigation.path
+    - toc.follow
     - content.code.copy
+    - content.tooltips
+    - search.suggest
+    - search.highlight
 
 plugins:
   - search
@@ -26,6 +59,9 @@ plugins:
           name: English
           site_name: Golang Development Manual
 
+extra_css:
+  - assets/extra.css
+
 markdown_extensions:
   - attr_list
   - sane_lists
@@ -33,4 +69,5 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.highlight
+  - pymdownx.magiclink
   - pymdownx.superfences

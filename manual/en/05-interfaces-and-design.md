@@ -57,7 +57,7 @@ Placement depends on how many implementations are expected:
 
 - Only ever a single implementation: put the interface and the implementation in the same package, with the interface adjacent to the implementation, so that reading the code does not require cross-package comparison; export the interface and the constructor, and keep the implementation struct unexported.
 - Multiple implementations expected, or replacement needed (storage, external services, notifications, and the like): put the interface in the package of the consumer, selecting only the methods the consumer actually needs; the implementation package exports the concrete type and constructor, and writes a compile-time assertion per IFACE-002 to put the promise into code.
-- The interface signature is already fixed by the standard library or a third party (io.Reader and the like): this clause does not apply, and the implementer simply satisfies it as is.
+- The interface signature is already fixed by the standard library or a third party (`io.Reader` and the like): this clause does not apply, and the implementer simply satisfies it as is.
 
 **Why**
 
@@ -147,7 +147,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
 - Category: Interfaces and Design/Interface Definition and Placement
 - Since: Go 1.0
 
-Use interface values themselves for parameters, return values, and fields, not *Interface. An interface value already contains the type information and a data pointer internally, and whether the underlying data is a value or a pointer is decided by the concrete type; when methods need to modify the underlying data, the implementer expresses that with a pointer receiver.
+Use interface values themselves for parameters, return values, and fields, not `*Interface`. An interface value already contains the type information and a data pointer internally, and whether the underlying data is a value or a pointer is decided by the concrete type; when methods need to modify the underlying data, the implementer expresses that with a pointer receiver.
 
 **Why**
 
@@ -155,7 +155,7 @@ Use interface values themselves for parameters, return values, and fields, not *
 >
 > — https://github.com/uber-go/guide/blob/master/style.md#pointers-to-interfaces
 
-*Interface adds a layer of dereferencing at call sites and makes nil checks more complex: an interface value that is nil and an interface whose internal data pointer is nil are two states, and once mixed together the emptiness condition is either written wrong or guessed. Passing the interface value itself expresses the same intent with a single meaning for emptiness.
+`*Interface` adds a layer of dereferencing at call sites and makes nil checks more complex: an interface value that is nil and an interface whose internal data pointer is nil are two states, and once mixed together the emptiness condition is either written wrong or guessed. Passing the interface value itself expresses the same intent with a single meaning for emptiness.
 
 **Good**
 
@@ -221,7 +221,7 @@ type Server struct {
 - Category: Interfaces and Design/Composition and Reuse
 - Since: Go 1.0
 
-Use anonymous embedding only when the inner type's methods should become the outer type's methods; otherwise use a named field. After embedding, the outer zero value must still be usable, the copy semantics unchanged, and no unrelated methods additionally exposed. Synchronization primitives such as sync.Mutex always use a named field, since anonymous embedding hangs Lock and Unlock onto the outer API.
+Use anonymous embedding only when the inner type's methods should become the outer type's methods; otherwise use a named field. After embedding, the outer zero value must still be usable, the copy semantics unchanged, and no unrelated methods additionally exposed. Synchronization primitives such as `sync.Mutex` always use a named field, since anonymous embedding hangs `Lock` and `Unlock` onto the outer API.
 
 **Why**
 
@@ -263,7 +263,7 @@ type Server struct {
 - Category: Interfaces and Design/Dependency Injection and Wiring
 - Since: Go 1.0
 
-Concentrate each layer's constructors and interface bindings in a single ProviderSet, and write interface-to-implementation bindings with wire.Bind; the entry point only calls the generated Initialize function. The wire version is pinned via the tool directive in go.mod; after changing the wiring, regenerate wire_gen.go with go generate.
+Concentrate each layer's constructors and interface bindings in a single ProviderSet, and write interface-to-implementation bindings with `wire.Bind`; the entry point only calls the generated `Initialize` function. The `wire` version is pinned via the tool directive in go.mod; after changing the wiring, regenerate wire_gen.go with `go generate`.
 
 **Why**
 
@@ -347,7 +347,7 @@ func Sign(msg string) string {
 - Category: Interfaces and Design/Passing context
 - Since: Go 1.7
 
-When the upstream context is not available yet, pass context.TODO(); use context.Background() at program entry, in initialization, and in tests. Do not treat nil as the expression of "no context".
+When the upstream context is not available yet, pass `context.TODO()`; use `context.Background()` at program entry, in initialization, and in tests. Do not treat nil as the expression of "no context".
 
 **Why**
 
@@ -355,7 +355,7 @@ When the upstream context is not available yet, pass context.TODO(); use context
 >
 > — https://pkg.go.dev/context#pkg-overview
 
-nil is a legal interface value and passes at compile time; the recipient panics outright as soon as it calls Done or Value, and whether it panics depends on its internal implementation, which is invisible from the function signature. Passing context.TODO() has the same semantics and is always safe, and static analysis can also use it to find such omissions.
+nil is a legal interface value and passes at compile time; the recipient panics outright as soon as it calls `Done` or `Value`, and whether it panics depends on its internal implementation, which is invisible from the function signature. Passing `context.TODO()` has the same semantics and is always safe, and static analysis can also use it to find such omissions.
 
 **Good**
 
@@ -517,7 +517,7 @@ Once a synchronization primitive is copied, the copies no longer share the same 
 >
 > — https://pkg.go.dev/cmd/vet
 
-Value copies are legal at compile time, and the copylocks check in go vet is the main line of defense; once it is missed, the problem surfaces only under concurrency pressure, making it costly to track down.
+Value copies are legal at compile time, and the copylocks check in `go vet` is the main line of defense; once it is missed, the problem surfaces only under concurrency pressure, making it costly to track down.
 
 **Good**
 

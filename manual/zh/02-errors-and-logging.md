@@ -7,7 +7,7 @@
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.13
 
-需要让调用方用 errors.Is、errors.As 判断错误时，用 %w 包装，并附上本层的上下文。只有真正终止错误链的边界（对外输出、写日志）才用 %v。
+需要让调用方用 `errors.Is`、`errors.As` 判断错误时，用 %w 包装，并附上本层的上下文。只有真正终止错误链的边界（对外输出、写日志）才用 %v。
 
 **为什么**
 
@@ -45,7 +45,7 @@ if err := repo.Save(ctx, order); err != nil {
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.13
 
-裸比较与类型断言只看错误链的最外层：错误被 %w 包装后 == 不再相等，err.(*MyError) 直接断言失败。errors.Is 按哨兵错误逐层比较，errors.As 按错误类型逐层匹配，两者都会展开错误链。可供判断的哨兵错误与错误类型由产生错误的包导出；只有确认错误从未被包装时，才可以用 == 比较。
+裸比较与类型断言只看错误链的最外层：错误被 %w 包装后 == 不再相等，`err.(*MyError)` 直接断言失败。`errors.Is` 按哨兵错误逐层比较，`errors.As` 按错误类型逐层匹配，两者都会展开错误链。可供判断的哨兵错误与错误类型由产生错误的包导出；只有确认错误从未被包装时，才可以用 == 比较。
 
 **为什么**
 
@@ -324,7 +324,7 @@ if err := callOrder(ctx); err != nil {
 - 归属：错误与日志/日志规约
 - 起始版本：Go 1.21
 
-结构化日志统一走 log/slog：进程入口用 slog.New 装配 Handler，生产环境用 JSONHandler，其余位置用注入的 *slog.Logger 或 slog.Default()。fmt.Print 与标准 log 只用于一次性脚本的输出；接入第三方日志库时，经自定义 Handler 收口到同一套输出。
+结构化日志统一走 `log/slog`：进程入口用 `slog.New` 装配 `Handler`，生产环境用 `JSONHandler`，其余位置用注入的 `*slog.Logger` 或 `slog.Default()`。`fmt.Print` 与标准 `log` 只用于一次性脚本的输出；接入第三方日志库时，经自定义 `Handler` 收口到同一套输出。
 
 **为什么**
 
@@ -332,7 +332,7 @@ if err := callOrder(ctx); err != nil {
 >
 > —— https://go.dev/blog/slog
 
-fmt 与 log 打出的整行文本无法按字段解析，收集端只能整段存下，按 order_id 检索、按耗时聚合都要另写解析规则；slog 的键值对与 JSON 输出可直接被收集端识别。
+`fmt` 与 `log` 打出的整行文本无法按字段解析，收集端只能整段存下，按 order_id 检索、按耗时聚合都要另写解析规则；`slog` 的键值对与 JSON 输出可直接被收集端识别。
 
 **正例**
 
@@ -358,7 +358,7 @@ fmt.Printf("order created: %s\n", order.ID)
 - 归属：错误与日志/日志规约
 - 起始版本：Go 1.21
 
-随日志带出的取值（ID、数量、耗时、错误）都作为参数写成 key-value，消息只写发生了什么。同一个含义在仓库内用同一个键名；错误值用 slog.Any("error", err) 传入，不写进消息。
+随日志带出的取值（ID、数量、耗时、错误）都作为参数写成 key-value，消息只写发生了什么。同一个含义在仓库内用同一个键名；错误值用 `slog.Any("error", err)` 传入，不写进消息。
 
 **为什么**
 
@@ -391,7 +391,7 @@ slog.Info(fmt.Sprintf("order %s created, amount %d", order.ID, order.Amount))
 - 归属：错误与日志/日志规约
 - 起始版本：Go 1.21
 
-处理请求时用 slog 的 InfoContext、ErrorContext 等方法把 ctx 一并传入，handler 据此补上请求 ID、trace 标识一类贯穿整个请求的字段。启动、退出等没有请求上下文的路径用不带 Context 的方法。
+处理请求时用 `slog` 的 `InfoContext`、`ErrorContext` 等方法把 ctx 一并传入，handler 据此补上请求 ID、trace 标识一类贯穿整个请求的字段。启动、退出等没有请求上下文的路径用不带 Context 的方法。
 
 **为什么**
 

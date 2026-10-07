@@ -210,7 +210,7 @@ package util
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
 
-Callers already use the package name as a prefix, so repeating it in an exported type or method name only adds length. Use New when the package contains a single type, or when the constructor returns the type that shares the package's name; only when it returns another type in the package should that type appear in the name.
+Callers already use the package name as a prefix, so repeating it in an exported type or method name only adds length. Use `New` when the package contains a single type, or when the constructor returns the type that shares the package's name; only when it returns another type in the package should that type appear in the name.
 
 **Why**
 
@@ -218,7 +218,7 @@ Callers already use the package name as a prefix, so repeating it in an exported
 >
 > — https://go.dev/blog/package-names
 
-At the call site widget.NewWidget expands to widget.NewWidget(), where half the characters carry the same information; when there is a single type sharing the name, New is shorter and reads the same way as standard library entry points such as time.Now and list.New.
+At the call site `widget.NewWidget` expands to `widget.NewWidget()`, where half the characters carry the same information; when there is a single type sharing the name, `New` is shorter and reads the same way as standard library entry points such as `time.Now` and `list.New`.
 
 **Good**
 
@@ -324,7 +324,7 @@ import (
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.11
 
-Add or remove dependencies with go get, change require and replace with go mod edit, tidy with go mod tidy, and let only the tooling write go.sum. Editing version numbers or checksums by hand will not match the dependency graph or the module cache.
+Add or remove dependencies with `go get`, change require and replace with `go mod edit`, tidy with `go mod tidy`, and let only the tooling write go.sum. Editing version numbers or checksums by hand will not match the dependency graph or the module cache.
 
 **Why**
 
@@ -332,7 +332,7 @@ Add or remove dependencies with go get, change require and replace with go mod e
 >
 > — https://go.dev/doc/modules/managing-dependencies#synchronizing
 
-The dependency graph contains many indirect dependencies, and manual maintenance can only reach the direct dependency layer; go mod tidy works backward from the actual imports, adding what is missing and removing what is no longer used, with go.sum corrected accordingly, so that the build result matches the source.
+The dependency graph contains many indirect dependencies, and manual maintenance can only reach the direct dependency layer; `go mod tidy` works backward from the actual imports, adding what is missing and removing what is no longer used, with go.sum corrected accordingly, so that the build result matches the source.
 
 **Good**
 
@@ -434,7 +434,7 @@ replace example.com/lib => ../lib
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.24
 
-Command-line tools declare their package path with the tool directive and run via go tool <name>, with the version pinned by go.mod and go.sum. A version obtained from a global go install varies by machine and by when it was run, so CI and local environments cannot be brought into line.
+Command-line tools declare their package path with the tool directive and run via `go tool <name>`, with the version pinned by go.mod and go.sum. A version obtained from a global `go install` varies by machine and by when it was run, so CI and local environments cannot be brought into line.
 
 **Why**
 
@@ -515,7 +515,7 @@ Import paths are measured from the module root, and the source tree unfolds at t
 >
 > — https://github.com/golang-standards/project-layout#directories-you-shouldnt-have
 
-The go command treats the directory containing go.mod as the module root, and the import path is assembled from the relative path below that directory; nesting another src/ under the root forces every import, go install package path, and documentation example to add an extra layer, and it does not line up with the repository's actual directories.
+The go command treats the directory containing go.mod as the module root, and the import path is assembled from the relative path below that directory; nesting another src/ under the root forces every import, `go install` package path, and documentation example to add an extra layer, and it does not line up with the repository's actual directories.
 
 **Good**
 
@@ -591,7 +591,7 @@ When a repository holds both importable packages and executables, main packages 
 >
 > — https://go.dev/doc/modules/layout#multiple-commands
 
-When main packages are mixed into the module root or business directories, the import path does not match the executable name and go install first requires locating the directory holding the file; once they are gathered into cmd/, packages and commands are separated structurally and each program's entry point is obvious at a glance.
+When main packages are mixed into the module root or business directories, the import path does not match the executable name and `go install` first requires locating the directory holding the file; once they are gathered into cmd/, packages and commands are separated structurally and each program's entry point is obvious at a glance.
 
 **Good**
 

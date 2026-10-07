@@ -132,7 +132,7 @@ Convert between int, uint, float, bool, and strings with `strconv` functions suc
 >
 > — https://github.com/uber-go/guide/blob/master/style.md#prefer-strconv-over-fmt
 
-fmt's formatting goes through interfaces and reflection on a general parsing path, allocating more and checking more than strconv's dedicated functions. In Uber's benchmark the same conversion costs 143 ns/op and two allocations with `fmt.Sprint`, against 64.2 ns/op and one allocation with `strconv.Itoa`; on a high-frequency path the gap is amplified as it accumulates with the call count.
+`fmt`'s formatting goes through interfaces and reflection on a general parsing path, allocating more and checking more than `strconv`'s dedicated functions. In Uber's benchmark the same conversion costs 143 ns/op and two allocations with `fmt.Sprint`, against 64.2 ns/op and one allocation with `strconv.Itoa`; on a high-frequency path the gap is amplified as it accumulates with the call count.
 
 **Good**
 
@@ -165,7 +165,7 @@ When a loop or hot path repeatedly converts the same string literal or variable 
 >
 > — https://github.com/uber-go/guide/blob/master/style.md#avoid-repeated-string-to-byte-conversions
 
-Converting between string and []byte allocates new memory and copies byte by byte. A fixed string converted inside a loop produces a slice that is discarded immediately each iteration, with allocations on the order of the loop count and the same amount of garbage added for the GC. In Uber's benchmark one conversion per iteration costs 22.2 ns/op, dropping to 3.25 ns/op once hoisted out of the loop.
+Converting between string and `[]byte` allocates new memory and copies byte by byte. A fixed string converted inside a loop produces a slice that is discarded immediately each iteration, with allocations on the order of the loop count and the same amount of garbage added for the GC. In Uber's benchmark one conversion per iteration costs 22.2 ns/op, dropping to 3.25 ns/op once hoisted out of the loop.
 
 **Good**
 
@@ -203,7 +203,7 @@ Use `strings.Builder` when building a string piece by piece (inside a loop, acro
 >
 > — https://pkg.go.dev/strings#Builder
 
-Strings are immutable, so every += builds a new string and copies the whole accumulated content; inside a loop the repeated moving grows with the accumulated length, making the total copied close to quadratic. Builder writes into one mutable buffer and produces the result only once at retrieval; calling Grow before writing removes even the buffer growth.
+Strings are immutable, so every += builds a new string and copies the whole accumulated content; inside a loop the repeated moving grows with the accumulated length, making the total copied close to quadratic. `Builder` writes into one mutable buffer and produces the result only once at retrieval; calling `Grow` before writing removes even the buffer growth.
 
 **Good**
 
@@ -244,7 +244,7 @@ for _, part := range parts {
 >
 > — https://go.dev/blog/slices-intro#a-possible-gotcha
 
-When a small section is cut out of a large file or large response and kept for a long time, the sub-slice still points at the original backing array, the GC treats the whole array as still referenced, and the process's resident memory far exceeds what is actually needed. Clone copies out an independent array containing only the needed elements, and the original array can be reclaimed once it loses its references.
+When a small section is cut out of a large file or large response and kept for a long time, the sub-slice still points at the original backing array, the GC treats the whole array as still referenced, and the process's resident memory far exceeds what is actually needed. `Clone` copies out an independent array containing only the needed elements, and the original array can be reclaimed once it loses its references.
 
 **Good**
 

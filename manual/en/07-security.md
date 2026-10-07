@@ -13,7 +13,7 @@ Parameter values for queries and writes are passed through `database/sql` placeh
 >
 > — https://go.dev/doc/database/sql-injection
 
-Once parameters are handed to the sql package, the driver sends the statement and the parameters separately, so parameter values are not parsed as SQL syntax. Switching to fmt.Sprintf to concatenate values into the statement before handing it to Query means the whole SQL text is already formed, and fragments supplied by the caller take part in the syntax directly; passing `1 OR 1=1` as `id` bypasses the condition, and the official documentation marks this usage as a SECURITY RISK.
+Once parameters are handed to the `sql` package, the driver sends the statement and the parameters separately, so parameter values are not parsed as SQL syntax. Switching to `fmt.Sprintf` to concatenate values into the statement before handing it to `Query` means the whole SQL text is already formed, and fragments supplied by the caller take part in the syntax directly; passing `1 OR 1=1` as `id` bypasses the condition, and the official documentation marks this usage as a SECURITY RISK.
 
 **Good**
 
@@ -47,7 +47,7 @@ When using `exec.Command` or `exec.CommandContext`, pass the executable and each
 >
 > — https://pkg.go.dev/os/exec
 
-os/exec starts a process with an argument array and does not go through the shell, so `;`, `|`, and `&&` in arguments are treated as ordinary characters. Once changed to concatenation with sh -c, external input re-enters shell syntax, and a fragment of `; rm -rf` can change the command actually executed; the official documentation also warns, in the glob expansion section, to be careful about escaping external input when invoking the shell directly.
+`os/exec` starts a process with an argument array and does not go through the shell, so `;`, `|`, and `&&` in arguments are treated as ordinary characters. Once changed to concatenation with `sh -c`, external input re-enters shell syntax, and a fragment of `; rm -rf` can change the command actually executed; the official documentation also warns, in the glob expansion section, to be careful about escaping external input when invoking the shell directly.
 
 **Good**
 
@@ -72,7 +72,7 @@ cmd := exec.CommandContext(ctx, "sh", "-c", "git log --oneline -n "+n)
 - Category: Security
 - Since: Go 1.24
 
-When external input takes part in constructing a file path, first use `os.OpenRoot` to open an `*os.Root` on the allowed root directory, then access files through its `Open`, `Create`, `ReadFile` and other methods. When os.Root does not apply, at least run `filepath.Clean` and verify that the result still falls within the root directory prefix, and handle symbolic links separately.
+When external input takes part in constructing a file path, first use `os.OpenRoot` to open an `*os.Root` on the allowed root directory, then access files through its `Open`, `Create`, `ReadFile` and other methods. When `os.Root` does not apply, at least run `filepath.Clean` and verify that the result still falls within the root directory prefix, and handle symbolic links separately.
 
 **Why**
 
@@ -80,7 +80,7 @@ When external input takes part in constructing a file path, first use `os.OpenRo
 >
 > — https://go.dev/doc/go1.24#directory-limited-filesystem-access
 
-`../` in a path and symbolic links pointing outside can lead `os.Open` out of the intended directory, reading or overwriting files outside the root directory. os.Root takes the root directory as its boundary and validates the final resolved result on every operation, reporting an error immediately for out-of-bounds paths; a hand-written check must compare prefixes after Clean and also block symbolic links on its own, which easily misses cases.
+`../` in a path and symbolic links pointing outside can lead `os.Open` out of the intended directory, reading or overwriting files outside the root directory. `os.Root` takes the root directory as its boundary and validates the final resolved result on every operation, reporting an error immediately for out-of-bounds paths; a hand-written check must compare prefixes after `Clean` and also block symbolic links on its own, which easily misses cases.
 
 **Good**
 
@@ -120,7 +120,7 @@ When generating random values related to security, such as tokens, session IDs, 
 >
 > — https://pkg.go.dev/math/rand
 
-The output of math/rand is determined by the seed and can be inferred; the official documentation states explicitly that it is unsuitable for security purposes and points out that the sequence is easy to guess. Using it to generate tokens lets an attacker derive subsequent values from a small amount of output; crypto/rand draws on the secure random source provided by the operating system, and its output is unpredictable.
+The output of `math/rand` is determined by the seed and can be inferred; the official documentation states explicitly that it is unsuitable for security purposes and points out that the sequence is easy to guess. Using it to generate tokens lets an attacker derive subsequent values from a small amount of output; `crypto/rand` draws on the secure random source provided by the operating system, and its output is unpredictable.
 
 **Good**
 
@@ -287,7 +287,7 @@ err := os.WriteFile(path, data, 0o777)
 - Category: Security
 - Since: Go 1.0
 
-When generating text that requires escaping, such as HTML, XML, and JS, use `html/template`, which escapes automatically according to the context the data appears in. `text/template` is used only for plain text output; when HTML can only be produced with text/template, escape the data yourself before output.
+When generating text that requires escaping, such as HTML, XML, and JS, use `html/template`, which escapes automatically according to the context the data appears in. `text/template` is used only for plain text output; when HTML can only be produced with `text/template`, escape the data yourself before output.
 
 **Why**
 
@@ -295,7 +295,7 @@ When generating text that requires escaping, such as HTML, XML, and JS, use `htm
 >
 > — https://pkg.go.dev/html/template
 
-text/template writes data into the output as-is, so a `<script>` fragment in the data is executed by the browser as a tag, constituting cross-site scripting. html/template applies the corresponding escaping according to whether the data falls in a tag, an attribute, a URL, or a JS string, with the template code unchanged; switching the package blocks the injection.
+`text/template` writes data into the output as-is, so a `<script>` fragment in the data is executed by the browser as a tag, constituting cross-site scripting. `html/template` applies the corresponding escaping according to whether the data falls in a tag, an attribute, a URL, or a JS string, with the template code unchanged; switching the package blocks the injection.
 
 **Good**
 
@@ -332,7 +332,7 @@ t, err := template.New("page").Parse(pageTemplate)
 >
 > — https://pkg.go.dev/net/http#Server.ReadHeaderTimeout
 
-If a connection does not finish sending its request headers after being established, the server keeps holding that connection waiting; once concurrent connections accumulate, normal requests cannot get through, forming a slow attack. ReadHeaderTimeout sets an upper bound on reading request headers, and the official documentation states that when this value is zero and ReadTimeout is also zero there is no timeout — leaving the zero value unset falls into that state.
+If a connection does not finish sending its request headers after being established, the server keeps holding that connection waiting; once concurrent connections accumulate, normal requests cannot get through, forming a slow attack. `ReadHeaderTimeout` sets an upper bound on reading request headers, and the official documentation states that when this value is zero and `ReadTimeout` is also zero there is no timeout — leaving the zero value unset falls into that state.
 
 **Good**
 
@@ -372,7 +372,7 @@ When verifying secret values such as MACs, tokens, and signatures, use `hmac.Equ
 >
 > — https://pkg.go.dev/crypto/subtle#ConstantTimeCompare
 
-An ordinary comparison returns at the first differing byte, letting an attacker probe byte by byte: a correct prefix takes longer, so filtering by elapsed time can recover the secret within a limited number of attempts. ConstantTimeCompare takes time related only to length, cutting off this timing side channel.
+An ordinary comparison returns at the first differing byte, letting an attacker probe byte by byte: a correct prefix takes longer, so filtering by elapsed time can recover the secret within a limited number of attempts. `ConstantTimeCompare` takes time related only to length, cutting off this timing side channel.
 
 **Good**
 

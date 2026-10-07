@@ -6,7 +6,7 @@
     "section": "error-handling",
     "since_go": "1.13",
     "summary": "需要保留错误链时用 %w 包装，不使用 %v 或 %s。",
-    "details": "需要让调用方用 errors.Is、errors.As 判断错误时，用 %w 包装，并附上本层的上下文。只有真正终止错误链的边界（对外输出、写日志）才用 %v。",
+    "details": "需要让调用方用 `errors.Is`、`errors.As` 判断错误时，用 %w 包装，并附上本层的上下文。只有真正终止错误链的边界（对外输出、写日志）才用 %v。",
     "quote": {
       "text": "In Go 1.13, the fmt.Errorf function supports a new %w verb. When this verb is present, the error returned by fmt.Errorf will have an Unwrap method returning the argument of %w, which must be an error. In all other ways, %w is identical to %v.",
       "source": "https://go.dev/blog/go1.13-errors"
@@ -32,7 +32,7 @@
     "section": "error-handling",
     "since_go": "1.13",
     "summary": "判断错误种类用 errors.Is 与 errors.As，不用 == 或类型断言。",
-    "details": "裸比较与类型断言只看错误链的最外层：错误被 %w 包装后 == 不再相等，err.(*MyError) 直接断言失败。errors.Is 按哨兵错误逐层比较，errors.As 按错误类型逐层匹配，两者都会展开错误链。可供判断的哨兵错误与错误类型由产生错误的包导出；只有确认错误从未被包装时，才可以用 == 比较。",
+    "details": "裸比较与类型断言只看错误链的最外层：错误被 %w 包装后 == 不再相等，`err.(*MyError)` 直接断言失败。`errors.Is` 按哨兵错误逐层比较，`errors.As` 按错误类型逐层匹配，两者都会展开错误链。可供判断的哨兵错误与错误类型由产生错误的包导出；只有确认错误从未被包装时，才可以用 == 比较。",
     "quote": {
       "text": "In the simplest case, the errors.Is function behaves like a comparison to a sentinel error, and the errors.As function behaves like a type assertion. When operating on wrapped errors, however, these functions consider all the errors in a chain.",
       "source": "https://go.dev/blog/go1.13-errors"
@@ -211,12 +211,12 @@
     "section": "logging",
     "since_go": "1.21",
     "summary": "业务日志用 log/slog 记录，不用 fmt 与 log 直接打印。",
-    "details": "结构化日志统一走 log/slog：进程入口用 slog.New 装配 Handler，生产环境用 JSONHandler，其余位置用注入的 *slog.Logger 或 slog.Default()。fmt.Print 与标准 log 只用于一次性脚本的输出；接入第三方日志库时，经自定义 Handler 收口到同一套输出。",
+    "details": "结构化日志统一走 `log/slog`：进程入口用 `slog.New` 装配 `Handler`，生产环境用 `JSONHandler`，其余位置用注入的 `*slog.Logger` 或 `slog.Default()`。`fmt.Print` 与标准 `log` 只用于一次性脚本的输出；接入第三方日志库时，经自定义 `Handler` 收口到同一套输出。",
     "quote": {
       "text": "Structured logs use key-value pairs so they can be parsed, filtered, searched, and analyzed quickly and reliably.",
       "source": "https://go.dev/blog/slog"
     },
-    "rationale": "fmt 与 log 打出的整行文本无法按字段解析，收集端只能整段存下，按 order_id 检索、按耗时聚合都要另写解析规则；slog 的键值对与 JSON 输出可直接被收集端识别。",
+    "rationale": "`fmt` 与 `log` 打出的整行文本无法按字段解析，收集端只能整段存下，按 order_id 检索、按耗时聚合都要另写解析规则；`slog` 的键值对与 JSON 输出可直接被收集端识别。",
     "examples": {
       "good": "slog.Info(\"order created\", \"order_id\", order.ID)",
       "bad": "fmt.Printf(\"order created: %s\\n\", order.ID)"
@@ -238,7 +238,7 @@
     "section": "logging",
     "since_go": "1.21",
     "summary": "日志字段写成键值对，不拼进消息文本。",
-    "details": "随日志带出的取值（ID、数量、耗时、错误）都作为参数写成 key-value，消息只写发生了什么。同一个含义在仓库内用同一个键名；错误值用 slog.Any(\"error\", err) 传入，不写进消息。",
+    "details": "随日志带出的取值（ID、数量、耗时、错误）都作为参数写成 key-value，消息只写发生了什么。同一个含义在仓库内用同一个键名；错误值用 `slog.Any(\"error\", err)` 传入，不写进消息。",
     "quote": {
       "text": "Unlike with the log package, we can easily add key-value pairs to our output by writing them after the message.",
       "source": "https://go.dev/blog/slog"
@@ -263,7 +263,7 @@
     "section": "logging",
     "since_go": "1.21",
     "summary": "请求路径上的日志用带 Context 的方法。",
-    "details": "处理请求时用 slog 的 InfoContext、ErrorContext 等方法把 ctx 一并传入，handler 据此补上请求 ID、trace 标识一类贯穿整个请求的字段。启动、退出等没有请求上下文的路径用不带 Context 的方法。",
+    "details": "处理请求时用 `slog` 的 `InfoContext`、`ErrorContext` 等方法把 ctx 一并传入，handler 据此补上请求 ID、trace 标识一类贯穿整个请求的字段。启动、退出等没有请求上下文的路径用不带 Context 的方法。",
     "quote": {
       "text": "As the call to LogAttrs shows, you can pass a context.Context to some log functions so a handler can extract context information like trace IDs. (Canceling the context does not prevent the log entry from being written.)",
       "source": "https://go.dev/blog/slog"

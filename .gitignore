@@ -6,6 +6,11 @@ Thumbs.db
 
 # 站点构建产物
 /.site/
+/manual/*/assets/
+
+# 站点构建用的虚拟环境
+/.venv/
+__pycache__/
 
 # 编辑器
 .idea/

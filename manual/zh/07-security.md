@@ -13,7 +13,7 @@
 >
 > —— https://go.dev/doc/database/sql-injection
 
-参数交给 sql 包后，驱动把语句与参数分开发送，参数值不会被当作 SQL 语法解析。改用 fmt.Sprintf 先把值拼进语句再交给 Query，整条 SQL 已成型，调用方传入的片段直接参与语法，`id` 传成 `1 OR 1=1` 就能绕过条件，官方文档把这处写法直接标成 SECURITY RISK。
+参数交给 `sql` 包后，驱动把语句与参数分开发送，参数值不会被当作 SQL 语法解析。改用 `fmt.Sprintf` 先把值拼进语句再交给 `Query`，整条 SQL 已成型，调用方传入的片段直接参与语法，`id` 传成 `1 OR 1=1` 就能绕过条件，官方文档把这处写法直接标成 SECURITY RISK。
 
 **正例**
 
@@ -47,7 +47,7 @@ rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT id, name FROM user WHERE i
 >
 > —— https://pkg.go.dev/os/exec
 
-os/exec 按参数数组启动进程，不走 shell，参数里的 `;`、`|`、`&&` 只当普通字符。改成 sh -c 拼接后，外部输入重新进入 shell 语法，一段 `; rm -rf` 就能改变实际执行的命令；官方文档在通配符展开处也提醒直接调 shell 要当心转义外部输入。
+`os/exec` 按参数数组启动进程，不走 shell，参数里的 `;`、`|`、`&&` 只当普通字符。改成 `sh -c` 拼接后，外部输入重新进入 shell 语法，一段 `; rm -rf` 就能改变实际执行的命令；官方文档在通配符展开处也提醒直接调 shell 要当心转义外部输入。
 
 **正例**
 
@@ -72,7 +72,7 @@ cmd := exec.CommandContext(ctx, "sh", "-c", "git log --oneline -n "+n)
 - 归属：安全规约
 - 起始版本：Go 1.24
 
-外部输入参与构造文件路径时，先用 `os.OpenRoot` 在允许的根目录上打开 `*os.Root`，再经它的 `Open`、`Create`、`ReadFile` 等方法访问。用不上 os.Root 时，至少 `filepath.Clean` 后校验结果仍落在根目录前缀内，并单独处理符号链接。
+外部输入参与构造文件路径时，先用 `os.OpenRoot` 在允许的根目录上打开 `*os.Root`，再经它的 `Open`、`Create`、`ReadFile` 等方法访问。用不上 `os.Root` 时，至少 `filepath.Clean` 后校验结果仍落在根目录前缀内，并单独处理符号链接。
 
 **为什么**
 
@@ -80,7 +80,7 @@ cmd := exec.CommandContext(ctx, "sh", "-c", "git log --oneline -n "+n)
 >
 > —— https://go.dev/doc/go1.24#directory-limited-filesystem-access
 
-路径里的 `../` 与指向外部的符号链接能把 `os.Open` 引出预期目录，读到或覆盖根目录外的文件。os.Root 以根目录为边界，逐次操作校验最终解析结果，越界路径直接报错；手写校验要在 Clean 之后比对前缀，还要单独挡住符号链接，容易漏项。
+路径里的 `../` 与指向外部的符号链接能把 `os.Open` 引出预期目录，读到或覆盖根目录外的文件。`os.Root` 以根目录为边界，逐次操作校验最终解析结果，越界路径直接报错；手写校验要在 `Clean` 之后比对前缀，还要单独挡住符号链接，容易漏项。
 
 **正例**
 
@@ -120,7 +120,7 @@ f, err := os.Open(filepath.Join(dataDir, name))
 >
 > —— https://pkg.go.dev/math/rand
 
-math/rand 的输出由种子决定、可被推断，官方文档明说它不适合安全用途，并指出序列容易被猜出。用它生成令牌，攻击者拿到少量输出即可推算出后续值；crypto/rand 取操作系统提供的安全随机源，输出不可预测。
+`math/rand` 的输出由种子决定、可被推断，官方文档明说它不适合安全用途，并指出序列容易被猜出。用它生成令牌，攻击者拿到少量输出即可推算出后续值；`crypto/rand` 取操作系统提供的安全随机源，输出不可预测。
 
 **正例**
 
@@ -287,7 +287,7 @@ err := os.WriteFile(path, data, 0o777)
 - 归属：安全规约
 - 起始版本：Go 1.0
 
-生成 HTML、XML、JS 等需要转义的文本时用 `html/template`，它按数据所处上下文自动转义。`text/template` 只用于纯文本输出；只能用 text/template 产出 HTML 时，输出前自行对数据转义。
+生成 HTML、XML、JS 等需要转义的文本时用 `html/template`，它按数据所处上下文自动转义。`text/template` 只用于纯文本输出；只能用 `text/template` 产出 HTML 时，输出前自行对数据转义。
 
 **为什么**
 
@@ -295,7 +295,7 @@ err := os.WriteFile(path, data, 0o777)
 >
 > —— https://pkg.go.dev/html/template
 
-text/template 把数据原样写进输出，数据里一段 <script> 会作为标签被浏览器执行，构成跨站脚本。html/template 按数据落在标签、属性、URL、JS 字符串哪个位置套用对应转义，模板代码不动，换包即挡住注入。
+`text/template` 把数据原样写进输出，数据里一段 `<script>` 会作为标签被浏览器执行，构成跨站脚本。`html/template` 按数据落在标签、属性、URL、JS 字符串哪个位置套用对应转义，模板代码不动，换包即挡住注入。
 
 **正例**
 
@@ -332,7 +332,7 @@ t, err := template.New("page").Parse(pageTemplate)
 >
 > —— https://pkg.go.dev/net/http#Server.ReadHeaderTimeout
 
-连接建立后不把请求头发完，服务端会一直占着这条连接等下去；并发连接累积后正常请求排不到，形成慢速攻击。ReadHeaderTimeout 给读请求头设上限，官方文档说明该值为零且 ReadTimeout 也为零时等于不超时，零值不设就落在这一状态。
+连接建立后不把请求头发完，服务端会一直占着这条连接等下去；并发连接累积后正常请求排不到，形成慢速攻击。`ReadHeaderTimeout` 给读请求头设上限，官方文档说明该值为零且 `ReadTimeout` 也为零时等于不超时，零值不设就落在这一状态。
 
 **正例**
 
@@ -372,7 +372,7 @@ http.ListenAndServe(":8080", mux)
 >
 > —— https://pkg.go.dev/crypto/subtle#ConstantTimeCompare
 
-普通比较遇到第一个不同字节就返回，攻击者能逐字节试探：猜对前缀时耗时更长，按耗时筛选即可在有限次数内还原出秘密。ConstantTimeCompare 的耗时只与长度相关，掐掉这条时间侧信道。
+普通比较遇到第一个不同字节就返回，攻击者能逐字节试探：猜对前缀时耗时更长，按耗时筛选即可在有限次数内还原出秘密。`ConstantTimeCompare` 的耗时只与长度相关，掐掉这条时间侧信道。
 
 **正例**
 

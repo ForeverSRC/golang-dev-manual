@@ -59,7 +59,7 @@
   },
   "MODERN-001": {
     "summary": "Common operations on slices and maps prefer the slices and maps standard library packages over hand-written loops.",
-    "details": "slices and maps provide high-frequency operations such as Contains, Sort, Clone, and Keys. When the standard library can express the operation, stop writing loops by hand, which reduces boundary mistakes and unifies the style.",
+    "details": "`slices` and `maps` provide high-frequency operations such as `Contains`, `Sort`, `Clone`, and `Keys`. When the standard library can express the operation, stop writing loops by hand, which reduces boundary mistakes and unifies the style.",
     "rationale": "Hand-written loops tend to go wrong on empty slices, duplicate elements, and sort stability, and the standard library already covers these boundaries.",
     "detect_note": "go fix also suggests the equivalent modern form"
   },
@@ -72,7 +72,7 @@
   "DATA-002": {
     "summary": "Struct literals are initialized with field names rather than listed by position.",
     "details": "A literal writes field name: value for each field. Small private structs with few fields and a stable order, and test table data, may be exceptions; a struct from another package always uses field names, because adding, removing, or reordering fields silently misplaces positional entries.",
-    "rationale": "The positional form turns field order into an implicit contract, so after the other side adjusts the struct, positions of the same type are silently mismatched with no compile error; the field name form binds each value to its field so the change surfaces at once. The composites check in go vet covers positional literals from another package.",
+    "rationale": "The positional form turns field order into an implicit contract, so after the other side adjusts the struct, positions of the same type are silently mismatched with no compile error; the field name form binds each value to its field so the change surfaces at once. The composites check in `go vet` covers positional literals from another package.",
     "detect_note": "govet covers only positional literals from another package, and the composites check must be enabled"
   },
   "FUNC-001": {
@@ -100,7 +100,7 @@
   },
   "CONC-001": {
     "summary": "Before starting a goroutine, make its exit timing clear, and let the starter wait for it to finish.",
-    "details": "Before writing go, settle three things: when it ends, who waits for it to end, and who handles an error. The starter gathers it with sync.WaitGroup or errgroup in the same function, and uses errgroup when the subtask can return an error. Do not write a fire-and-forget with no waiter.",
+    "details": "Before writing go, settle three things: when it ends, who waits for it to end, and who handles an error. The starter gathers it with `sync.WaitGroup` or `errgroup` in the same function, and uses `errgroup` when the subtask can return an error. Do not write a fire-and-forget with no waiter.",
     "rationale": "A blocked goroutine is not reclaimed by garbage collection and keeps holding memory together with the references on its stack; with no waiter, the errors and panics of a background task have no owner and surface only in production.",
     "detect_note": "Check that each go statement has a matching waiter and exit path"
   },
@@ -118,7 +118,7 @@
   },
   "CONC-004": {
     "summary": "Shared state and the lock protecting it live in the same struct and are read and written only through methods.",
-    "details": "The protected field is unexported, reads and writes go through locked methods, and the lock is not exposed outside the struct. Choose a lock or a channel by scenario: use sync.Mutex to protect shared data such as a cache or state, and use a channel to transfer data ownership, distribute tasks, or pass asynchronous results.",
+    "details": "The protected field is unexported, reads and writes go through locked methods, and the lock is not exposed outside the struct. Choose a lock or a channel by scenario: use `sync.Mutex` to protect shared data such as a cache or state, and use a channel to transfer data ownership, distribute tasks, or pass asynchronous results.",
     "rationale": "When the state and the lock are separate, a caller can bypass the method and change the field directly, leaving the lock useless; once they are together, the only entry for reads and writes is the method, and the protected range can be checked line by line.",
     "detect_note": "Check whether the lock-protected field is exported and whether it is reachable only through methods"
   },
@@ -130,7 +130,7 @@
   },
   "CTRL-002": {
     "summary": "Do not explicitly copy the loop variable any longer.",
-    "details": "Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing v := v or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.",
+    "details": "Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing `v := v` or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.",
     "rationale": "The explicit copy was the way to avoid a shared variable before Go 1.22, and keeping it after the language was fixed only makes readers think protection is still needed here; letting copyloopvar detect it cleans it up uniformly."
   }
 }

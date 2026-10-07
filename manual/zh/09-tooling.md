@@ -7,7 +7,7 @@
 - 归属：工具规约/命令行
 - 起始版本：Go 1.0
 
-根命令下挂子命令，业务逻辑写进各命令的 RunE；输出写 cmd.OutOrStdout()，错误写 cmd.ErrOrStderr()。
+根命令下挂子命令，业务逻辑写进各命令的 `RunE`；输出写 `cmd.OutOrStdout()`，错误写 `cmd.ErrOrStderr()`。
 
 **为什么**
 
@@ -15,7 +15,7 @@
 >
 > —— https://github.com/spf13/cobra
 
-手写 os.Args 分发要在子命令、全局 flag、帮助文本上重复造轮子；cobra 把输出与参数注入命令，命令可直接在测试里执行。
+手写 `os.Args` 分发要在子命令、全局 `flag`、帮助文本上重复造轮子；`cobra` 把输出与参数注入命令，命令可直接在测试里执行。
 
 **正例**
 
@@ -49,15 +49,15 @@ case "list":
 - 归属：工具规约/命令行
 - 起始版本：Go 1.26
 
-把构建切到更新的 Go 版本后，在干净的 git 工作区跑 go fix ./...，改动单独成一个提交，便于逐处复核。
+把构建切到更新的 Go 版本后，在干净的 git 工作区跑 `go fix ./...`，改动单独成一个提交，便于逐处复核。
 
-- 只看不改用 go fix -diff ./... 预览补丁
+- 只看不改用 `go fix -diff ./...` 预览补丁
 - 默认跑全部分析器；拆分改动时用 -<分析器> 只跑一个（如 -any），写 -<分析器>=false 则排除它
 - 落在生成文件上的改写会被丢弃，这类改动要改的是生成器本身
 - 按 GOOS / GOARCH 各跑一次，覆盖不同构建标签下的代码
 - 包作者迁移自己的 API 时，在被替换的函数上写 //go:fix inline，由 inline 分析器落地
 
-modernize 检查与本节工具指向同一批分析器，区别是 golangci-lint 在评审期提示，go fix 直接生成补丁。
+modernize 检查与本节工具指向同一批分析器，区别是 `golangci-lint` 在评审期提示，`go fix` 直接生成补丁。
 
 **为什么**
 
@@ -65,7 +65,7 @@ modernize 检查与本节工具指向同一批分析器，区别是 golangci-lin
 >
 > —— https://pkg.go.dev/cmd/fix
 
-语言与标准库每版都在补新写法，旧代码不改就逐版变成技术债；靠人工记忆与评审提出，没被想到的地方无人知道。go fix 把这批改写收成一条可复现的命令，跟着工具链升级跑一次即可。
+语言与标准库每版都在补新写法，旧代码不改就逐版变成技术债；靠人工记忆与评审提出，没被想到的地方无人知道。`go fix` 把这批改写收成一条可复现的命令，跟着工具链升级跑一次即可。
 
 **正例**
 
@@ -96,7 +96,7 @@ $ go vet ./...
 - 归属：工具规约/测试工具
 - 起始版本：Go 1.0
 
-断言用 assert 或 require，按失败是否终止用例选择：前置条件用 require，其余检查用 assert。测试文件里不手写 if 加 t.Errorf、t.Fatalf 做比较。
+断言用 `assert` 或 `require`，按失败是否终止用例选择：前置条件用 `require`，其余检查用 `assert`。测试文件里不手写 if 加 `t.Errorf`、`t.Fatalf` 做比较。
 
 **为什么**
 
@@ -104,7 +104,7 @@ $ go vet ./...
 >
 > —— https://github.com/stretchr/testify#assert-package
 
-手写比较的失败信息只有自定义文案，缺少期望与实际对照；testify 统一格式化差异并带出调用位置，排查时不必重读源码。
+手写比较的失败信息只有自定义文案，缺少期望与实际对照；`testify` 统一格式化差异并带出调用位置，排查时不必重读源码。
 
 **正例**
 
@@ -133,7 +133,7 @@ if got != want {
 - 归属：工具规约/代码生成
 - 起始版本：Go 1.4
 
-生成器与输入源是唯一可改的地方，改完重新生成，不在生成物上直接改。生成器自带 // Code generated ... DO NOT EDIT. 一类标记行时保留它，不删改；生成器不输出标记的，不必补造，识别交给 TOOL-011 的文件名约定。本仓库的 gdm/cmd/gdm-cli/wire/wire_gen.go 与 manual/ 都属此类，生成命令走 make generate 与 make gen。
+生成器与输入源是唯一可改的地方，改完重新生成，不在生成物上直接改。生成器自带 // Code generated ... DO NOT EDIT. 一类标记行时保留它，不删改；生成器不输出标记的，不必补造，识别交给 TOOL-011 的文件名约定。本仓库的 gdm/cmd/gdm-cli/wire/wire_gen.go 与 manual/ 都属此类，生成命令走 `make generate` 与 `make gen`。
 
 **为什么**
 
@@ -173,7 +173,7 @@ repository := jsonfile.New()
 - 后缀优先，形如 wire_gen.go、order_repo_gen.go，按名称排序时与同类文件相邻。
 - 前缀写成 gen_，形如 gen_version.go。
 - 分隔符只用下划线，不写连字符。
-- 文件名由生成器自己固定（wire 输出 wire_gen.go）或由平台决定时，按生成器默认走，不必改名。
+- 文件名由生成器自己固定（`wire` 输出 wire_gen.go）或由平台决定时，按生成器默认走，不必改名。
 
 **为什么**
 
@@ -181,7 +181,7 @@ repository := jsonfile.New()
 >
 > —— https://protobuf.dev/reference/go/go-generated/
 
-protoc 给生成文件加 .pb.go 后缀，wire 输出 wire_gen.go，都是在文件名上标明这是个生成物。名字由调用方指定时不加约定，生成物与手写文件混在同一层目录里，评审要逐个打开才知道哪个能改，改之前还得先翻生成命令。统一到 gen 前后缀后，目录列表本身就能作答；推荐后缀是因为它不打断原有的命名顺序，检索、排序与相邻关系仍按业务名前缀走。分隔符取自己的文件名约定，Go 工具链认的 `_test.go`、`source_windows_amd64.go` 都用下划线，标准库带连字符的文件只出现在 testdata 一类测试数据里。
+`protoc` 给生成文件加 .pb.go 后缀，`wire` 输出 wire_gen.go，都是在文件名上标明这是个生成物。名字由调用方指定时不加约定，生成物与手写文件混在同一层目录里，评审要逐个打开才知道哪个能改，改之前还得先翻生成命令。统一到 gen 前后缀后，目录列表本身就能作答；推荐后缀是因为它不打断原有的命名顺序，检索、排序与相邻关系仍按业务名前缀走。分隔符取自己的文件名约定，Go 工具链认的 `_test.go`、`source_windows_amd64.go` 都用下划线，标准库带连字符的文件只出现在 testdata 一类测试数据里。
 
 **正例**
 

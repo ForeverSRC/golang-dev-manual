@@ -7,7 +7,7 @@
 - 归属：静态检查规约/配置与运行
 - 起始版本：Go 1.0
 
-全仓库只保留一份 .golangci.yml，本地与 CI 跑同一条命令；golangci-lint 版本由 go.mod 的 tool 指令固定，不依赖各机器上的全局安装。
+全仓库只保留一份 .golangci.yml，本地与 CI 跑同一条命令；`golangci-lint` 版本由 go.mod 的 tool 指令固定，不依赖各机器上的全局安装。
 
 **为什么**
 
@@ -79,10 +79,10 @@ raw, err := os.ReadFile(path) //nolint
 - 归属：静态检查规约/必开规则
 - 起始版本：Go 1.0
 
-standard 集是 golangci-lint 默认启用的五个检查器，配置里不要关掉，也不要只留其中几个：
+standard 集是 `golangci-lint` 默认启用的五个检查器，配置里不要关掉，也不要只留其中几个：
 
 - errcheck：未处理的错误返回值
-- govet：可疑构造，等价于 go vet
+- govet：可疑构造，等价于 `go vet`
 - ineffassign：赋了值却不再读的赋值
 - staticcheck：staticcheck 的诊断规则
 - unused：未使用的标识符
@@ -161,7 +161,7 @@ for i := 0; i < n; i++ {
 - 归属：静态检查规约/推荐规则
 - 起始版本：Go 1.0
 
-testifylint 拦下 assert.Nil 判错误、参数顺序颠倒一类高频误用；未用 testify 的项目不必启用。
+testifylint 拦下 `assert.Nil` 判错误、参数顺序颠倒一类高频误用；未用 `testify` 的项目不必启用。
 
 **为什么**
 
@@ -169,7 +169,7 @@ testifylint 拦下 assert.Nil 判错误、参数顺序颠倒一类高频误用�
 >
 > —— https://github.com/Antonboom/testifylint
 
-testify 部分 API 误用后编译期不报错，如 assert.Nil(t, err) 在 err 为接口时判断失效；交给 linter 比靠评审记忆可靠。
+testify 部分 API 误用后编译期不报错，如 `assert.Nil(t, err)` 在 err 为接口时判断失效；交给 linter 比靠评审记忆可靠。
 
 **正例**
 
@@ -199,7 +199,7 @@ standard 集之外，推荐开启以下分析器：
 - errorlint：错误链相关的写法问题
 - nilerr：判断了 err != nil 却返回 nil
 - bodyclose：HTTP 响应体未关闭
-- noctx：请求未带 context.Context
+- noctx：请求未带 `context.Context`
 - nolintlint：抑制告警未指名检查器、缺理由或已失效
 - gosec：安全隐患
 - gocritic：缺陷与性能诊断

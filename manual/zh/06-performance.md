@@ -132,7 +132,7 @@ int、uint、float、bool 与字符串之间的转换走 `strconv` 的 `Itoa`、
 >
 > —— https://github.com/uber-go/guide/blob/master/style.md#prefer-strconv-over-fmt
 
-fmt 的格式化要经接口与反射走通用解析路径，比 strconv 的专用函数多分配、多判断。Uber 的基准里同一转换 `fmt.Sprint` 是 143 ns/op 两次分配，`strconv.Itoa` 是 64.2 ns/op 一次分配；放在高频路径上按调用次数累加，差距会被放大。
+`fmt` 的格式化要经接口与反射走通用解析路径，比 `strconv` 的专用函数多分配、多判断。Uber 的基准里同一转换 `fmt.Sprint` 是 143 ns/op 两次分配，`strconv.Itoa` 是 64.2 ns/op 一次分配；放在高频路径上按调用次数累加，差距会被放大。
 
 **正例**
 
@@ -165,7 +165,7 @@ s := fmt.Sprint(n)
 >
 > —— https://github.com/uber-go/guide/blob/master/style.md#avoid-repeated-string-to-byte-conversions
 
-string 与 []byte 互转要新分配内存并逐字节拷贝。写在循环里的固定字符串，每轮产生一份立刻丢弃的切片，分配次数与循环次数同阶，同时给 GC 增加同量垃圾。Uber 的基准里每轮转换 22.2 ns/op，提到循环外后降到 3.25 ns/op。
+string 与 `[]byte` 互转要新分配内存并逐字节拷贝。写在循环里的固定字符串，每轮产生一份立刻丢弃的切片，分配次数与循环次数同阶，同时给 GC 增加同量垃圾。Uber 的基准里每轮转换 22.2 ns/op，提到循环外后降到 3.25 ns/op。
 
 **正例**
 
@@ -203,7 +203,7 @@ for range n {
 >
 > —— https://pkg.go.dev/strings#Builder
 
-字符串不可变，每次 += 都要新建字符串并整段拷贝已累积的内容，循环里按累计长度重复搬运，总拷贝量接近平方级。Builder 写进同一块可变缓冲，只在取值时产出一次结果；先 Grow 再写，连缓冲扩容也省掉。
+字符串不可变，每次 += 都要新建字符串并整段拷贝已累积的内容，循环里按累计长度重复搬运，总拷贝量接近平方级。`Builder` 写进同一块可变缓冲，只在取值时产出一次结果；先 `Grow` 再写，连缓冲扩容也省掉。
 
 **正例**
 
@@ -244,7 +244,7 @@ for _, part := range parts {
 >
 > —— https://go.dev/blog/slices-intro#a-possible-gotcha
 
-从大文件或大响应里截出一小段并长期保存时，子切片仍指向原底层数组，GC 认为整块数组仍被引用，进程常驻内存远大于实际所需。Clone 复制出只含所需元素的独立数组，原数组失去引用后即可回收。
+从大文件或大响应里截出一小段并长期保存时，子切片仍指向原底层数组，GC 认为整块数组仍被引用，进程常驻内存远大于实际所需。`Clone` 复制出只含所需元素的独立数组，原数组失去引用后即可回收。
 
 **正例**
 

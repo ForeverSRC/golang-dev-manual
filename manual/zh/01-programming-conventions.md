@@ -515,7 +515,7 @@ ids := []string{}
 >
 > —— https://github.com/uber-go/guide/blob/master/style.md#use-field-names-to-initialize-structs
 
-位置写法把字段顺序变成隐式契约，对方调整结构体后，类型相同的位置会静默错配且编译不报错；字段名写法让每个值对应到字段，改动当场暴露。go vet 的 composites 检查覆盖跨包位置字面量。
+位置写法把字段顺序变成隐式契约，对方调整结构体后，类型相同的位置会静默错配且编译不报错；字段名写法让每个值对应到字段，改动当场暴露。`go vet` 的 composites 检查覆盖跨包位置字面量。
 
 **正例**
 
@@ -544,7 +544,7 @@ user := User{"alice", 30}
 - 归属：编程规约/数据结构规约
 - 起始版本：Go 1.21
 
-slices 与 maps 提供 Contains、Sort、Clone、Keys 等高频操作。能用标准库表达时不再手写循环，减少边界错误并统一写法。
+`slices` 与 `maps` 提供 `Contains`、`Sort`、`Clone`、`Keys` 等高频操作。能用标准库表达时不再手写循环，减少边界错误并统一写法。
 
 **为什么**
 
@@ -586,7 +586,7 @@ for _, id := range ids {
 - 归属：编程规约/并发规约
 - 起始版本：Go 1.25
 
-写 go 之前先想清三件事：它何时结束、谁等它结束、出错谁处理。启动方在同一个函数里用 sync.WaitGroup 或 errgroup 收束；子任务会返回错误时用 errgroup。不写没有等待方的 fire-and-forget。
+写 go 之前先想清三件事：它何时结束、谁等它结束、出错谁处理。启动方在同一个函数里用 `sync.WaitGroup` 或 `errgroup` 收束；子任务会返回错误时用 `errgroup`。不写没有等待方的 fire-and-forget。
 
 **为什么**
 
@@ -711,7 +711,7 @@ func FetchAsync() <-chan Data {
 - 归属：编程规约/并发规约
 - 起始版本：Go 1.0
 
-被保护的字段不导出，读写都走加锁的方法，锁不暴露到结构体之外。选锁还是 channel 按场景：保护缓存、状态等共享数据用 sync.Mutex；传递数据所有权、分发任务、传递异步结果用 channel。
+被保护的字段不导出，读写都走加锁的方法，锁不暴露到结构体之外。选锁还是 channel 按场景：保护缓存、状态等共享数据用 `sync.Mutex`；传递数据所有权、分发任务、传递异步结果用 channel。
 
 **为什么**
 
@@ -799,7 +799,7 @@ if err := save(); err == nil {
 - 归属：编程规约/控制语句规约
 - 起始版本：Go 1.22
 
-Go 1.22 起 for 循环的迭代变量每次迭代各自独立，闭包与 goroutine 捕获到的就是当次的值，不需要再写 v := v 或把变量当参数传进 goroutine。本条对 go.mod 声明 Go 1.22 及以上的模块生效。
+Go 1.22 起 for 循环的迭代变量每次迭代各自独立，闭包与 goroutine 捕获到的就是当次的值，不需要再写 `v := v` 或把变量当参数传进 goroutine。本条对 go.mod 声明 Go 1.22 及以上的模块生效。
 
 **为什么**
 

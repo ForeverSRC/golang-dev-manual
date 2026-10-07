@@ -1,7 +1,9 @@
 GDM_CLI := bin/gdm-cli
 GDM_GEN := bin/gdm-gen
 
-.PHONY: build gen check lint generate site site-serve
+SITE_ASSET_DIRS := manual/zh/assets manual/en/assets
+
+.PHONY: build gen check lint generate site site-assets site-serve
 
 build:
 	go build -o $(GDM_CLI) ./gdm/cmd/gdm-cli
@@ -20,8 +22,11 @@ check:
 	go vet ./...
 	go test ./...
 
-site:
+site-assets:
+	@for dir in $(SITE_ASSET_DIRS); do mkdir -p $$dir; cp -R website/assets/. $$dir/; done
+
+site: gen site-assets
 	mkdocs build -f website/mkdocs.yml
 
-site-serve:
+site-serve: gen site-assets
 	mkdocs serve -f website/mkdocs.yml

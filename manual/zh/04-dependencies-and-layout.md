@@ -210,7 +210,7 @@ package util
 - 归属：依赖与工程结构/包组织规约
 - 起始版本：Go 1.0
 
-调用方已用包名作前缀，导出类型与方法名里重复它只增加长度。包内只有一个类型、或构造函数返回与包同名的类型时用 New；返回包内其它类型时才在名字里带上该类型。
+调用方已用包名作前缀，导出类型与方法名里重复它只增加长度。包内只有一个类型、或构造函数返回与包同名的类型时用 `New`；返回包内其它类型时才在名字里带上该类型。
 
 **为什么**
 
@@ -218,7 +218,7 @@ package util
 >
 > —— https://go.dev/blog/package-names
 
-widget.NewWidget 在调用点展开就是 widget.NewWidget()，一半字符是同一信息；只有一个同名类型时用 New，名字更短，读法与 time.Now、list.New 这类标准库入口也一致。
+`widget.NewWidget` 在调用点展开就是 `widget.NewWidget()`，一半字符是同一信息；只有一个同名类型时用 `New`，名字更短，读法与 `time.Now`、`list.New` 这类标准库入口也一致。
 
 **正例**
 
@@ -324,7 +324,7 @@ import (
 - 归属：依赖与工程结构/依赖管理规约
 - 起始版本：Go 1.11
 
-增删依赖用 go get，改 require 与 replace 用 go mod edit，整理用 go mod tidy，go.sum 只由工具写入。手工改版本号或校验和会与依赖图、模块缓存对不上。
+增删依赖用 `go get`，改 require 与 replace 用 `go mod edit`，整理用 `go mod tidy`，go.sum 只由工具写入。手工改版本号或校验和会与依赖图、模块缓存对不上。
 
 **为什么**
 
@@ -332,7 +332,7 @@ import (
 >
 > —— https://go.dev/doc/modules/managing-dependencies#synchronizing
 
-依赖图里含大量间接依赖，人手工维护只能管到直接依赖那一层；go mod tidy 按实际 import 反推，缺的补上、不再用的删掉，go.sum 随之校正，构建结果才与源码一致。
+依赖图里含大量间接依赖，人手工维护只能管到直接依赖那一层；`go mod tidy` 按实际 import 反推，缺的补上、不再用的删掉，go.sum 随之校正，构建结果才与源码一致。
 
 **正例**
 
@@ -434,7 +434,7 @@ replace example.com/lib => ../lib
 - 归属：依赖与工程结构/依赖管理规约
 - 起始版本：Go 1.24
 
-命令行工具用 tool 指令声明包路径，用 go tool <name> 运行，版本由 go.mod 与 go.sum 固定。全局 go install 得到的版本随机器与执行时间变化，CI 与本地无法对齐。
+命令行工具用 tool 指令声明包路径，用 `go tool <name>` 运行，版本由 go.mod 与 go.sum 固定。全局 `go install` 得到的版本随机器与执行时间变化，CI 与本地无法对齐。
 
 **为什么**
 
@@ -515,7 +515,7 @@ n, err := convert.ToInt(s) // pull in the convert module for a single type conve
 >
 > —— https://github.com/golang-standards/project-layout#directories-you-shouldnt-have
 
-go 命令以 go.mod 所在目录为模块根，import path 由该目录往下的相对路径拼成；根下再套 src/，所有导入、go install 的包路径与文档示例都要多写一层，还与仓库实际目录对不上。
+go 命令以 go.mod 所在目录为模块根，import path 由该目录往下的相对路径拼成；根下再套 src/，所有导入、`go install` 的包路径与文档示例都要多写一层，还与仓库实际目录对不上。
 
 **正例**
 
@@ -591,7 +591,7 @@ import "github.com/ForeverSRC/golang-dev-manual/repository/jsonfile"
 >
 > —— https://go.dev/doc/modules/layout#multiple-commands
 
-main 包混在模块根或业务目录里，import 路径与可执行文件名对不上，go install 时要先找文件所在目录；集中到 cmd/ 后，包与命令在结构上分开，每个程序的入口一目了然。
+main 包混在模块根或业务目录里，import 路径与可执行文件名对不上，`go install` 时要先找文件所在目录；集中到 cmd/ 后，包与命令在结构上分开，每个程序的入口一目了然。
 
 **正例**
 

@@ -34,7 +34,7 @@
       "text": "When converting primitives to/from strings, `strconv` is faster than `fmt`.",
       "source": "https://github.com/uber-go/guide/blob/master/style.md#prefer-strconv-over-fmt"
     },
-    "rationale": "fmt 的格式化要经接口与反射走通用解析路径，比 strconv 的专用函数多分配、多判断。Uber 的基准里同一转换 `fmt.Sprint` 是 143 ns/op 两次分配，`strconv.Itoa` 是 64.2 ns/op 一次分配；放在高频路径上按调用次数累加，差距会被放大。",
+    "rationale": "`fmt` 的格式化要经接口与反射走通用解析路径，比 `strconv` 的专用函数多分配、多判断。Uber 的基准里同一转换 `fmt.Sprint` 是 143 ns/op 两次分配，`strconv.Itoa` 是 64.2 ns/op 一次分配；放在高频路径上按调用次数累加，差距会被放大。",
     "examples": {
       "good": "s := strconv.Itoa(n)",
       "bad": "s := fmt.Sprint(n)"
@@ -58,7 +58,7 @@
       "text": "Do not create byte slices from a fixed string repeatedly. Instead, perform the conversion once and capture the result.",
       "source": "https://github.com/uber-go/guide/blob/master/style.md#avoid-repeated-string-to-byte-conversions"
     },
-    "rationale": "string 与 []byte 互转要新分配内存并逐字节拷贝。写在循环里的固定字符串，每轮产生一份立刻丢弃的切片，分配次数与循环次数同阶，同时给 GC 增加同量垃圾。Uber 的基准里每轮转换 22.2 ns/op，提到循环外后降到 3.25 ns/op。",
+    "rationale": "string 与 `[]byte` 互转要新分配内存并逐字节拷贝。写在循环里的固定字符串，每轮产生一份立刻丢弃的切片，分配次数与循环次数同阶，同时给 GC 增加同量垃圾。Uber 的基准里每轮转换 22.2 ns/op，提到循环外后降到 3.25 ns/op。",
     "examples": {
       "good": "data := []byte(\"Hello world\")\nfor range n {\n\tw.Write(data)\n}",
       "bad": "for range n {\n\tw.Write([]byte(\"Hello world\"))\n}"
@@ -131,7 +131,7 @@
       "text": "A Builder is used to efficiently build a string using Builder.Write methods. It minimizes memory copying. The zero value is ready to use. Do not copy a non-zero Builder.",
       "source": "https://pkg.go.dev/strings#Builder"
     },
-    "rationale": "字符串不可变，每次 += 都要新建字符串并整段拷贝已累积的内容，循环里按累计长度重复搬运，总拷贝量接近平方级。Builder 写进同一块可变缓冲，只在取值时产出一次结果；先 Grow 再写，连缓冲扩容也省掉。",
+    "rationale": "字符串不可变，每次 += 都要新建字符串并整段拷贝已累积的内容，循环里按累计长度重复搬运，总拷贝量接近平方级。`Builder` 写进同一块可变缓冲，只在取值时产出一次结果；先 `Grow` 再写，连缓冲扩容也省掉。",
     "examples": {
       "good": "var b strings.Builder\nb.Grow(total)\nfor _, part := range parts {\n\tb.WriteString(part)\n}\ns := b.String()",
       "bad": "var s string\nfor _, part := range parts {\n\ts += part\n}"
@@ -155,7 +155,7 @@
       "text": "As mentioned earlier, re-slicing a slice doesn't make a copy of the underlying array. The full array will be kept in memory until it is no longer referenced. Occasionally this can cause the program to hold all the data in memory when only a small piece of it is needed.",
       "source": "https://go.dev/blog/slices-intro#a-possible-gotcha"
     },
-    "rationale": "从大文件或大响应里截出一小段并长期保存时，子切片仍指向原底层数组，GC 认为整块数组仍被引用，进程常驻内存远大于实际所需。Clone 复制出只含所需元素的独立数组，原数组失去引用后即可回收。",
+    "rationale": "从大文件或大响应里截出一小段并长期保存时，子切片仍指向原底层数组，GC 认为整块数组仍被引用，进程常驻内存远大于实际所需。`Clone` 复制出只含所需元素的独立数组，原数组失去引用后即可回收。",
     "examples": {
       "good": "line := slices.Clone(buf[start:end])\nreturn line",
       "bad": "line := buf[start:end]\nreturn line"

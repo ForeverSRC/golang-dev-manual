@@ -7,7 +7,7 @@
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.13
 
-When the caller needs to test the error with errors.Is or errors.As, wrap it with %w and add this layer's context. Use %v only at the boundary that truly terminates the error chain (output to the outside, writing logs).
+When the caller needs to test the error with `errors.Is` or `errors.As`, wrap it with %w and add this layer's context. Use %v only at the boundary that truly terminates the error chain (output to the outside, writing logs).
 
 **Why**
 
@@ -45,7 +45,7 @@ if err := repo.Save(ctx, order); err != nil {
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.13
 
-A bare comparison and a type assertion only look at the outermost layer of the error chain: once the error is wrapped with %w, == no longer holds and err.(*MyError) fails outright. errors.Is compares layer by layer against sentinel errors, and errors.As matches layer by layer by error type; both unwrap the error chain. The sentinel errors and error types available for testing are exported by the package that produces the error; compare with == only when the error is known never to be wrapped.
+A bare comparison and a type assertion only look at the outermost layer of the error chain: once the error is wrapped with %w, == no longer holds and `err.(*MyError)` fails outright. `errors.Is` compares layer by layer against sentinel errors, and `errors.As` matches layer by layer by error type; both unwrap the error chain. The sentinel errors and error types available for testing are exported by the package that produces the error; compare with == only when the error is known never to be wrapped.
 
 **Why**
 
@@ -324,7 +324,7 @@ if err := callOrder(ctx); err != nil {
 - Category: Errors and Logging/Logging
 - Since: Go 1.21
 
-Route structured logging uniformly through log/slog: assemble the Handler with slog.New at the process entry point, use JSONHandler in production, and use an injected *slog.Logger or slog.Default() everywhere else. Use fmt.Print and the standard log package only for the output of one-off scripts; when adopting a third-party logging library, funnel it into the same output through a custom Handler.
+Route structured logging uniformly through `log/slog`: assemble the `Handler` with `slog.New` at the process entry point, use `JSONHandler` in production, and use an injected `*slog.Logger` or `slog.Default()` everywhere else. Use `fmt.Print` and the standard `log` package only for the output of one-off scripts; when adopting a third-party logging library, funnel it into the same output through a custom `Handler`.
 
 **Why**
 
@@ -332,7 +332,7 @@ Route structured logging uniformly through log/slog: assemble the Handler with s
 >
 > — https://go.dev/blog/slog
 
-A whole line of text printed by fmt or log cannot be parsed by field, so the collector can only store it as one block, and searching by order_id or aggregating by latency requires writing separate parsing rules; the key-value pairs and JSON output of slog can be recognized directly by the collector.
+A whole line of text printed by `fmt` or `log` cannot be parsed by field, so the collector can only store it as one block, and searching by order_id or aggregating by latency requires writing separate parsing rules; the key-value pairs and JSON output of `slog` can be recognized directly by the collector.
 
 **Good**
 
@@ -358,7 +358,7 @@ fmt.Printf("order created: %s\n", order.ID)
 - Category: Errors and Logging/Logging
 - Since: Go 1.21
 
-Carry every value that accompanies a log entry (ID, count, latency, error) as a key-value argument, and write only what happened in the message. Use the same key name for the same meaning throughout the repository; pass an error value as slog.Any("error", err) rather than writing it into the message.
+Carry every value that accompanies a log entry (ID, count, latency, error) as a key-value argument, and write only what happened in the message. Use the same key name for the same meaning throughout the repository; pass an error value as `slog.Any("error", err)` rather than writing it into the message.
 
 **Why**
 
@@ -391,7 +391,7 @@ slog.Info(fmt.Sprintf("order %s created, amount %d", order.ID, order.Amount))
 - Category: Errors and Logging/Logging
 - Since: Go 1.21
 
-When handling a request, pass ctx together with slog methods such as InfoContext and ErrorContext, so the handler can fill in fields that run through the whole request, such as the request ID and trace identifier. Use the methods without Context on paths that have no request context, such as startup and shutdown.
+When handling a request, pass ctx together with `slog` methods such as `InfoContext` and `ErrorContext`, so the handler can fill in fields that run through the whole request, such as the request ID and trace identifier. Use the methods without Context on paths that have no request context, such as startup and shutdown.
 
 **Why**
 

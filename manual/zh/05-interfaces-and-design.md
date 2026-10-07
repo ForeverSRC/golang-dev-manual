@@ -57,7 +57,7 @@ type SourceFactory interface {
 
 - 只会有单实现：接口与实现放在同一个包，接口紧邻实现，读代码时不必跨包对照；接口与构造函数导出，实现结构体不导出。
 - 预计有多个实现或需要替换（存储、外部服务、通知一类）：接口放在使用方所在包，按使用方真正用得着的方法选取；实现包导出具体类型与构造函数，并按 IFACE-002 写编译期断言，把承诺写进代码。
-- 接口签名已由标准库或第三方固定（io.Reader 一类）：本条不适用，实现方按原样满足即可。
+- 接口签名已由标准库或第三方固定（`io.Reader` 一类）：本条不适用，实现方按原样满足即可。
 
 **为什么**
 
@@ -147,7 +147,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
 - 归属：接口与设计规约/接口定义与落位
 - 起始版本：Go 1.0
 
-参数、返回值与字段都用接口值本身，不用 *Interface。接口值内部已含类型信息与数据指针，底层数据是值还是指针由具体类型决定；需要方法改到底层数据时，由实现方用指针接收者表达。
+参数、返回值与字段都用接口值本身，不用 `*Interface`。接口值内部已含类型信息与数据指针，底层数据是值还是指针由具体类型决定；需要方法改到底层数据时，由实现方用指针接收者表达。
 
 **为什么**
 
@@ -155,7 +155,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
 >
 > —— https://github.com/uber-go/guide/blob/master/style.md#pointers-to-interfaces
 
-*Interface 让调用处多一层解引用，nil 判断也变复杂：接口值为 nil 与接口内部数据指针为 nil 是两种状态，混在一起后判空条件要么写错要么靠猜。传接口值本身表达同一意图，判空只有一种含义。
+`*Interface` 让调用处多一层解引用，nil 判断也变复杂：接口值为 nil 与接口内部数据指针为 nil 是两种状态，混在一起后判空条件要么写错要么靠猜。传接口值本身表达同一意图，判空只有一种含义。
 
 **正例**
 
@@ -221,7 +221,7 @@ type Server struct {
 - 归属：接口与设计规约/组合与复用
 - 起始版本：Go 1.0
 
-只有当内层类型的方法应当成为外层方法时才用匿名内嵌，其余情况用具名字段。嵌入后外层零值仍可用、拷贝语义不变、不额外暴露无关方法。sync.Mutex 一类同步原语一律用具名字段，匿名嵌入会把 Lock、Unlock 挂到外层 API 上。
+只有当内层类型的方法应当成为外层方法时才用匿名内嵌，其余情况用具名字段。嵌入后外层零值仍可用、拷贝语义不变、不额外暴露无关方法。`sync.Mutex` 一类同步原语一律用具名字段，匿名嵌入会把 `Lock`、`Unlock` 挂到外层 API 上。
 
 **为什么**
 
@@ -263,7 +263,7 @@ type Server struct {
 - 归属：接口与设计规约/依赖注入与装配
 - 起始版本：Go 1.0
 
-各层构造函数与接口绑定集中在一个 ProviderSet，接口到实现的绑定写 wire.Bind；入口只调用生成好的 Initialize 函数。wire 版本经 go.mod 的 tool 指令固定，改动装配后用 go generate 重新生成 wire_gen.go。
+各层构造函数与接口绑定集中在一个 ProviderSet，接口到实现的绑定写 `wire.Bind`；入口只调用生成好的 `Initialize` 函数。`wire` 版本经 go.mod 的 tool 指令固定，改动装配后用 `go generate` 重新生成 wire_gen.go。
 
 **为什么**
 
@@ -347,7 +347,7 @@ func Sign(msg string) string {
 - 归属：接口与设计规约/context 传递
 - 起始版本：Go 1.7
 
-暂时拿不到上游 context 时传 context.TODO()，程序入口、初始化与测试用 context.Background()。不把 nil 当作「没有 context」的表达。
+暂时拿不到上游 context 时传 `context.TODO()`，程序入口、初始化与测试用 `context.Background()`。不把 nil 当作「没有 context」的表达。
 
 **为什么**
 
@@ -355,7 +355,7 @@ func Sign(msg string) string {
 >
 > —— https://pkg.go.dev/context#pkg-overview
 
-nil 是合法的接口值，能在编译期通过；接收方一旦调用 Done 或 Value 就直接 panic，是否 panic 取决于其内部实现，函数签名上看不出来。传 context.TODO() 语义相同且始终安全，静态检查也能据此找出这类遗漏。
+nil 是合法的接口值，能在编译期通过；接收方一旦调用 `Done` 或 `Value` 就直接 panic，是否 panic 取决于其内部实现，函数签名上看不出来。传 `context.TODO()` 语义相同且始终安全，静态检查也能据此找出这类遗漏。
 
 **正例**
 
@@ -517,7 +517,7 @@ func Render(ctx context.Context) error {
 >
 > —— https://pkg.go.dev/cmd/vet
 
-值拷贝在编译期合法，go vet 的 copylocks 检查是主要防线；一旦漏检，问题只在并发压力下暴露，排查成本高。
+值拷贝在编译期合法，`go vet` 的 copylocks 检查是主要防线；一旦漏检，问题只在并发压力下暴露，排查成本高。
 
 **正例**
 

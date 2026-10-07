@@ -6,7 +6,7 @@
     "section": "configuration",
     "since_go": "1.0",
     "summary": "统一用 golangci-lint 做静态代码检查。",
-    "details": "全仓库只保留一份 .golangci.yml，本地与 CI 跑同一条命令；golangci-lint 版本由 go.mod 的 tool 指令固定，不依赖各机器上的全局安装。",
+    "details": "全仓库只保留一份 .golangci.yml，本地与 CI 跑同一条命令；`golangci-lint` 版本由 go.mod 的 tool 指令固定，不依赖各机器上的全局安装。",
     "quote": {
       "text": "Golangci-lint is a fast linters runner for Go. It runs linters in parallel, uses caching, supports YAML configuration, integrates with all major IDEs, and includes over a hundred linters.",
       "source": "https://golangci-lint.run/"
@@ -84,12 +84,12 @@
     "section": "recommended-rules",
     "since_go": "1.0",
     "summary": "使用 testify 时，同步开启 testifylint。",
-    "details": "testifylint 拦下 assert.Nil 判错误、参数顺序颠倒一类高频误用；未用 testify 的项目不必启用。",
+    "details": "testifylint 拦下 `assert.Nil` 判错误、参数顺序颠倒一类高频误用；未用 `testify` 的项目不必启用。",
     "quote": {
       "text": "testify is the most popular Golang testing framework in recent years. But it has a terrible ambiguous API in places, and the purpose of this linter is to protect you from annoying mistakes.",
       "source": "https://github.com/Antonboom/testifylint"
     },
-    "rationale": "testify 部分 API 误用后编译期不报错，如 assert.Nil(t, err) 在 err 为接口时判断失效；交给 linter 比靠评审记忆可靠。",
+    "rationale": "testify 部分 API 误用后编译期不报错，如 `assert.Nil(t, err)` 在 err 为接口时判断失效；交给 linter 比靠评审记忆可靠。",
     "examples": {
       "good": "require.NoError(t, err)",
       "bad": "assert.Nil(t, err)"
@@ -109,7 +109,7 @@
     "section": "required-rules",
     "since_go": "1.0",
     "summary": "至少开启 golangci-lint 的 standard 集。",
-    "details": "standard 集是 golangci-lint 默认启用的五个检查器，配置里不要关掉，也不要只留其中几个：\n\n- errcheck：未处理的错误返回值\n- govet：可疑构造，等价于 go vet\n- ineffassign：赋了值却不再读的赋值\n- staticcheck：staticcheck 的诊断规则\n- unused：未使用的标识符",
+    "details": "standard 集是 `golangci-lint` 默认启用的五个检查器，配置里不要关掉，也不要只留其中几个：\n\n- errcheck：未处理的错误返回值\n- govet：可疑构造，等价于 `go vet`\n- ineffassign：赋了值却不再读的赋值\n- staticcheck：staticcheck 的诊断规则\n- unused：未使用的标识符",
     "quote": {
       "text": "Golangci-lint can be used with zero configuration. By default, the following linters are enabled: errcheck, govet, ineffassign, staticcheck, unused.",
       "source": "https://golangci-lint.run/docs/welcome/quick-start/"
@@ -135,7 +135,7 @@
     "section": "recommended-rules",
     "since_go": "1.0",
     "summary": "standard 集之外，推荐开启常用的补充分析器。",
-    "details": "standard 集之外，推荐开启以下分析器：\n\n- errorlint：错误链相关的写法问题\n- nilerr：判断了 err != nil 却返回 nil\n- bodyclose：HTTP 响应体未关闭\n- noctx：请求未带 context.Context\n- nolintlint：抑制告警未指名检查器、缺理由或已失效\n- gosec：安全隐患\n- gocritic：缺陷与性能诊断\n- exhaustive：枚举 switch 未穷举\n- copyloopvar：Go 1.22 起多余的循环变量拷贝\n- testpackage：同包测试\n- funcorder：导出与未导出的函数次序\n- misspell：拼写错误\n\nmodernize 与 testifylint 见同节单列条款。与项目形态不符的可以不启用，理由写进配置注释或评审记录。",
+    "details": "standard 集之外，推荐开启以下分析器：\n\n- errorlint：错误链相关的写法问题\n- nilerr：判断了 err != nil 却返回 nil\n- bodyclose：HTTP 响应体未关闭\n- noctx：请求未带 `context.Context`\n- nolintlint：抑制告警未指名检查器、缺理由或已失效\n- gosec：安全隐患\n- gocritic：缺陷与性能诊断\n- exhaustive：枚举 switch 未穷举\n- copyloopvar：Go 1.22 起多余的循环变量拷贝\n- testpackage：同包测试\n- funcorder：导出与未导出的函数次序\n- misspell：拼写错误\n\nmodernize 与 testifylint 见同节单列条款。与项目形态不符的可以不启用，理由写进配置注释或评审记录。",
     "quote": {
       "text": "To see a list of supported linters and which linters are enabled/disabled: golangci-lint help linters",
       "source": "https://golangci-lint.run/docs/linters/"

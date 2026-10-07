@@ -1,12 +1,12 @@
 {
   "ERR-001": {
     "summary": "Wrap with %w when the error chain must be preserved; do not use %v or %s.",
-    "details": "When the caller needs to test the error with errors.Is or errors.As, wrap it with %w and add this layer's context. Use %v only at the boundary that truly terminates the error chain (output to the outside, writing logs).",
+    "details": "When the caller needs to test the error with `errors.Is` or `errors.As`, wrap it with %w and add this layer's context. Use %v only at the boundary that truly terminates the error chain (output to the outside, writing logs).",
     "rationale": "%v cuts the error chain, so the caller can no longer test the error by type and can only compare strings, which breaks as soon as the wording changes."
   },
   "ERR-003": {
     "summary": "Test the kind of an error with errors.Is and errors.As, not with == or a type assertion.",
-    "details": "A bare comparison and a type assertion only look at the outermost layer of the error chain: once the error is wrapped with %w, == no longer holds and err.(*MyError) fails outright. errors.Is compares layer by layer against sentinel errors, and errors.As matches layer by layer by error type; both unwrap the error chain. The sentinel errors and error types available for testing are exported by the package that produces the error; compare with == only when the error is known never to be wrapped.",
+    "details": "A bare comparison and a type assertion only look at the outermost layer of the error chain: once the error is wrapped with %w, == no longer holds and `err.(*MyError)` fails outright. `errors.Is` compares layer by layer against sentinel errors, and `errors.As` matches layer by layer by error type; both unwrap the error chain. The sentinel errors and error types available for testing are exported by the package that produces the error; compare with == only when the error is known never to be wrapped.",
     "rationale": "Once some layer changes a direct return into a %w wrap, == and type assertions silently stop matching, the error branch is never taken, and the problem usually surfaces only in production; errorlint covers both forms, and following it blocks them automatically.",
     "detect_note": "Covers both the == comparison and the type assertion forms"
   },
@@ -48,19 +48,19 @@
   },
   "LOG-001": {
     "summary": "Record business logs with log/slog; do not print directly with fmt or log.",
-    "details": "Route structured logging uniformly through log/slog: assemble the Handler with slog.New at the process entry point, use JSONHandler in production, and use an injected *slog.Logger or slog.Default() everywhere else. Use fmt.Print and the standard log package only for the output of one-off scripts; when adopting a third-party logging library, funnel it into the same output through a custom Handler.",
-    "rationale": "A whole line of text printed by fmt or log cannot be parsed by field, so the collector can only store it as one block, and searching by order_id or aggregating by latency requires writing separate parsing rules; the key-value pairs and JSON output of slog can be recognized directly by the collector.",
+    "details": "Route structured logging uniformly through `log/slog`: assemble the `Handler` with `slog.New` at the process entry point, use `JSONHandler` in production, and use an injected `*slog.Logger` or `slog.Default()` everywhere else. Use `fmt.Print` and the standard `log` package only for the output of one-off scripts; when adopting a third-party logging library, funnel it into the same output through a custom `Handler`.",
+    "rationale": "A whole line of text printed by `fmt` or `log` cannot be parsed by field, so the collector can only store it as one block, and searching by order_id or aggregating by latency requires writing separate parsing rules; the key-value pairs and JSON output of `slog` can be recognized directly by the collector.",
     "detect_note": "Check by hand whether the match is a business log"
   },
   "LOG-002": {
     "summary": "Write log fields as key-value pairs; do not splice them into the message text.",
-    "details": "Carry every value that accompanies a log entry (ID, count, latency, error) as a key-value argument, and write only what happened in the message. Use the same key name for the same meaning throughout the repository; pass an error value as slog.Any(\"error\", err) rather than writing it into the message.",
+    "details": "Carry every value that accompanies a log entry (ID, count, latency, error) as a key-value argument, and write only what happened in the message. Use the same key name for the same meaning throughout the repository; pass an error value as `slog.Any(\"error\", err)` rather than writing it into the message.",
     "rationale": "Once a value is spliced into the message, the collector can only fuzzy-match the whole line and can neither search nor aggregate precisely by field; a key-value pair becomes a separate field at the collector and can be filtered and counted directly.",
     "detect_note": "Check whether log values are spliced into the message string"
   },
   "LOG-003": {
     "summary": "Use the Context-carrying methods for logs on the request path.",
-    "details": "When handling a request, pass ctx together with slog methods such as InfoContext and ErrorContext, so the handler can fill in fields that run through the whole request, such as the request ID and trace identifier. Use the methods without Context on paths that have no request context, such as startup and shutdown.",
+    "details": "When handling a request, pass ctx together with `slog` methods such as `InfoContext` and `ErrorContext`, so the handler can fill in fields that run through the whole request, such as the request ID and trace identifier. Use the methods without Context on paths that have no request context, such as startup and shutdown.",
     "rationale": "When a log entry carries no ctx, the several entries produced by one request cannot be tied together automatically at the collector, and investigating first requires pulling a batch by time window and telling them apart by hand; with ctx, the request-level fields are filled in uniformly by the handler, with no need to write them out at every place.",
     "detect_note": "Check whether logs on the request path pass in ctx"
   }

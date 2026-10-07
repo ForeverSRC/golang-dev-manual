@@ -7,7 +7,7 @@
 - Category: Static Analysis/Configuration and Running
 - Since: Go 1.0
 
-Keep a single .golangci.yml across the whole repository, and run the same command locally and in CI; the golangci-lint version is pinned by the tool directive in go.mod, not relying on a global installation on each machine.
+Keep a single .golangci.yml across the whole repository, and run the same command locally and in CI; the `golangci-lint` version is pinned by the tool directive in go.mod, not relying on a global installation on each machine.
 
 **Why**
 
@@ -79,10 +79,10 @@ raw, err := os.ReadFile(path) //nolint
 - Category: Static Analysis/Required Rules
 - Since: Go 1.0
 
-The standard set is the five checkers enabled by default in golangci-lint; do not turn them off in the configuration, and do not keep only some of them:
+The standard set is the five checkers enabled by default in `golangci-lint`; do not turn them off in the configuration, and do not keep only some of them:
 
 - errcheck: unhandled error return values
-- govet: suspicious constructs, equivalent to go vet
+- govet: suspicious constructs, equivalent to `go vet`
 - ineffassign: assignments whose value is never read again
 - staticcheck: the diagnostic rules of staticcheck
 - unused: unused identifiers
@@ -161,7 +161,7 @@ for i := 0; i < n; i++ {
 - Category: Static Analysis/Recommended Rules
 - Since: Go 1.0
 
-testifylint blocks high-frequency misuses such as judging errors with assert.Nil and reversed argument order; projects that do not use testify need not enable it.
+testifylint blocks high-frequency misuses such as judging errors with `assert.Nil` and reversed argument order; projects that do not use `testify` need not enable it.
 
 **Why**
 
@@ -169,7 +169,7 @@ testifylint blocks high-frequency misuses such as judging errors with assert.Nil
 >
 > — https://github.com/Antonboom/testifylint
 
-Some misuse of the testify API raises no compile-time error, for example assert.Nil(t, err) fails to judge correctly when err is an interface; handing this to a linter is more reliable than relying on reviewers' memory.
+Some misuse of the testify API raises no compile-time error, for example `assert.Nil(t, err)` fails to judge correctly when err is an interface; handing this to a linter is more reliable than relying on reviewers' memory.
 
 **Good**
 
@@ -199,7 +199,7 @@ Beyond the standard set, enable the following analyzers:
 - errorlint: writing problems related to error chains
 - nilerr: checking err != nil yet returning nil
 - bodyclose: an HTTP response body is not closed
-- noctx: a request carries no context.Context
+- noctx: a request carries no `context.Context`
 - nolintlint: a suppression does not name a checker, lacks a reason, or is no longer effective
 - gosec: security risks
 - gocritic: defect and performance diagnostics
