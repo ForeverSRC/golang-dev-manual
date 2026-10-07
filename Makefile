@@ -5,7 +5,7 @@ SITE_ASSET_DIRS := manual/zh/assets manual/en/assets
 
 .PHONY: build gen check lint lint-fix generate site site-assets site-serve
 
-build:
+build: generate
 	go build -o $(GDM_CLI) ./gdm/cmd/gdm-cli
 	go build -o $(GDM_GEN) ./gdm/cmd/gdm-gen
 
