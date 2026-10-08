@@ -6,6 +6,7 @@
 
 - 归属：接口与设计规约/接口定义与落位
 - 起始版本：Go 1.0
+- 主题：api-design
 
 接口、工厂、注册表在出现第二个实现、需要测试替身或确有变化点要隔离时才引入；只有一个实现且没有替换与测试需求时，先用具体类型。分层与端口在确有隔离需求时属于正当抽象，不受本条限制。
 
@@ -52,6 +53,7 @@ type SourceFactory interface {
 
 - 归属：接口与设计规约/接口定义与落位
 - 起始版本：Go 1.0
+- 主题：api-design, layering
 
 落位看预期有几个实现：
 
@@ -101,6 +103,7 @@ type ManualService interface {
 
 - 归属：接口与设计规约/接口定义与落位
 - 起始版本：Go 1.0
+- 主题：api-design
 
 在类型定义附近写 `var _ 接口 = 该类型零值`，指针、slice、map 用 nil，结构体用空结构体字面量。接口由使用方定义时，本条与 IFACE-001 成对使用，使用方声明接口、实现包写断言，缺一项该做法就不成立。适用场景：
 
@@ -146,6 +149,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
 
 - 归属：接口与设计规约/接口定义与落位
 - 起始版本：Go 1.0
+- 主题：api-design
 
 参数、返回值与字段都用接口值本身，不用 `*Interface`。接口值内部已含类型信息与数据指针，底层数据是值还是指针由具体类型决定；需要方法改到底层数据时，由实现方用指针接收者表达。
 
@@ -181,6 +185,7 @@ func Save(w *io.Writer) error
 
 - 归属：接口与设计规约/组合与复用
 - 起始版本：Go 1.0
+- 主题：api-design
 
 复用一个类型的能力时，用字段显式持有它；需要把它的方法一并暴露出去时才用匿名内嵌。给类型起 Base、Abstract 一类名字再内嵌，是在模拟继承层次，应避免。接口之间同样用内嵌组合小接口，不造大而全的接口。
 
@@ -220,6 +225,7 @@ type Server struct {
 
 - 归属：接口与设计规约/组合与复用
 - 起始版本：Go 1.0
+- 主题：api-design
 
 只有当内层类型的方法应当成为外层方法时才用匿名内嵌，其余情况用具名字段。嵌入后外层零值仍可用、拷贝语义不变、不额外暴露无关方法。`sync.Mutex` 一类同步原语一律用具名字段，匿名嵌入会把 `Lock`、`Unlock` 挂到外层 API 上。
 
@@ -262,6 +268,7 @@ type Server struct {
 
 - 归属：接口与设计规约/依赖注入与装配
 - 起始版本：Go 1.0
+- 主题：dependency-injection
 
 各层构造函数与接口绑定集中在一个 ProviderSet，接口到实现的绑定写 `wire.Bind`；入口只调用生成好的 `Initialize` 函数。`wire` 版本经 go.mod 的 tool 指令固定，改动装配后用 `go generate` 重新生成 wire_gen.go。
 
@@ -301,6 +308,7 @@ if err := container.Provide(jsonfile.New); err != nil {
 
 - 归属：接口与设计规约/依赖注入与装配
 - 起始版本：Go 1.0
+- 主题：dependency-injection
 
 时间源、随机源、客户端、配置这些依赖作为构造参数或字段传入，包级变量只放只读常量。测试要替换行为时传替身，不改全局状态。函数指针与其他类型的值同样适用。
 
@@ -346,6 +354,7 @@ func Sign(msg string) string {
 
 - 归属：接口与设计规约/context 传递
 - 起始版本：Go 1.7
+- 主题：context
 
 暂时拿不到上游 context 时传 `context.TODO()`，程序入口、初始化与测试用 `context.Background()`。不把 nil 当作「没有 context」的表达。
 
@@ -381,6 +390,7 @@ return svc.Load(nil, path)
 
 - 归属：接口与设计规约/context 传递
 - 起始版本：Go 1.7
+- 主题：context
 
 context 承载单次请求的取消、超时与传递值，生命周期与请求一致。跨层传递时把 context 作为第一个参数，命名统一用 ctx。
 
@@ -420,6 +430,7 @@ type Service struct {
 
 - 归属：接口与设计规约/context 传递
 - 起始版本：Go 1.7
+- 主题：context
 
 每个包为自己的取值定义 `type key int` 一类未导出类型与未导出常量，再提供类型安全的存取函数，调用方不直接接触 key。不用 string、int 等内建类型作 key。
 
@@ -460,6 +471,7 @@ ctx = context.WithValue(ctx, "user", u)
 
 - 归属：接口与设计规约/context 传递
 - 起始版本：Go 1.7
+- 主题：context
 
 用户身份、追踪信息、截止时间这类跨进程、跨 API 传递的请求数据才放 context；函数自己的可选参数与配置项走显式参数或选项结构体。
 
@@ -508,6 +520,7 @@ func Render(ctx context.Context) error {
 
 - 归属：接口与设计规约/结构体安全形状
 - 起始版本：Go 1.0
+- 主题：concurrency
 
 同步原语复制后不再共享同一把锁，互斥语义会静默失效。含锁的结构体用指针接收者定义方法，并在文档注释里写明不可拷贝。
 
@@ -555,6 +568,7 @@ func (c Counter) Inc() {
 
 - 归属：接口与设计规约/结构体安全形状
 - 起始版本：Go 1.0
+- 主题：api-design
 
 含内部状态、缓存或指针字段、用 == 比不到业务身份的结构体，嵌入一个 `[0]func()` 命名的辅助类型；此后 == 与把它用作 map key 的写法都不再编译。只影响比较写法，不占额外内存。
 

@@ -1,0 +1,8 @@
+{
+  "PERF-001": {
+    "summary": "Specify a slice capacity with make when the element count is known.",
+    "details": "Initialize a slice that is about to be appended to with make([]T, 0, n).",
+    "rationale": "Too small a capacity triggers repeated growth and copying.",
+    "detect_note": "check whether a capacity is given"
+  }
+}

@@ -105,6 +105,15 @@ func (s *RepositorySuite) TestLoadError() {
 			},
 		},
 		{
+			name: "should return error when a clause id repeats",
+			prepare: func() string {
+				dir := s.T().TempDir()
+				writeFile(s, filepath.Join(dir, "manual.json"), `{"toc":[{"id":"x","name":"x"}]}`)
+				writeFile(s, filepath.Join(dir, "clauses", "x.json"), `[{"id":"A-001","chapter":"x"},{"id":"A-001","chapter":"x"}]`)
+				return dir
+			},
+		},
+		{
 			name: "should return error when a clause references an unknown section",
 			prepare: func() string {
 				dir := s.T().TempDir()

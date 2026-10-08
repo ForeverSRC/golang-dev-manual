@@ -6,6 +6,7 @@
 
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.13
+- Tags: error-handling
 
 When the caller needs to test the error with `errors.Is` or `errors.As`, wrap it with %w and add this layer's context. Use %v only at the boundary that truly terminates the error chain (output to the outside, writing logs).
 
@@ -44,6 +45,7 @@ if err := repo.Save(ctx, order); err != nil {
 
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.13
+- Tags: error-handling
 
 A bare comparison and a type assertion only look at the outermost layer of the error chain: once the error is wrapped with %w, == no longer holds and `err.(*MyError)` fails outright. `errors.Is` compares layer by layer against sentinel errors, and `errors.As` matches layer by layer by error type; both unwrap the error chain. The sentinel errors and error types available for testing are exported by the package that produces the error; compare with == only when the error is known never to be wrapped.
 
@@ -82,6 +84,7 @@ if err == os.ErrNotExist {
 
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.13
+- Tags: error-handling
 
 Handle an error at the layer that can decide what to do about it: if a caller above can still respond, add context and return it directly; if it has reached the boundary and no one else will take it, log it in place and let the flow degrade. Do not write a log entry and then return err; when the same place both logs and returns, the layer above usually logs it again, and one failure shows up as several entries in the logs.
 
@@ -121,6 +124,7 @@ if err := save(order); err != nil {
 
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.16
+- Tags: error-handling
 
 Reserve panic for cases where the caller cannot continue, such as missing required configuration at startup or a branch that is logically unreachable being reached. Return an error for expected failures (invalid arguments, a resource that does not exist, an error returned by a downstream dependency) and let the caller decide how to handle it. Library code does not panic; recover is only a last resort at the process entry point.
 
@@ -167,6 +171,7 @@ func Load(path string) *Config {
 
 - Category: Errors and Logging/Error Handling
 - Since: Go 1.0
+- Tags: error-handling
 
 Do not use -1, an empty string or a zero value to express "not found" or "failed"; return an error instead, or add an ok return value when no reason needs to be given. The caller must check ok or err before using the result, and a missed check fails to compile on the spot. This clause does not apply when nil or 0 in the return values is itself a valid result.
 
@@ -213,6 +218,7 @@ order := Lookup(id) // the caller cannot tell not-found from a zero value
 
 - Category: Errors and Logging/Error Codes
 - Since: Go 1.0
+- Tags: api-design
 
 When a service returns errors to the outside, express the broad class with the standard classification of its protocol (HTTP status codes, gRPC status codes) and put the finer reason in the error details or in a custom error type. When the business really has a broad class that the standard classification does not cover, add a reason field on top of the standard code; do not invent a numbering scheme that sits alongside the standard codes.
 
@@ -246,6 +252,7 @@ http.Error(w, "1001", http.StatusOK)
 
 - Category: Errors and Logging/Error Codes
 - Since: Go 1.13
+- Tags: api-design, error-handling
 
 Error messages address people and their wording can change at any time: callers, tests and alerting rules should all test by error code or error type, not by message text. When localized text must be shown to users, put the text in a separate field or in the error details, kept apart from the message shown to developers.
 
@@ -283,6 +290,7 @@ if strings.Contains(err.Error(), "not found") {
 
 - Category: Errors and Logging/Error Codes
 - Since: Go 1.0
+- Tags: api-design
 
 After receiving an error from a downstream service, judge its meaning and then return it to the outside under this service's error codes: a downstream internal fault becomes unavailable or internal, and an argument error is kept only when it was truly caused by this service's caller. Write the downstream raw error and error chain into the local logs, not into the external response.
 
@@ -323,6 +331,7 @@ if err := callOrder(ctx); err != nil {
 
 - Category: Errors and Logging/Logging
 - Since: Go 1.21
+- Tags: logging
 
 Route structured logging uniformly through `log/slog`: assemble the `Handler` with `slog.New` at the process entry point, use `JSONHandler` in production, and use an injected `*slog.Logger` or `slog.Default()` everywhere else. Use `fmt.Print` and the standard `log` package only for the output of one-off scripts; when adopting a third-party logging library, funnel it into the same output through a custom `Handler`.
 
@@ -357,6 +366,7 @@ fmt.Printf("order created: %s\n", order.ID)
 
 - Category: Errors and Logging/Logging
 - Since: Go 1.21
+- Tags: logging
 
 Carry every value that accompanies a log entry (ID, count, latency, error) as a key-value argument, and write only what happened in the message. Use the same key name for the same meaning throughout the repository; pass an error value as `slog.Any("error", err)` rather than writing it into the message.
 
@@ -390,6 +400,7 @@ slog.Info(fmt.Sprintf("order %s created, amount %d", order.ID, order.Amount))
 
 - Category: Errors and Logging/Logging
 - Since: Go 1.21
+- Tags: context, logging
 
 When handling a request, pass ctx together with `slog` methods such as `InfoContext` and `ErrorContext`, so the handler can fill in fields that run through the whole request, such as the request ID and trace identifier. Use the methods without Context on paths that have no request context, such as startup and shutdown.
 

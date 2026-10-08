@@ -6,6 +6,7 @@
 
 - Category: Tooling/Command Line
 - Since: Go 1.0
+- Tags: tooling
 
 Attach subcommands to the root command and put business logic in each command's `RunE`; write output to `cmd.OutOrStdout()` and errors to `cmd.ErrOrStderr()`.
 
@@ -48,6 +49,7 @@ case "list":
 
 - Category: Tooling/Command Line
 - Since: Go 1.26
+- Tags: modernization, tooling
 
 After switching the build to a newer Go version, run `go fix ./...` in a clean git working tree and keep the changes in a separate commit for item-by-item review.
 
@@ -95,6 +97,7 @@ $ go vet ./...
 
 - Category: Tooling/Testing Tools
 - Since: Go 1.0
+- Tags: assertion, testing
 
 Use `assert` or `require` for assertions, choosing by whether a failure should stop the test case: use `require` for preconditions and `assert` for all other checks. Do not hand-write `if` statements with `t.Errorf` or `t.Fatalf` for comparisons in test files.
 
@@ -132,6 +135,7 @@ if got != want {
 
 - Category: Tooling/Code Generation
 - Since: Go 1.4
+- Tags: code-generation
 
 The generator and its input sources are the only places to change; regenerate after changing them and never edit the generated file directly. When the generator emits a marker line such as `// Code generated ... DO NOT EDIT.`, keep it intact and do not delete or alter it; when the generator emits no marker, do not fabricate one, since identification is handled by the file name convention in TOOL-011. This repository's gdm/cmd/gdm-cli/wire/wire_gen.go and manual/ both fall into this category, and their generation commands are `make generate` and `make gen`.
 
@@ -167,6 +171,7 @@ repository := jsonfile.New()
 
 - Category: Tooling/Code Generation
 - Since: Go 1.0
+- Tags: code-generation
 
 When the generator allows specifying the output file name, name the file with a gen prefix or suffix:
 

@@ -6,6 +6,7 @@
 
 - 归属：工具规约/命令行
 - 起始版本：Go 1.0
+- 主题：tooling
 
 根命令下挂子命令，业务逻辑写进各命令的 `RunE`；输出写 `cmd.OutOrStdout()`，错误写 `cmd.ErrOrStderr()`。
 
@@ -48,6 +49,7 @@ case "list":
 
 - 归属：工具规约/命令行
 - 起始版本：Go 1.26
+- 主题：modernization, tooling
 
 把构建切到更新的 Go 版本后，在干净的 git 工作区跑 `go fix ./...`，改动单独成一个提交，便于逐处复核。
 
@@ -95,6 +97,7 @@ $ go vet ./...
 
 - 归属：工具规约/测试工具
 - 起始版本：Go 1.0
+- 主题：assertion, testing
 
 断言用 `assert` 或 `require`，按失败是否终止用例选择：前置条件用 `require`，其余检查用 `assert`。测试文件里不手写 if 加 `t.Errorf`、`t.Fatalf` 做比较。
 
@@ -132,6 +135,7 @@ if got != want {
 
 - 归属：工具规约/代码生成
 - 起始版本：Go 1.4
+- 主题：code-generation
 
 生成器与输入源是唯一可改的地方，改完重新生成，不在生成物上直接改。生成器自带 // Code generated ... DO NOT EDIT. 一类标记行时保留它，不删改；生成器不输出标记的，不必补造，识别交给 TOOL-011 的文件名约定。本仓库的 gdm/cmd/gdm-cli/wire/wire_gen.go 与 manual/ 都属此类，生成命令走 `make generate` 与 `make gen`。
 
@@ -167,6 +171,7 @@ repository := jsonfile.New()
 
 - 归属：工具规约/代码生成
 - 起始版本：Go 1.0
+- 主题：code-generation
 
 生成器允许指定输出文件名时，文件名带 gen 前缀或后缀：
 

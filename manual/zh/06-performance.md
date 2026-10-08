@@ -4,6 +4,7 @@
 
 - 归属：性能规约
 - 起始版本：Go 1.0
+- 主题：performance
 
 用 `make([]T, 0, n)` 初始化准备 append 的切片，n 取已知长度或合理上界。数量完全不可估、切片通常很小或生命周期很短时不强求。
 
@@ -44,6 +45,7 @@ for _, it := range items {
 
 - 归属：性能规约
 - 起始版本：Go 1.0
+- 主题：performance
 
 用 `make(map[K]V, n)`，n 取已知元素数或合理上界。数量未知、或 map 通常只有几个元素时不强求。元素集合固定时用 map 字面量一次写完，不先 make 再逐条赋值。
 
@@ -83,6 +85,7 @@ for _, it := range items {
 
 - 归属：性能规约
 - 起始版本：Go 1.24
+- 主题：performance, testing
 
 改动性能相关代码前，先用 `go test -bench`、`go tool pprof` 或 `runtime/pprof` 拿到数据，确认热点落在哪一段。没有数据支撑的改写不进入代码：它可能改在不常走的路径上，也可能为极少数情况牺牲通用路径的可读性。
 
@@ -123,6 +126,7 @@ func BenchmarkRender(b *testing.B) {
 
 - 归属：性能规约
 - 起始版本：Go 1.0
+- 主题：performance
 
 int、uint、float、bool 与字符串之间的转换走 `strconv` 的 `Itoa`、`Atoi`、`FormatInt`、`ParseFloat`、`FormatBool` 等函数。`fmt.Sprintf` 只在确有多值与复杂格式（如 `%v` 组合、宽度与精度）需要时才用。
 
@@ -156,6 +160,7 @@ s := fmt.Sprint(n)
 
 - 归属：性能规约
 - 起始版本：Go 1.22
+- 主题：performance
 
 循环或热点路径里反复把同一个字符串字面量或变量转成 `[]byte` 时，把转换提到循环外，一次转换的结果反复使用。字符串内容每轮都变、或需要可独立改写的切片时，仍在循环内转换。
 
@@ -194,6 +199,7 @@ for range n {
 
 - 归属：性能规约
 - 起始版本：Go 1.10
+- 主题：performance
 
 按片段逐步构建字符串（循环内、多分支、次数不定）时用 `strings.Builder`，结果长度可预估时先调用 `Grow`。少量、写法固定的行内拼接继续用 `+`。需要读写缓冲或 `Bytes` 访问时用 `bytes.Buffer`。
 
@@ -235,6 +241,7 @@ for _, part := range parts {
 
 - 归属：性能规约
 - 起始版本：Go 1.21
+- 主题：performance
 
 `s[i:j]` 与原切片共享底层数组，子切片还被引用时整个数组无法回收。子切片生命周期长、或原切片远大于所需片段时，用 `slices.Clone`（Go 1.21 起）或 `make` 加 `copy` 复制出独立切片。子切片随函数结束即释放、或本就覆盖大部分元素时，直接切即可。
 
@@ -270,6 +277,7 @@ return line
 
 - 归属：性能规约
 - 起始版本：Go 1.0
+- 主题：performance
 
 string、接口值、小结构体本身就只有机器字大小，传值与传指针的拷贝代价相当。函数体内只用 `*p` 读取、从不改写时按值传参。需要改写调用方数据、或结构体明显偏大时传指针。
 

@@ -6,6 +6,7 @@
 
 - Category: Interfaces and Design/Interface Definition and Placement
 - Since: Go 1.0
+- Tags: api-design
 
 Introduce interfaces, factories, and registries only when a second implementation appears, a test double is needed, or there is a genuine variation point to isolate; when there is only one implementation and no replacement or testing need, use a concrete type first. Layering and ports count as legitimate abstraction when there is a genuine isolation need, and this clause does not restrict them.
 
@@ -52,6 +53,7 @@ type SourceFactory interface {
 
 - Category: Interfaces and Design/Interface Definition and Placement
 - Since: Go 1.0
+- Tags: api-design, layering
 
 Placement depends on how many implementations are expected:
 
@@ -101,6 +103,7 @@ type ManualService interface {
 
 - Category: Interfaces and Design/Interface Definition and Placement
 - Since: Go 1.0
+- Tags: api-design
 
 Write `var _ Interface = zero value of the type` near the type definition, using nil for pointers, slices, and maps, and an empty struct literal for structs. When the interface is defined by the consumer, this clause is used as a pair with IFACE-001: the consumer declares the interface and the implementation package writes the assertion, and if either is missing the practice does not hold. Applicable scenarios:
 
@@ -146,6 +149,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {}
 
 - Category: Interfaces and Design/Interface Definition and Placement
 - Since: Go 1.0
+- Tags: api-design
 
 Use interface values themselves for parameters, return values, and fields, not `*Interface`. An interface value already contains the type information and a data pointer internally, and whether the underlying data is a value or a pointer is decided by the concrete type; when methods need to modify the underlying data, the implementer expresses that with a pointer receiver.
 
@@ -181,6 +185,7 @@ func Save(w *io.Writer) error
 
 - Category: Interfaces and Design/Composition and Reuse
 - Since: Go 1.0
+- Tags: api-design
 
 To reuse a type's capability, hold it explicitly as a field; use anonymous embedding only when its methods also need to be exposed. Naming a type Base, Abstract, or the like and then embedding it simulates an inheritance hierarchy and should be avoided. Interfaces likewise compose small interfaces by embedding, rather than building one all-encompassing interface.
 
@@ -220,6 +225,7 @@ type Server struct {
 
 - Category: Interfaces and Design/Composition and Reuse
 - Since: Go 1.0
+- Tags: api-design
 
 Use anonymous embedding only when the inner type's methods should become the outer type's methods; otherwise use a named field. After embedding, the outer zero value must still be usable, the copy semantics unchanged, and no unrelated methods additionally exposed. Synchronization primitives such as `sync.Mutex` always use a named field, since anonymous embedding hangs `Lock` and `Unlock` onto the outer API.
 
@@ -262,6 +268,7 @@ type Server struct {
 
 - Category: Interfaces and Design/Dependency Injection and Wiring
 - Since: Go 1.0
+- Tags: dependency-injection
 
 Concentrate each layer's constructors and interface bindings in a single ProviderSet, and write interface-to-implementation bindings with `wire.Bind`; the entry point only calls the generated `Initialize` function. The `wire` version is pinned via the tool directive in go.mod; after changing the wiring, regenerate wire_gen.go with `go generate`.
 
@@ -301,6 +308,7 @@ if err := container.Provide(jsonfile.New); err != nil {
 
 - Category: Interfaces and Design/Dependency Injection and Wiring
 - Since: Go 1.0
+- Tags: dependency-injection
 
 Dependencies such as time sources, random sources, clients, and configuration are passed in as constructor parameters or fields, and package-level variables hold only read-only constants. When a test needs to replace behavior, pass a double rather than changing global state. The same applies to function pointers and values of other types.
 
@@ -346,6 +354,7 @@ func Sign(msg string) string {
 
 - Category: Interfaces and Design/Passing context
 - Since: Go 1.7
+- Tags: context
 
 When the upstream context is not available yet, pass `context.TODO()`; use `context.Background()` at program entry, in initialization, and in tests. Do not treat nil as the expression of "no context".
 
@@ -381,6 +390,7 @@ return svc.Load(nil, path)
 
 - Category: Interfaces and Design/Passing context
 - Since: Go 1.7
+- Tags: context
 
 A context carries the cancellation, timeout, and values of a single request, with a lifetime matching the request. When passing it across layers, make the context the first parameter and name it ctx consistently.
 
@@ -420,6 +430,7 @@ type Service struct {
 
 - Category: Interfaces and Design/Passing context
 - Since: Go 1.7
+- Tags: context
 
 Each package defines an unexported type such as `type key int` and unexported constants for its own value retrieval, then provides type-safe accessor functions so that callers do not touch the key directly. Do not use built-in types such as string or int as keys.
 
@@ -460,6 +471,7 @@ ctx = context.WithValue(ctx, "user", u)
 
 - Category: Interfaces and Design/Passing context
 - Since: Go 1.7
+- Tags: context
 
 Only request data that transits processes and APIs, such as user identity, tracing information, and deadlines, goes into the context; a function's own optional parameters and configuration items go through explicit parameters or an options struct.
 
@@ -508,6 +520,7 @@ func Render(ctx context.Context) error {
 
 - Category: Interfaces and Design/Safe Struct Shape
 - Since: Go 1.0
+- Tags: concurrency
 
 Once a synchronization primitive is copied, the copies no longer share the same lock, and the mutual exclusion semantics silently fail. Define methods on structs that contain a lock with a pointer receiver, and state in the doc comment that they must not be copied.
 
@@ -555,6 +568,7 @@ func (c Counter) Inc() {
 
 - Category: Interfaces and Design/Safe Struct Shape
 - Since: Go 1.0
+- Tags: api-design
 
 For structs that contain internal state, caches, or pointer fields and whose == cannot compare business identity, embed a helper type named `[0]func()`; from then on, both == and using it as a map key no longer compile. This affects only comparison syntax and takes no extra memory.
 

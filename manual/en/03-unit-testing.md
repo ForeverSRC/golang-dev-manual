@@ -6,6 +6,7 @@
 
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.0
+- Tags: testing
 
 A test file declares the package as "the package under test_test", writes cases only against the public API, does not access package-internal members, and does not drag internal implementation into tests just to pad coverage. Unexported logic is covered indirectly by cases exercising the package's public entry points.
 
@@ -47,6 +48,7 @@ func TestMatch(t *testing.T) {
 
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.24
+- Tags: testing
 
 For functions that only map input to output, with no object under test or dependencies to construct, write `func TestXxx(t *testing.T)` plus assertions directly, organizing multiple inputs into a table with `t.Run`; for components that encapsulate behavior per type, need a constructor to produce the object under test, or need dependencies assembled and a shared fixture prepared, embed `suite.Suite`, put the object under test and its dependencies into struct fields assembled once in `SetupSuite`, and run everything through a single entry function that calls `suite.Run`.
 
@@ -108,6 +110,7 @@ func TestLoadError(t *testing.T) {
 
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.24
+- Tags: testing
 
 Tests whose input is constructed by the case itself and which neither read nor write real files or the network are unit tests, written directly inside that package; tests that need real files, real dependencies, or an end-to-end path are integration tests, named with the _it_test.go suffix, in the same package as the unit tests, and executed together by `go test`. Integrity checks on real data belong to integration tests.
 
@@ -149,6 +152,7 @@ func TestLoad(t *testing.T) {
 
 - Category: Unit Testing/Test Naming and Structure
 - Since: Go 1.0
+- Tags: testing
 
 Write the subtest name given to `t.Run` and the name field in a table as should followed by the expected outcome and when followed by the triggering condition, for example should return error when file is missing. When the scenario is clear at a glance, a short Chinese or English description works just as well; do not stretch the name just to fit the pattern.
 
@@ -184,6 +188,7 @@ Subtest names go straight into `go test` output, and people judge which one fail
 
 - Category: Unit Testing/Table-Driven and Case Design
 - Since: Go 1.0
+- Tags: assertion
 
 Write the expected value by hand as a literal, or assemble it with a factory unrelated to the implementation under test. Do not call the function under test itself, nor the few steps it reuses internally, to produce the expected result. When the data is too large to hand-write, put it into an expected file under testdata and fix it in advance, rather than going back to the code under test to fill it in. When a reference implementation is used for comparison, it must be a separate implementation independent of the code under test.
 
@@ -222,6 +227,7 @@ assert.Equal(t, want, manual.Filter([]string{"MUST"}, "Programming Conventions")
 
 - Category: Unit Testing/Table-Driven and Case Design
 - Since: Go 1.24
+- Tags: testing
 
 When multiple inputs share one set of check logic (build the input, call, compare the result), write it as a table walk, where adding a case means adding one row of data. When some cases are checked differently, split them into multiple test functions; only when the setup is the same but the checks differ may you write them as a sequence of flat subtests inside a single test function. Do not distinguish kinds of cases with conditional branches in the loop body.
 
@@ -273,6 +279,7 @@ func TestLoad(t *testing.T) {
 
 - Category: Unit Testing/Table-Driven and Case Design
 - Since: Go 1.0
+- Tags: assertion
 
 Keep only the triggering condition and the expected outcome as table fields; move request parameters shared by all cases and common setup operations out into variables outside the loop. When a few cases need different stub behavior, carry that difference in a field holding a closure, rather than adding a branch in the loop body or copying the whole stub configuration into every row.
 
@@ -324,6 +331,7 @@ tests := []struct {
 
 - Category: Unit Testing/Table-Driven and Case Design
 - Since: Go 1.0
+- Tags: testing
 
 Beyond the normal path, create a case for each boundary input:
 
@@ -376,6 +384,7 @@ tests := []struct {
 
 - Category: Unit Testing/Table-Driven and Case Design
 - Since: Go 1.0
+- Tags: testing
 
 When fixing a defect, add a case that reproduces it in the same commit, with input fixed to the conditions that trigger the defect, failing before the fix and passing after it. The triggering conditions stay in the case, not in a review note or a record of manual steps.
 
@@ -418,6 +427,7 @@ func TestFilterByID(t *testing.T) {
 
 - Category: Unit Testing/Assertions and Test Data
 - Since: Go 1.0
+- Tags: assertion
 
 Write the expected value in one shot, as a literal or through an independent constructor, spelling out fields expected to be zero values as well, and then compare it against the method's complete return value: if it returns a slice, compare the slice itself, neither mapping it first into a subset such as a list of IDs, nor splitting it into one assertion per field. Only when the result contains uncontrollable content (timestamps, random IDs, floating-point precision loss) or fields that do not support equality comparison should you assert field by field or switch to a dedicated comparison helper. When multiple values are returned, compare them one by one; there is no need to wrap them into a struct first.
 
@@ -459,6 +469,7 @@ assert.Equal(t, []string{"A-001"}, ids)
 
 - Category: Unit Testing/Assertions and Test Data
 - Since: Go 1.16
+- Tags: assertion
 
 When the input payload or the expected result is long, write it as a separate file under testdata/, kept apart from the code; the case embeds the file into the test binary with //go:embed and then reads it, rather than locating the file by joining paths from the working directory. When cases need to be driven in bulk by file name, embed an `embed.FS` and walk it with `fs.Glob`. When the object under test itself takes a file path as input (a file loader or a directory scanner, for example), pass the relative path under testdata directly. When expected results change intentionally along with the implementation, inject a -update flag to overwrite the expected file with the actual output, then review it by hand via git diff.
 
@@ -497,6 +508,7 @@ require.NoError(t, err)
 
 - Category: Unit Testing/Assertions and Test Data
 - Since: Go 1.24
+- Tags: assertion, error-handling
 
 On a failure path, first assert whether an error was returned; when the kind of error needs to be distinguished, use `errors.Is` for sentinels and `errors.As` for error types, rather than string comparison of the message, and do not construct an identical error for value comparison. Only when the error message itself is part of the contract under test (for example, it must carry the input parameter name) should you assert on the message as a string, and only on such properties as are unaffected by wording.
 
@@ -535,6 +547,7 @@ require.ErrorContains(t, err, "load")
 
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
+- Tags: mock
 
 Only `go.uber.org/mock` and its `mockgen` appear in go.mod and in the generated files, with no `github.com/golang/mock` introduced; existing old references are migrated to the uber version as well.
 
@@ -568,6 +581,7 @@ import "github.com/golang/mock/gomock"
 
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.14
+- Tags: mock
 
 After `gomock.NewController(t)` is given a `*testing.T`, the controller validates expectations automatically when the test and its subtests finish, so `ctrl.Finish()` is no longer written in the code. When a self-built `TestReporter` is used, or what is passed in is not a `*testing.T`, you still have to ensure the validation timing yourself.
 
@@ -603,6 +617,7 @@ defer ctrl.Finish()
 
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
+- Tags: mock
 
 A `gomock` expectation requires exactly one call by default, and `Times(1)` does not change the behavior. Write `Times(0)` only to guard against an unexpected call, or `Times(n)` when a specific multiple is required.
 
@@ -637,6 +652,7 @@ repo.EXPECT().Load(gomock.Any(), "a.json").Return(manual, nil).Times(1)
 
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
+- Tags: mock
 
 By default `gomock` does not constrain the order in which expectations are called. Only in scenarios where the wrong order changes the result, such as lock, decrement, and release with their ordering dependencies, should you pin the order with `InOrder` or `After`; do not use it when the same set of expectations is called concurrently, to avoid occasional failures caused by varying scheduling order.
 
@@ -674,6 +690,7 @@ gomock.InOrder(
 
 - Category: Unit Testing/Mocks and Test Doubles
 - Since: Go 1.0
+- Tags: mock
 
 Arguments that are not matchers match by equality, so writing the literal directly suffices, with no extra layer of `gomock.Eq`; use `AssignableToTypeOf` to constrain the type, and `Cond`, `Len`, or `Nil` to match by condition. Use `Any()` only for values that are not asserted on, such as `context.Context`, and state the reason for relaxing the match there.
 
@@ -713,6 +730,7 @@ repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
 - Category: Unit Testing/Using Coverage
 - Since: Go 1.0
+- Tags: testing
 
 Cases target business rules, branch boundaries, and error paths, and coverage numbers are not an acceptance condition. Utility types and pure algorithm types are required to reach 100% coverage, still achieved through external package tests, without accessing package-internal members because of the coverage requirement.
 

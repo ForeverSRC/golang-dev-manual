@@ -23,15 +23,16 @@
 
 | 路径 | 内容 |
 | --- | --- |
-| `gdm/data/i18n/<lang>/manual.json` | 索引页文案、附录文案、渲染标签、CLI 标签，非来源语言另含 `toc` 译文 |
+| `gdm/data/i18n/<lang>/manual.json` | 索引页文案、附录文案、渲染标签、CLI 标签，非来源语言另含 `toc` 译文与 `tags` 解释 |
 | `gdm/data/i18n/<lang>/clauses/<章节 id>.json` | 该章节条款的 `summary`、`details`、`rationale` 与 `detect.note` 翻译，按条款 id 索引 |
 
 - `toc` 译文按章节 id 与 `gdm/data/manual.json` 的 `toc` 挂接，每项给章节名与该章小节名，不依赖数组下标。
+- `tags` 解释按 tag id 与 `gdm/data/manual.json` 的 `tags` 挂接，只给解释，`id` 本身不翻译。
 - `render` 里的模板字段用 `{v}` 作占位符，如 `"baseline_line": "基准版本：Go {v}"`。
 - `render.number_style` 取 `chinese`（章节用「一、」）或 `arabic`（章节用「1.」）。
 - `cli` 块给 `gdm-cli` 的字段标签：`details`、`why`、`quote`、`source`、`good`、`bad`、`references`、`detection`、`category`、`since_go`、`no_hits`、`uncovered`。
 - 归属不落译文：条款用 `chapter` / `section` 两个 id 引用目录，展示值按语言的 `toc` 译文推导。
-- 生成非来源语言时，`toc` 或条款翻译缺失即失败，报错列出缺失的章节、小节与条款 id。
+- 生成非来源语言时，`toc`、`tags` 或条款翻译缺失即失败，报错列出缺失的章节、小节、tag 与条款 id。
 - 来源语言不需要 `clauses/` 目录；其余语言的 `clauses/` 必须覆盖该章节全部条款。
 
 ### 顶层字段（gdm/data/manual.json）
@@ -40,7 +41,19 @@
 | --- | --- | --- |
 | `version` | string | 数据格式版本，格式变更时递增 |
 | `go_baseline` | string | 本版条款的 Go 基准版本 |
+| `tags` | array | 受控主题词表，每项给 `id` 与 `description`（来源语言的简短解释），见下 |
 | `toc` | array | 手册目录，决定章节顺序与手册文件划分 |
+
+### tags 词表
+
+`tags` 是条款的横向主题，与 `chapter` / `section` 的归属维度相互独立，一条条款可以带多个主题标签。
+
+- 数组顺序即展示顺序，按 `id` 字典序排列，条款的 `tags` 也按字典序排列。
+- 每项给 `id` 与 `description`，`description` 是一句话的来源语言解释。
+- `id` 以英文直出，不做译名，中英两个版本一致。
+- 词表是 `gdm-cli tags` 的输出内容，也是 `gdm-cli list --tag` 与 `gdm-cli search` 的取值来源。
+
+词表的当前内容用 `gdm-cli tags` 查看，改词表改 `gdm/data/manual.json` 与 `gdm/data/i18n/<lang>/manual.json`。
 
 ### toc
 
@@ -60,6 +73,7 @@
 | `level` | string | 是 | 分级，取值 `MUST` / `SHOULD` / `MAY` |
 | `chapter` | string | 是 | 所属章节 id，必须能在 `toc` 中找到 |
 | `section` | string | 否 | 所属小节 id，必须能在该章节的 `sections` 中找到；省略表示归属整个章节 |
+| `tags` | array | 否 | 横向主题标签，取值必须来自 `manual.json` 的词表，条款内不重复；省略表示该条款暂无横向主题 |
 | `since_go` | string | 是 | 条款按本手册写法可落地的最低 Go 版本，取语言特性或标准库 API 的引入版本，如 `1.25`（sync.WaitGroup.Go）；第三方库的版本要求不计；无版本依赖的条款写 `1.0` |
 | `summary` | string | 是 | 一句话条款，`list` 只输出它，须短且可判定 |
 | `details` | string | 是 | 条款说明，写清边界与例外 |
@@ -183,6 +197,7 @@
 自检清单：
 
 - 编号唯一，`chapter` 能在 `gdm/data/manual.json` 的 `toc` 中找到，`section` 能在该章节的 `sections` 中找到。
+- `tags` 取值都在 `manual.json` 的词表里，条款内不重复，词表里每个 tag 至少被一条条款使用。
 - 级别选对：违反即错用 `MUST`，例外可解释用 `SHOULD`，方向性用 `MAY`。
 - `summary` 不含理由，`rationale` 不含要求原话。
 - `quote.text` 逐字来自 `quote.source`，两处链接可打开。

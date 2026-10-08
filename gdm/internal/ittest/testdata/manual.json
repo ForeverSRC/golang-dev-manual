@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "go_baseline": "1.24",
+  "tags": [
+    {"id": "comments", "description": "注释写法"},
+    {"id": "naming", "description": "包名与标识符命名"},
+    {"id": "performance", "description": "容量预分配与开销"}
+  ],
+  "toc": [
+    {
+      "id": "programming-conventions",
+      "name": "编程规约",
+      "sections": [
+        {"id": "naming", "name": "命名规约"},
+        {"id": "comments", "name": "注释规约"}
+      ]
+    },
+    {"id": "performance", "name": "性能规约"}
+  ]
+}

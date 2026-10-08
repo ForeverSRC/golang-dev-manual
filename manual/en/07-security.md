@@ -4,6 +4,7 @@
 
 - Category: Security
 - Since: Go 1.8
+- Tags: security
 
 Parameter values for queries and writes are passed through `database/sql` placeholders, not concatenated into the SQL text. Identifiers that placeholders cannot cover, such as table names, column names, and sort fields, are validated against a whitelist before being concatenated.
 
@@ -38,6 +39,7 @@ rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT id, name FROM user WHERE i
 
 - Category: Security
 - Since: Go 1.7
+- Tags: security
 
 When using `exec.Command` or `exec.CommandContext`, pass the executable and each argument as separate arguments, and do not build a complete command line through `sh -c` or `cmd /c`. When glob expansion or pipelines are needed, use `filepath.Glob` or implement them in the program; when the shell cannot be avoided, escape the concatenated external input first.
 
@@ -71,6 +73,7 @@ cmd := exec.CommandContext(ctx, "sh", "-c", "git log --oneline -n "+n)
 
 - Category: Security
 - Since: Go 1.24
+- Tags: security
 
 When external input takes part in constructing a file path, first use `os.OpenRoot` to open an `*os.Root` on the allowed root directory, then access files through its `Open`, `Create`, `ReadFile` and other methods. When `os.Root` does not apply, at least run `filepath.Clean` and verify that the result still falls within the root directory prefix, and handle symbolic links separately.
 
@@ -111,6 +114,7 @@ f, err := os.Open(filepath.Join(dataDir, name))
 
 - Category: Security
 - Since: Go 1.24
+- Tags: security
 
 When generating random values related to security, such as tokens, session IDs, keys, salts, and verification codes, use `Read`, `Text` and similar functions from `crypto/rand`. `math/rand` is used only for scenarios that do not involve security, such as simulation, sampling, and shuffling.
 
@@ -151,6 +155,7 @@ rand.Read(token)
 
 - Category: Security
 - Since: Go 1.0
+- Tags: security
 
 Security scenarios such as password hashing, signatures, message authentication, and key derivation must not introduce `crypto/md5`, `crypto/sha1`, `crypto/des`, `crypto/rc4`, `golang.org/x/crypto/md4`, or `golang.org/x/crypto/ripemd160`. These algorithms remain usable in non-security scenarios, such as file checksums and content addressing.
 
@@ -187,6 +192,7 @@ sum := md5.Sum(data)
 
 - Category: Security
 - Since: Go 1.0
+- Tags: security
 
 Sensitive values such as keys, passwords, access tokens, and connection strings are injected through environment variables, configuration files, or a secret management service, not written as literals in source code. Test credentials go into test fixtures, clearly distinguished, and do not enter production code or the version repository.
 
@@ -220,6 +226,7 @@ apiKey := "sk-live-9f3c1d2e4b5a6c7d"
 
 - Category: Security
 - Since: Go 1.0
+- Tags: security
 
 Keep `tls.Config` at its default certificate chain and host name verification, with `InsecureSkipVerify` left false. For self-signed certificate scenarios, add the CA to `RootCAs`, or use `VerifyPeerCertificate` or `VerifyConnection` for custom verification. It may be enabled temporarily in test environments and one-off verification scripts, with the reason stated.
 
@@ -253,6 +260,7 @@ cfg := &tls.Config{InsecureSkipVerify: true}
 
 - Category: Security
 - Since: Go 1.16
+- Tags: security
 
 The permission arguments of `os.OpenFile`, `os.WriteFile`, `os.Mkdir`, and `os.MkdirAll` are chosen as the minimum needed; do not use values such as `0777` and `0666` that open write permission to all users, and use `0600` for files containing sensitive data. When exact permissions are needed, set them explicitly with `Chmod` after creation; the process umask filters the passed value first.
 
@@ -286,6 +294,7 @@ err := os.WriteFile(path, data, 0o777)
 
 - Category: Security
 - Since: Go 1.0
+- Tags: security
 
 When generating text that requires escaping, such as HTML, XML, and JS, use `html/template`, which escapes automatically according to the context the data appears in. `text/template` is used only for plain text output; when HTML can only be produced with `text/template`, escape the data yourself before output.
 
@@ -323,6 +332,7 @@ t, err := template.New("page").Parse(pageTemplate)
 
 - Category: Security
 - Since: Go 1.8
+- Tags: security
 
 `http.Server` should at least set `ReadHeaderTimeout`, and configure `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` according to the business needs. When using convenience functions without timeouts such as `http.ListenAndServe`, switch to a custom `http.Server`.
 
@@ -363,6 +373,7 @@ http.ListenAndServe(":8080", mux)
 
 - Category: Security
 - Since: Go 1.0
+- Tags: security
 
 When verifying secret values such as MACs, tokens, and signatures, use `hmac.Equal`, or `ConstantTimeCompare` from `crypto/subtle`. `bytes.Equal`, `==`, and `strings.Compare` return early at the first difference and are not used for secret comparison.
 

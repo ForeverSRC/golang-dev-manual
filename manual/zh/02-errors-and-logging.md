@@ -6,6 +6,7 @@
 
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.13
+- 主题：error-handling
 
 需要让调用方用 `errors.Is`、`errors.As` 判断错误时，用 %w 包装，并附上本层的上下文。只有真正终止错误链的边界（对外输出、写日志）才用 %v。
 
@@ -44,6 +45,7 @@ if err := repo.Save(ctx, order); err != nil {
 
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.13
+- 主题：error-handling
 
 裸比较与类型断言只看错误链的最外层：错误被 %w 包装后 == 不再相等，`err.(*MyError)` 直接断言失败。`errors.Is` 按哨兵错误逐层比较，`errors.As` 按错误类型逐层匹配，两者都会展开错误链。可供判断的哨兵错误与错误类型由产生错误的包导出；只有确认错误从未被包装时，才可以用 == 比较。
 
@@ -82,6 +84,7 @@ if err == os.ErrNotExist {
 
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.13
+- 主题：error-handling
 
 在能决定处置方式的那一层处理错误：上层还有调用方能应对，就补上上下文直接返回；已经到边界、无人再接，就地记录并让流程降级。不写记一条日志再返回 err 的写法，同一处既记录又返回时，上层往往再记一次，同一失败在日志里出现多条。
 
@@ -121,6 +124,7 @@ if err := save(order); err != nil {
 
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.16
+- 主题：error-handling
 
 panic 留给调用方无法继续的情况，例如启动时缺少必需配置、按逻辑不可能走到的分支被走到。可预期的失败（参数不合法、资源不存在、下游返回错误）用 error 返回，由调用方决定处置方式。库代码不 panic；recover 只在进程入口兜底。
 
@@ -167,6 +171,7 @@ func Load(path string) *Config {
 
 - 归属：错误与日志/错误处理规约
 - 起始版本：Go 1.0
+- 主题：error-handling
 
 不用 -1、空字符串、零值表达「没找到」或「失败」，改用 error，或在不需要说明原因时加一个 ok 返回值。调用方必须先判断 ok 或 err 才能使用结果，漏判当场编译失败。返回值里的 nil、0 本身是合法结果时不受本条限制。
 
@@ -213,6 +218,7 @@ order := Lookup(id) // the caller cannot tell not-found from a zero value
 
 - 归属：错误与日志/错误码规约
 - 起始版本：Go 1.0
+- 主题：api-design
 
 服务对外返回错误时，用所处协议的标准分类表达大类（HTTP 状态码、gRPC 状态码），细分原因放进错误详情或自定义错误类型。业务确有标准分类覆盖不到的大类时，在标准码之上追加原因字段，不新造与标准码并列的编号。
 
@@ -246,6 +252,7 @@ http.Error(w, "1001", http.StatusOK)
 
 - 归属：错误与日志/错误码规约
 - 起始版本：Go 1.13
+- 主题：api-design, error-handling
 
 错误消息面向人，措辞随时可改：调用方、测试与告警规则都按错误码或错误类型判断，不用消息文本。需要给用户看本地化文案时，把文案放进单独的字段或错误详情，与给开发者看的消息分开。
 
@@ -283,6 +290,7 @@ if strings.Contains(err.Error(), "not found") {
 
 - 归属：错误与日志/错误码规约
 - 起始版本：Go 1.0
+- 主题：api-design
 
 收到下游错误后判断语义，再按本服务的错误码对外返回：下游内部故障归为不可用或内部错误，参数错误只在确由本服务调用方引起时保留。下游的原始错误与错误链写进本地日志，不放进对外响应。
 
@@ -323,6 +331,7 @@ if err := callOrder(ctx); err != nil {
 
 - 归属：错误与日志/日志规约
 - 起始版本：Go 1.21
+- 主题：logging
 
 结构化日志统一走 `log/slog`：进程入口用 `slog.New` 装配 `Handler`，生产环境用 `JSONHandler`，其余位置用注入的 `*slog.Logger` 或 `slog.Default()`。`fmt.Print` 与标准 `log` 只用于一次性脚本的输出；接入第三方日志库时，经自定义 `Handler` 收口到同一套输出。
 
@@ -357,6 +366,7 @@ fmt.Printf("order created: %s\n", order.ID)
 
 - 归属：错误与日志/日志规约
 - 起始版本：Go 1.21
+- 主题：logging
 
 随日志带出的取值（ID、数量、耗时、错误）都作为参数写成 key-value，消息只写发生了什么。同一个含义在仓库内用同一个键名；错误值用 `slog.Any("error", err)` 传入，不写进消息。
 
@@ -390,6 +400,7 @@ slog.Info(fmt.Sprintf("order %s created, amount %d", order.ID, order.Amount))
 
 - 归属：错误与日志/日志规约
 - 起始版本：Go 1.21
+- 主题：context, logging
 
 处理请求时用 `slog` 的 `InfoContext`、`ErrorContext` 等方法把 ctx 一并传入，handler 据此补上请求 ID、trace 标识一类贯穿整个请求的字段。启动、退出等没有请求上下文的路径用不带 Context 的方法。
 

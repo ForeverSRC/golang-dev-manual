@@ -4,6 +4,7 @@
 
 - 归属：安全规约
 - 起始版本：Go 1.8
+- 主题：security
 
 查询与写入的参数值经 `database/sql` 的占位符传入，不把值拼进 SQL 文本。表名、列名、排序字段这类占位符覆盖不到的标识符，先用白名单校验再拼接。
 
@@ -38,6 +39,7 @@ rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT id, name FROM user WHERE i
 
 - 归属：安全规约
 - 起始版本：Go 1.7
+- 主题：security
 
 用 `exec.Command`、`exec.CommandContext` 时把可执行文件与每个参数作为独立参数传入，不借助 `sh -c`、`cmd /c` 拼接完整命令行。需要通配符展开或管道时改用 `filepath.Glob` 或在程序里实现；不得不经 shell 时，先对拼接的外部输入做转义。
 
@@ -71,6 +73,7 @@ cmd := exec.CommandContext(ctx, "sh", "-c", "git log --oneline -n "+n)
 
 - 归属：安全规约
 - 起始版本：Go 1.24
+- 主题：security
 
 外部输入参与构造文件路径时，先用 `os.OpenRoot` 在允许的根目录上打开 `*os.Root`，再经它的 `Open`、`Create`、`ReadFile` 等方法访问。用不上 `os.Root` 时，至少 `filepath.Clean` 后校验结果仍落在根目录前缀内，并单独处理符号链接。
 
@@ -111,6 +114,7 @@ f, err := os.Open(filepath.Join(dataDir, name))
 
 - 归属：安全规约
 - 起始版本：Go 1.24
+- 主题：security
 
 生成令牌、会话 ID、密钥、盐值、验证码等与安全相关的随机值时用 `crypto/rand` 的 `Read`、`Text` 等。`math/rand` 只用于模拟、抽样、洗牌一类不涉及安全的场景。
 
@@ -151,6 +155,7 @@ rand.Read(token)
 
 - 归属：安全规约
 - 起始版本：Go 1.0
+- 主题：security
 
 口令哈希、签名、消息认证、密钥派生等安全场景不引入 `crypto/md5`、`crypto/sha1`、`crypto/des`、`crypto/rc4`、`golang.org/x/crypto/md4`、`golang.org/x/crypto/ripemd160`。这些算法在非安全场景仍可用，例如文件校验和与内容寻址。
 
@@ -187,6 +192,7 @@ sum := md5.Sum(data)
 
 - 归属：安全规约
 - 起始版本：Go 1.0
+- 主题：security
 
 密钥、口令、访问令牌、连接串等敏感值经环境变量、配置文件或密钥管理服务注入，不写成源码里的字面量。测试凭证放测试夹具并明显区分，不进生产代码与版本库。
 
@@ -220,6 +226,7 @@ apiKey := "sk-live-9f3c1d2e4b5a6c7d"
 
 - 归属：安全规约
 - 起始版本：Go 1.0
+- 主题：security
 
 `tls.Config` 保持默认的证书链与主机名校验，`InsecureSkipVerify` 保持 false。自签证书场景把 CA 加进 `RootCAs`，或用 `VerifyPeerCertificate`、`VerifyConnection` 自定义校验。测试环境与一次性验证脚本里可临时开启，并写明理由。
 
@@ -253,6 +260,7 @@ cfg := &tls.Config{InsecureSkipVerify: true}
 
 - 归属：安全规约
 - 起始版本：Go 1.16
+- 主题：security
 
 `os.OpenFile`、`os.WriteFile`、`os.Mkdir`、`os.MkdirAll` 的权限参数按最小需要取，不用 `0777`、`0666` 这类对所有用户开放写权限的值，含敏感数据的文件用 `0600`。需要精确权限时在创建后用 `Chmod` 显式设置，进程 umask 会先过滤一遍传入值。
 
@@ -286,6 +294,7 @@ err := os.WriteFile(path, data, 0o777)
 
 - 归属：安全规约
 - 起始版本：Go 1.0
+- 主题：security
 
 生成 HTML、XML、JS 等需要转义的文本时用 `html/template`，它按数据所处上下文自动转义。`text/template` 只用于纯文本输出；只能用 `text/template` 产出 HTML 时，输出前自行对数据转义。
 
@@ -323,6 +332,7 @@ t, err := template.New("page").Parse(pageTemplate)
 
 - 归属：安全规约
 - 起始版本：Go 1.8
+- 主题：security
 
 `http.Server` 至少设置 `ReadHeaderTimeout`，按业务再配 `ReadTimeout`、`WriteTimeout`、`IdleTimeout`。用 `http.ListenAndServe` 一类不带超时的便捷函数时改走自定义 `http.Server`。
 
@@ -363,6 +373,7 @@ http.ListenAndServe(":8080", mux)
 
 - 归属：安全规约
 - 起始版本：Go 1.0
+- 主题：security
 
 校验 MAC、令牌、签名等秘密值时用 `hmac.Equal`，或 `crypto/subtle` 的 `ConstantTimeCompare`。`bytes.Equal`、`==`、`strings.Compare` 在首个不同处提前返回，不用于秘密比较。
 

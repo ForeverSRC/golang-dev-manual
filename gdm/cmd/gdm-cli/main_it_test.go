@@ -2,153 +2,219 @@ package main_test
 
 import (
 	"bytes"
-	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/ForeverSRC/golang-dev-manual/gdm/cmd/gdm-cli/wire"
+	"github.com/ForeverSRC/golang-dev-manual/gdm/cmd/gdm-cli/wireit"
+	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/server"
 )
 
-var (
-	// clauseLinePattern matches one line of list output "id: summary".
-	clauseLinePattern = regexp.MustCompile(`^([A-Z]+-\d{3}): (.+)$`)
-	// explain prints its field labels in the requested language, so each language has its own patterns (the category may contain spaces).
-	zhCategoryPattern = regexp.MustCompile(`归属: \S`)
-	zhSinceGoPattern  = regexp.MustCompile(`起始版本: \S`)
-	enCategoryPattern = regexp.MustCompile(`Category: \S`)
-	enSinceGoPattern  = regexp.MustCompile(`Since: \S`)
-)
-
-// CLIITSuite is gdm's command-line integration test suite: it takes the repository's real clause data as input,
-// runs the full command tree in cobra's official execution pattern, and asserts end-to-end output and artifacts.
-// Every execution builds a fresh command tree via wire, so flags don't leak between cases.
+// CLIITSuite is gdm-cli's command-line integration test suite: wire assembles the real layers over the fixture data tree
+// under internal/ittest, and each case runs the full command tree in cobra's official execution pattern and compares
+// the printed output against expectations written out by hand.
 type CLIITSuite struct {
 	suite.Suite
+
+	container *wireit.CLIITTestContainer
 }
 
 func TestCLIITSuite(t *testing.T) {
 	suite.Run(t, new(CLIITSuite))
 }
 
+func (s *CLIITSuite) SetupSuite() {
+	container, err := wireit.InitializeCLIITTestContainer()
+	s.Require().NoError(err)
+	s.container = container
+}
+
 func (s *CLIITSuite) TestList() {
-	s.Run("should list unique clause ids from real data", func() {
-		ids := s.listClauseIDs()
-		s.NotEmpty(ids)
-
-		seen := make(map[string]bool, len(ids))
-		for _, id := range ids {
-			s.False(seen[id], "条款编号重复: %s", id)
-			seen[id] = true
-		}
+	s.Run("should print every clause in data order", func() {
+		s.Equal(`NAMING-001: 包名使用小写单词连写。
+COMMENT-001: 注释只写代码表达不出的东西。
+PERF-001: 元素数量已知时用 make 指定切片容量。
+`, s.output("list"))
 	})
 
-	s.Run("should cover every clause when all legal levels given", func() {
-		all := s.listClauseIDs()
-		byLevel := s.listClauseIDs("--level", "MUST,SHOULD,MAY")
-		s.Equal(all, byLevel, "三个合法级别应覆盖全量，漏出的条款分级非法")
+	s.Run("should print the summaries in the requested language", func() {
+		s.Equal(`NAMING-001: Write package names as lowercase words run together.
+COMMENT-001: Comment only what the code cannot express.
+PERF-001: Specify a slice capacity with make when the element count is known.
+`, s.output("list", "--lang", "en"))
 	})
 
-	s.Run("should print the summary in the requested language", func() {
-		zh := s.listOutput("--level", "MUST", "--lang", "zh")
-		en := s.listOutput("--level", "MUST", "--lang", "en")
-
-		s.NotEqual(zh, en, "两种语言的条款摘要应不同")
-		s.Len(strings.Split(en, "\n"), len(strings.Split(zh, "\n")), "两种语言的行数应一致")
+	s.Run("should keep the clauses of the given level", func() {
+		s.Equal(`NAMING-001: 包名使用小写单词连写。
+`, s.output("list", "--level", "MUST"))
 	})
 
-	s.Run("should filter by chapter id and by section id", func() {
-		chapter := s.listClauseIDs("--category", "programming-conventions")
-		section := s.listClauseIDs("--category", "programming-conventions/naming")
-
-		s.NotEmpty(section)
-		s.Subset(chapter, section, "章节过滤的结果应包含其小节过滤的结果")
+	s.Run("should keep the clauses of several levels", func() {
+		s.Equal(`NAMING-001: 包名使用小写单词连写。
+PERF-001: 元素数量已知时用 make 指定切片容量。
+`, s.output("list", "--level", "MUST,MAY"))
 	})
 
-	s.Run("should list available category ids when category does not exist", func() {
-		out, _, err := s.executeCommand("list", "--category", "nope")
+	s.Run("should keep the clauses of the given chapter", func() {
+		s.Equal(`NAMING-001: 包名使用小写单词连写。
+COMMENT-001: 注释只写代码表达不出的东西。
+`, s.output("list", "--category", "programming-conventions"))
+	})
+
+	s.Run("should keep the clauses of the given section", func() {
+		s.Equal(`COMMENT-001: 注释只写代码表达不出的东西。
+`, s.output("list", "--category", "programming-conventions/comments"))
+	})
+
+	s.Run("should keep the clauses carrying the given tag", func() {
+		s.Equal(`PERF-001: 元素数量已知时用 make 指定切片容量。
+`, s.output("list", "--tag", "performance"))
+	})
+
+	s.Run("should fail when the category does not exist", func() {
+		out, err := s.executeCommand("list", "--category", "nope")
 
 		s.Require().Error(err)
-		s.Contains(err.Error(), "programming-conventions/naming", "报错应列出可选归属")
+		s.Empty(out)
+	})
+
+	s.Run("should fail when the tag does not exist", func() {
+		out, err := s.executeCommand("list", "--tag", "nope")
+
+		s.Require().Error(err)
 		s.Empty(out)
 	})
 }
 
-func (s *CLIITSuite) TestExplain() {
-	s.Run("should render every clause with the Chinese labels by default", func() {
-		ids := s.listClauseIDs()
-		s.Require().NotEmpty(ids)
-
-		for _, id := range ids {
-			out, errOut, err := s.executeCommand("explain", id)
-			s.Require().NoError(err, "条款 %s 应可展开，stderr: %s", id, errOut)
-			s.Regexp(`【(MUST|SHOULD|MAY)】`+regexp.QuoteMeta(id)+` .+`, out, "条款 %s 缺少合法分级或摘要", id)
-			s.Regexp(zhCategoryPattern, out, "条款 %s 缺少归属", id)
-			s.Regexp(zhSinceGoPattern, out, "条款 %s 缺少起始版本", id)
-			s.Contains(out, "说明:", "条款 %s 缺少说明", id)
-			s.Contains(out, "为什么:", "条款 %s 缺少依据", id)
-		}
+func (s *CLIITSuite) TestSearch() {
+	s.Run("should print the hits in relevance order", func() {
+		s.Equal(`NAMING-001: 包名使用小写单词连写。
+COMMENT-001: 注释只写代码表达不出的东西。
+`, s.output("search", "标识符"))
 	})
 
-	s.Run("should render the English labels when lang is en", func() {
-		out, errOut, err := s.executeCommand("explain", "NAMING-001", "--lang", "en")
-		s.Require().NoError(err, "stderr: %s", errOut)
+	s.Run("should print the clause whose text carries the query", func() {
+		s.Equal(`PERF-001: 元素数量已知时用 make 指定切片容量。
+`, s.output("search", "容量"))
+	})
 
-		s.Regexp(enCategoryPattern, out, "缺少归属")
-		s.Regexp(enSinceGoPattern, out, "缺少起始版本")
-		s.Contains(out, "Details:")
-		s.Contains(out, "Why:")
-		s.NotContains(out, "说明:")
+	s.Run("should accept the filters list accepts", func() {
+		s.Equal(`NAMING-001: 包名使用小写单词连写。
+`, s.output("search", "使用", "--level", "MUST", "--tag", "naming"))
+	})
+
+	s.Run("should print nothing when no clause matches", func() {
+		s.Empty(s.output("search", "并发"))
+	})
+}
+
+func (s *CLIITSuite) TestTags() {
+	s.Run("should print every tag with its description", func() {
+		s.Equal(`comments: 注释写法
+naming: 包名与标识符命名
+performance: 容量预分配与开销
+`, s.output("tags"))
+	})
+
+	s.Run("should print the descriptions in the requested language", func() {
+		s.Equal(`comments: How comments and doc comments are written
+naming: Package, identifier, and import naming
+performance: Capacity preallocation, string concatenation, and slice cloning
+`, s.output("tags", "--lang", "en"))
+	})
+}
+
+func (s *CLIITSuite) TestExplain() {
+	s.Run("should render the clause with the Chinese labels by default", func() {
+		s.Equal("【MUST】NAMING-001 包名使用小写单词连写。\n"+
+			"\n"+
+			"归属: 编程规约/命名规约 | 起始版本: 1.0\n"+
+			"\n"+
+			"说明:\n"+
+			"包名全小写、无下划线与驼峰，标识符同理。\n"+
+			"\n"+
+			"为什么:\n"+
+			"引文: Package names should be short, concise, and evocative.\n"+
+			"出处: https://go.dev/blog/package-names\n"+
+			"包名出现在每个外部引用点，命名不一致会持续抬高阅读成本。\n"+
+			"\n"+
+			"正例:\n"+
+			"```go\n"+
+			"package orderbook\n"+
+			"```\n"+
+			"\n"+
+			"反例:\n"+
+			"```go\n"+
+			"package order_book\n"+
+			"```\n"+
+			"\n"+
+			"依据:\n"+
+			"- https://go.dev/wiki/CodeReviewComments#package-names\n"+
+			"\n"+
+			"检测: golangci-lint stylecheck(ST1003)（检查包名标识符）\n",
+			s.output("explain", "NAMING-001"))
+	})
+
+	s.Run("should render the English labels and the translated text when lang is en", func() {
+		s.Equal("【MUST】NAMING-001 Write package names as lowercase words run together.\n"+
+			"\n"+
+			"Category: Programming Conventions/Naming | Since: 1.0\n"+
+			"\n"+
+			"Details:\n"+
+			"Keep package names in lowercase with no underscores or camel case; the same holds for identifiers.\n"+
+			"\n"+
+			"Why:\n"+
+			"Quote: Package names should be short, concise, and evocative.\n"+
+			"Source: https://go.dev/blog/package-names\n"+
+			"A package name appears at every external reference, so inconsistent naming keeps raising the reading cost.\n"+
+			"\n"+
+			"Good:\n"+
+			"```go\n"+
+			"package orderbook\n"+
+			"```\n"+
+			"\n"+
+			"Bad:\n"+
+			"```go\n"+
+			"package order_book\n"+
+			"```\n"+
+			"\n"+
+			"References:\n"+
+			"- https://go.dev/wiki/CodeReviewComments#package-names\n"+
+			"\n"+
+			"Detection: golangci-lint stylecheck(ST1003) (check the package name identifier)\n",
+			s.output("explain", "NAMING-001", "--lang", "en"))
 	})
 }
 
 func (s *CLIITSuite) TestErrors() {
-	s.Run("should fail when clause id does not exist", func() {
-		_, _, err := s.executeCommand("explain", "NOPE-999")
+	s.Run("should fail when the clause id does not exist", func() {
+		out, err := s.executeCommand("explain", "NOPE-999")
+
 		s.Require().Error(err)
+		s.Empty(out)
 	})
 }
 
-// executeCommand builds a fresh command tree, runs the subcommand, and returns the captured stdout, stderr, and execution error.
-func (s *CLIITSuite) executeCommand(args ...string) (string, string, error) {
+// executeCommand builds a fresh command tree, runs the subcommand, and returns the captured stdout and execution error.
+func (s *CLIITSuite) executeCommand(args ...string) (string, error) {
 	s.T().Helper()
 
-	container, err := wire.InitializeCLI()
-	s.Require().NoError(err)
-
+	root := server.ProvideCLICommand(s.container.Handler)
 	out := new(bytes.Buffer)
 	errOut := new(bytes.Buffer)
-	root := container.RootCmd
 	root.SetOut(out)
 	root.SetErr(errOut)
 	root.SetArgs(args)
 
-	_, err = root.ExecuteC()
-	return out.String(), errOut.String(), err
+	_, err := root.ExecuteC()
+	return out.String(), err
 }
 
-// listOutput runs list and returns the trimmed stdout.
-func (s *CLIITSuite) listOutput(args ...string) string {
+// output runs the subcommand and returns its stdout, requiring the execution to succeed.
+func (s *CLIITSuite) output(args ...string) string {
 	s.T().Helper()
 
-	out, errOut, err := s.executeCommand(append([]string{"list"}, args...)...)
-	s.Require().NoError(err, "stderr: %s", errOut)
-	return strings.TrimSpace(out)
-}
-
-// listClauseIDs runs list and parses all ids, verifying that every line is "id: summary".
-func (s *CLIITSuite) listClauseIDs(args ...string) []string {
-	s.T().Helper()
-
-	var ids []string
-	for line := range strings.SplitSeq(s.listOutput(args...), "\n") {
-		if line == "" {
-			continue
-		}
-		m := clauseLinePattern.FindStringSubmatch(line)
-		s.Require().NotNil(m, "list 输出行应为「编号: 一句话」: %q", line)
-		ids = append(ids, m[1])
-	}
-	return ids
+	out, err := s.executeCommand(args...)
+	s.Require().NoError(err)
+	return out
 }

@@ -17,7 +17,7 @@ import (
 
 // Injectors from di.go:
 
-// InitializeCLI injects gdm's dependencies with wire.
+// InitializeCLI injects gdm's dependencies with wire over the embedded data tree.
 func InitializeCLI() (*CLIContainer, error) {
 	fs := _wireFSValue
 	repository := jsonfile.New(fs)

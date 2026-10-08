@@ -6,6 +6,7 @@
 
 - 归属：静态检查规约/配置与运行
 - 起始版本：Go 1.0
+- 主题：tooling
 
 全仓库只保留一份 .golangci.yml，本地与 CI 跑同一条命令；`golangci-lint` 版本由 go.mod 的 tool 指令固定，不依赖各机器上的全局安装。
 
@@ -42,6 +43,7 @@ lint:
 
 - 归属：静态检查规约/配置与运行
 - 起始版本：Go 1.0
+- 主题：tooling
 
 确认是误报后，在触发处写 //nolint:<检查器> // 理由，检查器名与理由缺一不可；不写裸 //nolint 与 //nolint:all，它们不表明被抑制的是哪条检查；也不在文件或包的顶部一次性关掉检查。配置里开启 nolintlint，用 require-specific、require-explanation、allow-unused 三项设置强制。
 
@@ -78,6 +80,7 @@ raw, err := os.ReadFile(path) //nolint
 
 - 归属：静态检查规约/必开规则
 - 起始版本：Go 1.0
+- 主题：tooling
 
 standard 集是 `golangci-lint` 默认启用的五个检查器，配置里不要关掉，也不要只留其中几个：
 
@@ -123,6 +126,7 @@ linters:
 
 - 归属：静态检查规约/推荐规则
 - 起始版本：Go 1.22
+- 主题：modernization, tooling
 
 Go 版本升级后，旧写法由 modernize 提示可简化的地方；未启用则这些惯用法只能靠人工记忆。
 
@@ -160,6 +164,7 @@ for i := 0; i < n; i++ {
 
 - 归属：静态检查规约/推荐规则
 - 起始版本：Go 1.0
+- 主题：testing, tooling
 
 testifylint 拦下 `assert.Nil` 判错误、参数顺序颠倒一类高频误用；未用 `testify` 的项目不必启用。
 
@@ -193,6 +198,7 @@ assert.Nil(t, err)
 
 - 归属：静态检查规约/推荐规则
 - 起始版本：Go 1.0
+- 主题：tooling
 
 standard 集之外，推荐开启以下分析器：
 

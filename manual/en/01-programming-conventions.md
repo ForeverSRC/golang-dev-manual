@@ -6,6 +6,7 @@
 
 - Category: Programming Conventions/Naming
 - Since: Go 1.0
+- Tags: naming
 
 The package name is the prefix that callers use to reference identifiers, so only all-lowercase with no separators stays consistent. Write multiple words together, without underscores or camel case, and do not add plurals.
 
@@ -40,6 +41,7 @@ package order_book
 
 - Category: Programming Conventions/Naming
 - Since: Go 1.0
+- Tags: naming
 
 Variables, constants, types, functions, and package names all use MixedCaps, without underscores separating words. There are only three exceptions:
 
@@ -78,6 +80,7 @@ func read_config() {}
 
 - Category: Programming Conventions/Naming
 - Since: Go 1.0
+- Tags: naming
 
 Initialisms such as URL, ID, and HTTP are either all uppercase or all lowercase, never written as Url or Id. The case follows how the initialism is written in English (such as iOS and gRPC), and the first letter is uppercased when the identifier must be exported.
 
@@ -112,6 +115,7 @@ func ServeHttp(w http.ResponseWriter, r *http.Request) {}
 
 - Category: Programming Conventions/Naming
 - Since: Go 1.0
+- Tags: naming
 
 A loop index or method receiver used within one or two lines needs only a single letter; a variable that spans an entire function or package-level scope uses a full word. When several similar concepts live in the same scope, add a qualifier to tell them apart.
 
@@ -156,6 +160,7 @@ for _, o := range orders {
 
 - Category: Programming Conventions/Naming
 - Since: Go 1.0
+- Tags: naming
 
 The declaration already gives the type, and the package name, method name, and file name already provide context, so the name does not repeat them; add a qualifier only when the type genuinely needs disambiguation.
 
@@ -194,6 +199,7 @@ var userSlice []User
 
 - Category: Programming Conventions/Naming
 - Since: Go 1.0
+- Tags: naming
 
 A receiver name is usually one or two letters taken from an abbreviation of the type name, and every method of the same type uses the same receiver name. Do not use this or self, and do not leave a placeholder name when the receiver is unused.
 
@@ -230,6 +236,7 @@ func (this *ReportWriter) Write(p []byte) (int, error) {}
 
 - Category: Programming Conventions/Constants and Enums
 - Since: Go 1.0
+- Tags: naming
 
 An exported constant starts with an uppercase letter and an unexported one with a lowercase letter, with each word capitalized in between. Do not use all-uppercase forms such as MAX_LENGTH, and do not use the k prefix of kMaxLength.
 
@@ -264,6 +271,7 @@ const MAX_PACKET_SIZE = 512
 
 - Category: Programming Conventions/Constants and Enums
 - Since: Go 1.0
+- Tags: naming
 
 A constant name says what it stands for, not what it equals; when a value has no meaning beyond the number itself, there is no need to define it as a constant. When the same value serves different roles, name each one separately.
 
@@ -297,6 +305,7 @@ const three = 3
 
 - Category: Programming Conventions/Constants and Enums
 - Since: Go 1.0
+- Tags: constants
 
 A set of enumerations from one source that increase in order is generated with iota, avoiding hand-written numbers that are forgotten when a value is inserted midway. The value of iota depends on its line number within the const block, so inserting a line into the block means rechecking the following values.
 
@@ -341,6 +350,7 @@ const (
 
 - Category: Programming Conventions/Formatting and Style
 - Since: Go 1.18
+- Tags: modernization
 
 Go 1.18 introduced any as an alias for interface{}, and the two are entirely equivalent. New code writes any uniformly; when touching an interface{} in old code, replace it along the way.
 
@@ -381,6 +391,7 @@ func printValue(v interface{}) {
 
 - Category: Programming Conventions/Functions and Methods
 - Since: Go 1.0
+- Tags: code-organization
 
 Within one file, exported functions come before unexported functions, and the exported methods of a type come before its unexported methods. This clause governs only the relative order of exported and unexported, not where types and constructors go.
 
@@ -427,6 +438,7 @@ func Load(path string) (*Manual, error) {
 
 - Category: Programming Conventions/Functions and Methods
 - Since: Go 1.0
+- Tags: naming
 
 When an unnamed result already conveys the meaning, do not add a name; when several values of the same type are returned, or the meaning of a result cannot be seen from the signature, name the result parameters so that the signature and godoc explain themselves. The test is whether the meaning is clear, independent of function length.
 
@@ -473,6 +485,7 @@ func split(sum int) (int, int) {
 
 - Category: Programming Conventions/Data Structures
 - Since: Go 1.0
+- Tags: data-structures
 
 Empty slices are uniformly declared with var, and a non-nil empty slice is used only when genuinely needed: in JSON serialization a nil slice outputs null while an empty slice outputs []. In interface design, do not treat a nil slice and a non-nil empty slice as two states.
 
@@ -506,6 +519,7 @@ ids := []string{}
 
 - Category: Programming Conventions/Data Structures
 - Since: Go 1.0
+- Tags: data-structures
 
 A literal writes field name: value for each field. Small private structs with few fields and a stable order, and test table data, may be exceptions; a struct from another package always uses field names, because adding, removing, or reordering fields silently misplaces positional entries.
 
@@ -543,6 +557,7 @@ user := User{"alice", 30}
 
 - Category: Programming Conventions/Data Structures
 - Since: Go 1.21
+- Tags: modernization
 
 `slices` and `maps` provide high-frequency operations such as `Contains`, `Sort`, `Clone`, and `Keys`. When the standard library can express the operation, stop writing loops by hand, which reduces boundary mistakes and unifies the style.
 
@@ -585,6 +600,7 @@ for _, id := range ids {
 
 - Category: Programming Conventions/Concurrency
 - Since: Go 1.25
+- Tags: concurrency
 
 Before writing go, settle three things: when it ends, who waits for it to end, and who handles an error. The starter gathers it with `sync.WaitGroup` or `errgroup` in the same function, and uses `errgroup` when the subtask can return an error. Do not write a fire-and-forget with no waiter.
 
@@ -627,6 +643,7 @@ for _, item := range items {
 
 - Category: Programming Conventions/Concurrency
 - Since: Go 1.0
+- Tags: concurrency
 
 The close is bound to the producer's exit path, usually right after all sends complete. With multiple producers, do not close the data channel directly; use a separate stop signal together with context to coordinate. Cancellation always goes through context, and closing a channel is not used to signal cancellation.
 
@@ -673,6 +690,7 @@ close(ch)
 
 - Category: Programming Conventions/Concurrency
 - Since: Go 1.7
+- Tags: api-design, concurrency
 
 Internally it may start several goroutines to fetch concurrently, but it gathers them before returning and hands back ordinary results and an error rather than a channel that leaves the caller to wait.
 
@@ -710,6 +728,7 @@ func FetchAsync() <-chan Data {
 
 - Category: Programming Conventions/Concurrency
 - Since: Go 1.0
+- Tags: concurrency
 
 The protected field is unexported, reads and writes go through locked methods, and the lock is not exposed outside the struct. Choose a lock or a channel by scenario: use `sync.Mutex` to protect shared data such as a cache or state, and use a channel to transfer data ownership, distribute tasks, or pass asynchronous results.
 
@@ -758,6 +777,7 @@ type counter struct {
 
 - Category: Programming Conventions/Control Flow
 - Since: Go 1.0
+- Tags: control-flow
 
 Rewrite the form that wraps the success branch of an if in an else into one that checks for the error and returns, with the normal logic following; when an if with a short variable declaration defines a variable still used later, move the declaration before the if.
 
@@ -798,6 +818,7 @@ if err := save(); err == nil {
 
 - Category: Programming Conventions/Control Flow
 - Since: Go 1.22
+- Tags: modernization
 
 Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing `v := v` or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.
 
@@ -845,6 +866,7 @@ for _, item := range items {
 
 - Category: Programming Conventions/Comments
 - Since: Go 1.21
+- Tags: comments
 
 What naming and structure already make clear needs no comment. Only these cases are worth a comment:
 
@@ -886,6 +908,7 @@ entries := slices.Clone(in)
 
 - Category: Programming Conventions/Comments
 - Since: Go 1.0
+- Tags: comments
 
 When a doc comment is needed (package comments, and exported identifiers that genuinely warrant explanation), it begins with the name followed by one sentence and ends with a period. This clause governs only how a doc comment is written; it does not require a comment on every exported identifier, and whether to write one is decided by the stance of COMMENT-001.
 
