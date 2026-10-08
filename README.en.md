@@ -5,7 +5,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Go 1.27.1](https://img.shields.io/badge/Go-1.27.1-00ADD8.svg)
 
-A personal Golang development manual: 113 language-level clauses graded `MUST` / `SHOULD` / `MAY`, each carrying a summary, details, a rationale, an upstream quote, good and bad examples, and references. Every clause is objectively checkable, so it can be turned into a lint rule or a review item. The manual ships as bilingual markdown and is published as a static site.
+A personal Golang development manual: 114 language-level clauses graded `MUST` / `SHOULD` / `MAY`, each carrying a summary, details, a rationale, an upstream quote, good and bad examples, and references. Every clause is objectively checkable, so it can be turned into a lint rule or a review item. The manual ships as bilingual markdown and is published as a static site.
 
 ## Design intent
 

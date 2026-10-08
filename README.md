@@ -5,7 +5,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Go 1.27.1](https://img.shields.io/badge/Go-1.27.1-00ADD8.svg)
 
-个人维护的 Golang 开发手册：9 个章节、113 条语言级条款，分 `MUST` / `SHOULD` / `MAY` 三级，每条带一句话、说明、依据讲解、上游引文、正反例与参考链接。条款都可客观判定，能直接转成 lint 规则或 review 项。手册提供中英两版 markdown，并以静态站点发布。
+个人维护的 Golang 开发手册：9 个章节、114 条语言级条款，分 `MUST` / `SHOULD` / `MAY` 三级，每条带一句话、说明、依据讲解、上游引文、正反例与参考链接。条款都可客观判定，能直接转成 lint 规则或 review 项。手册提供中英两版 markdown，并以静态站点发布。
 
 ## 设计初衷
 

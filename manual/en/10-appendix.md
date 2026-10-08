@@ -41,6 +41,7 @@
 | ERR-006 | MUST | Errors and Logging/Error Handling | Handle the same error only once: wrap and return it, or log it in place, never both. |
 | FUNC-001 | MUST | Programming Conventions/Functions and Methods | Exported functions and methods come at the front of a file, unexported ones at the back. |
 | FUNC-002 | SHOULD | Programming Conventions/Functions and Methods | Use named results when the meaning of the return values is not self-evident. |
+| FUNC-003 | SHOULD | Programming Conventions/Functions and Methods | Collect more than 4 arguments or more than 3 results into a struct. |
 | IFACE-001 | SHOULD | Interfaces and Design/Interface Definition and Placement | Place interfaces according to the number of implementations: a single implementation shares the package with the implementation, while multiple implementations are defined by the consumer. |
 | IFACE-002 | SHOULD | Interfaces and Design/Interface Definition and Placement | Declare a type's implementation of an interface with a compile-time assertion. |
 | IFACE-003 | SHOULD | Interfaces and Design/Interface Definition and Placement | Do not define pointers to interfaces. |
@@ -157,6 +158,7 @@
 - ERR-006: https://dave.cheney.net/practical-go/presentations/qcon-china.html#_only_handle_an_error_once https://go.dev/wiki/CodeReviewComments#handle-errors
 - FUNC-001: https://github.com/uber-go/guide/blob/master/style.md#function-grouping-and-ordering https://github.com/manuelarte/funcorder
 - FUNC-002: https://go.dev/wiki/CodeReviewComments#named-result-parameters
+- FUNC-003: https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md https://go-critic.com/overview.html#toomanyresultschecker
 - IFACE-001: https://go.dev/wiki/CodeReviewComments#interfaces
 - IFACE-002: https://github.com/uber-go/guide/blob/master/style.md#verify-interface-compliance
 - IFACE-003: https://github.com/uber-go/guide/blob/master/style.md#pointers-to-interfaces
@@ -275,6 +277,7 @@
 | ERR-006 | manual review (Check each if err != nil branch: writing a log and returning err in the same branch is a violation) |
 | FUNC-001 | golangci-lint funcorder |
 | FUNC-002 | manual review (Check whether results are named when their meaning is not self-evident) |
+| FUNC-003 | golangci-lint revive(argument-limit, function-result-limit) |
 | IFACE-001 | manual review (Verify whether the package holding the interface matches the number of implementations: for a single implementation, whether it shares the package with the implementation; for multiple implementations, whether it is in the consumer's package.) |
 | IFACE-002 | manual review (Verify whether exported types that implement an interface per an API contract have a compile-time assertion.) |
 | IFACE-003 | manual review (Verify whether function signatures and struct fields contain *interface types.) |

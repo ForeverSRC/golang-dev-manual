@@ -41,6 +41,7 @@
 | ERR-006 | MUST | 错误与日志/错误处理规约 | 同一个错误只处理一次：包装返回或就地记录，不两者都做。 |
 | FUNC-001 | MUST | 编程规约/函数与方法规约 | 导出的函数与方法放在文件前部，未导出的放在后部。 |
 | FUNC-002 | SHOULD | 编程规约/函数与方法规约 | 返回值含义不自明时用命名返回值。 |
+| FUNC-003 | SHOULD | 编程规约/函数与方法规约 | 入参超过 4 个或返回值超过 3 个时，改用结构体收束。 |
 | IFACE-001 | SHOULD | 接口与设计规约/接口定义与落位 | 接口按实现数量落位：单实现与实现同包，多实现由使用方定义。 |
 | IFACE-002 | SHOULD | 接口与设计规约/接口定义与落位 | 用编译期断言声明类型对接口的实现。 |
 | IFACE-003 | SHOULD | 接口与设计规约/接口定义与落位 | 不定义指向接口的指针。 |
@@ -157,6 +158,7 @@
 - ERR-006：https://dave.cheney.net/practical-go/presentations/qcon-china.html#_only_handle_an_error_once https://go.dev/wiki/CodeReviewComments#handle-errors
 - FUNC-001：https://github.com/uber-go/guide/blob/master/style.md#function-grouping-and-ordering https://github.com/manuelarte/funcorder
 - FUNC-002：https://go.dev/wiki/CodeReviewComments#named-result-parameters
+- FUNC-003：https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md https://go-critic.com/overview.html#toomanyresultschecker
 - IFACE-001：https://go.dev/wiki/CodeReviewComments#interfaces
 - IFACE-002：https://github.com/uber-go/guide/blob/master/style.md#verify-interface-compliance
 - IFACE-003：https://github.com/uber-go/guide/blob/master/style.md#pointers-to-interfaces
@@ -275,6 +277,7 @@
 | ERR-006 | 人工核对（逐个 if err != nil 分支核对：同一分支内既写日志又 return err 即违反） |
 | FUNC-001 | golangci-lint funcorder |
 | FUNC-002 | 人工核对（核对返回值含义不自明时是否命名） |
+| FUNC-003 | golangci-lint revive(argument-limit, function-result-limit) |
 | IFACE-001 | 人工核对（核对接口所在包与实现数量是否对应：单实现看是否与实现同包，多实现看是否在使用方包） |
 | IFACE-002 | 人工核对（核对按 API 契约实现接口的导出类型处是否有编译期断言） |
 | IFACE-003 | 人工核对（核对函数签名与结构体字段是否出现 *接口类型） |

@@ -30,16 +30,16 @@ func (s *manualService) Labels(ctx context.Context, lang string) (domain.I18nCli
 	return overlay.Cli, nil
 }
 
-func (s *manualService) List(ctx context.Context, lang string, levels []string, category string, tags []string) ([]ClauseView, error) {
-	manual, overlay, err := s.load(ctx, lang)
+func (s *manualService) List(ctx context.Context, q ClauseQuery) ([]ClauseView, error) {
+	manual, overlay, err := s.load(ctx, q.Lang)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateFilters(manual, category, tags); err != nil {
+	if err := validateFilters(manual, q.Category, q.Tags); err != nil {
 		return nil, err
 	}
 
-	clauses := manual.Filter(levels, category, tags)
+	clauses := manual.Filter(q.Levels, q.Category, q.Tags)
 	views := make([]ClauseView, 0, len(clauses))
 	for _, c := range clauses {
 		views = append(views, clauseView(manual, overlay, c))
@@ -59,18 +59,18 @@ func (s *manualService) Tags(ctx context.Context, lang string) ([]domain.Tag, er
 	return tags, nil
 }
 
-func (s *manualService) Search(ctx context.Context, lang, query string, levels []string, category string, tags []string) ([]SearchResult, error) {
-	manual, overlay, err := s.load(ctx, lang)
+func (s *manualService) Search(ctx context.Context, q ClauseQuery) ([]SearchResult, error) {
+	manual, overlay, err := s.load(ctx, q.Lang)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateFilters(manual, category, tags); err != nil {
+	if err := validateFilters(manual, q.Category, q.Tags); err != nil {
 		return nil, err
 	}
 
-	terms := domain.Tokenize(query)
+	terms := domain.Tokenize(q.Query)
 	results := make([]SearchResult, 0, len(manual.Clauses))
-	for _, c := range manual.Filter(levels, category, tags) {
+	for _, c := range manual.Filter(q.Levels, q.Category, q.Tags) {
 		view := clauseView(manual, overlay, c)
 		score, matched := view.Clause.MatchScore(terms)
 		if score == 0 {
@@ -151,7 +151,7 @@ func (s *manualService) load(ctx context.Context, lang string) (*domain.Manual, 
 
 // clauseView prepares one clause for display in the overlay's language.
 func clauseView(manual *domain.Manual, overlay *domain.I18n, c domain.Clause) ClauseView {
-	_, _, _, note := resolveClause(overlay, c)
+	note := resolveClause(overlay, c).note
 	return ClauseView{
 		Clause:   resolveClauseText(overlay, c),
 		Category: categoryName(manual, overlay, c),

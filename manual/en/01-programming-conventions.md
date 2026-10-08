@@ -479,6 +479,51 @@ func split(sum int) (int, int) {
 
 **Detection**: manual review (Check whether results are named when their meaning is not self-evident)
 
+### 【SHOULD】FUNC-003 Collect more than 4 arguments or more than 3 results into a struct.
+
+- Category: Programming Conventions/Functions and Methods
+- Since: Go 1.0
+- Tags: api-design
+
+When a function takes 5 or more arguments, or returns 4 or more results, gather the values that travel together into a struct and let callers pass them by field name. The counting and the way to collect them:
+
+- Counting: arguments are counted by name, `ctx` included and the method receiver excluded; results are counted by name, `error` included.
+- Arguments: business arguments go into one argument struct, while `ctx` stays first in the signature and out of the struct, consistent with `CTX-001`.
+- Results: the results go into one result struct, while `error` stays in the last result position and out of the struct.
+- Exceptions: a signature fixed by an external contract is left as is, such as interface implementations, `go:generate` output, and mock output.
+- Division of labor with `FUNC-002`: name the results when their meaning is not self-evident; collect them into a struct only when the count exceeds the limit.
+
+**Why**
+
+> Warns when a function receives more parameters than the maximum set by the rule's configuration. ... Specifies the maximum number of results a function can return. Functions returning too many results can be hard to understand/use.
+>
+> — https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+
+The two rules quoted above state configurable limits; Go itself only says to keep the number of parameters reasonable and gives no figure. The numbers come from tooling and the community: revive defaults `argument-limit` to 8 and `function-result-limit` to 3, and go-critic defaults `tooManyResultsChecker` to 5 with that check off by default. This manual sets its own limits of 4 arguments and 3 results. The reason is readability at the call site: by the fifth positional argument, readers can no longer tell which value carries which meaning and must scroll back to the signature to match them one by one; the same happens with a fourth result. Collected into a struct, every value carries a field name, the call site explains itself, and adding or removing a field later cannot silently shift positions.
+
+**Good**
+
+```go
+func (s *Service) List(ctx context.Context, q ListQuery) ([]ClauseView, error) {
+	return s.repo.Find(ctx, q)
+}
+```
+
+**Bad**
+
+```go
+func (s *Service) List(ctx context.Context, lang string, levels []string, category string, tags []string) ([]ClauseView, error) {
+	return s.repo.Find(ctx, lang, levels, category, tags)
+}
+```
+
+**References**
+
+- https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+- https://go-critic.com/overview.html#toomanyresultschecker
+
+**Detection**: golangci-lint revive(argument-limit, function-result-limit)
+
 ## (5) Data Structures
 
 ### 【SHOULD】DATA-001 Declare empty slices with var to get a nil slice.

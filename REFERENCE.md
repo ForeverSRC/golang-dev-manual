@@ -45,6 +45,8 @@
 ## 工具与检测
 
 - [gosec 规则清单（RULES.md）](https://github.com/securego/gosec/blob/master/RULES.md)
+- [revive 规则清单（RULES_DESCRIPTIONS.md）](https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md)
+- [go-critic 检查项总览](https://go-critic.com/overview.html)
 
 ## 工具链
 
