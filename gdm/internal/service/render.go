@@ -47,7 +47,7 @@ func renderManual(m *domain.Manual, i18n *domain.I18n, lang string) (map[string]
 		for j := range ch.Sections {
 			fmt.Fprintf(&index, "    - %s\n", sectionName(m, i18n, i, j))
 		}
-		files[filename] = renderChapter(m, i18n, i, headingNumber(i+1, style), byCategory)
+		files[filename] = renderChapter(renderContext{manual: m, i18n: i18n, byCategory: byCategory}, i, headingNumber(i+1, style))
 	}
 
 	appendixIndex := len(m.ToC) + 1
@@ -58,19 +58,26 @@ func renderManual(m *domain.Manual, i18n *domain.I18n, lang string) (map[string]
 	return files, nil
 }
 
+// renderContext groups the manual, overlay, and clause grouping shared while rendering chapters.
+type renderContext struct {
+	manual     *domain.Manual
+	i18n       *domain.I18n
+	byCategory map[string][]domain.Clause
+}
+
 // renderChapter renders one chapter. number is the chapter's numbering prefix.
-func renderChapter(m *domain.Manual, i18n *domain.I18n, ci int, number string, byCategory map[string][]domain.Clause) string {
-	ch := m.ToC[ci]
+func renderChapter(rc renderContext, ci int, number string) string {
+	ch := rc.manual.ToC[ci]
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s%s\n\n", number, chapterName(m, i18n, ci))
+	fmt.Fprintf(&b, "# %s%s\n\n", number, chapterName(rc.manual, rc.i18n, ci))
 
 	if len(ch.Sections) == 0 {
-		writeSection(&b, m, i18n, byCategory[ch.ID])
+		writeSection(&b, rc.manual, rc.i18n, rc.byCategory[ch.ID])
 		return b.String()
 	}
 	for j, s := range ch.Sections {
-		fmt.Fprintf(&b, "## %s%s\n\n", sectionNumber(j+1, i18n.Render.NumberStyle), sectionName(m, i18n, ci, j))
-		writeSection(&b, m, i18n, byCategory[ch.ID+"/"+s.ID])
+		fmt.Fprintf(&b, "## %s%s\n\n", sectionNumber(j+1, rc.i18n.Render.NumberStyle), sectionName(rc.manual, rc.i18n, ci, j))
+		writeSection(&b, rc.manual, rc.i18n, rc.byCategory[ch.ID+"/"+s.ID])
 	}
 	return b.String()
 }
@@ -86,25 +93,25 @@ func writeSection(b *strings.Builder, m *domain.Manual, i18n *domain.I18n, claus
 }
 
 func writeClause(b *strings.Builder, m *domain.Manual, i18n *domain.I18n, c domain.Clause) {
-	summary, details, rationale, note := resolveClause(i18n, c)
-	fmt.Fprintf(b, "### 【%s】%s %s\n\n", c.Level, c.ID, summary)
+	t := resolveClause(i18n, c)
+	fmt.Fprintf(b, "### 【%s】%s %s\n\n", c.Level, c.ID, t.summary)
 	fmt.Fprintf(b, "- %s\n", expand(i18n.Render.CategoryLine, categoryName(m, i18n, c)))
 	fmt.Fprintf(b, "- %s\n", expand(i18n.Render.SinceGoLine, c.SinceGo))
 	if len(c.Tags) > 0 {
 		fmt.Fprintf(b, "- %s\n", expand(i18n.Render.TagsLine, strings.Join(c.Tags, ", ")))
 	}
 	b.WriteString("\n")
-	if details != "" {
-		fmt.Fprintf(b, "%s\n\n", details)
+	if t.details != "" {
+		fmt.Fprintf(b, "%s\n\n", t.details)
 	}
-	if c.Quote.Text != "" || rationale != "" {
+	if c.Quote.Text != "" || t.rationale != "" {
 		fmt.Fprintf(b, "**%s**\n\n", i18n.Render.Why)
 	}
 	if c.Quote.Text != "" {
 		b.WriteString(quoteBlock(c.Quote, i18n.Render.QuoteMark))
 	}
-	if rationale != "" {
-		fmt.Fprintf(b, "%s\n\n", rationale)
+	if t.rationale != "" {
+		fmt.Fprintf(b, "%s\n\n", t.rationale)
 	}
 	if c.Examples.Good != "" {
 		fmt.Fprintf(b, "**%s**\n\n%s\n\n", i18n.Render.Good, codeFence(c.Examples.Good, c.Examples.Language()))
@@ -119,7 +126,7 @@ func writeClause(b *strings.Builder, m *domain.Manual, i18n *domain.I18n, c doma
 		}
 		b.WriteString("\n")
 	}
-	fmt.Fprintf(b, "%s\n\n", expand(i18n.Render.DetectLine, detectText(i18n.Render, c.Detect, note)))
+	fmt.Fprintf(b, "%s\n\n", expand(i18n.Render.DetectLine, detectText(i18n.Render, c.Detect, t.note)))
 }
 
 func renderAppendix(m *domain.Manual, i18n *domain.I18n, number string) string {
@@ -132,7 +139,7 @@ func renderAppendix(m *domain.Manual, i18n *domain.I18n, number string) string {
 	fmt.Fprintf(&b, "## 1 %s\n\n", i18n.Appendix.IndexHeading)
 	b.WriteString(tableHeader(i18n.Appendix.IndexColumns))
 	for _, c := range clauses {
-		summary, _, _, _ := resolveClause(i18n, c)
+		summary := resolveClause(i18n, c).summary
 		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", c.ID, c.Level, categoryName(m, i18n, c), summary)
 	}
 
@@ -148,27 +155,36 @@ func renderAppendix(m *domain.Manual, i18n *domain.I18n, number string) string {
 	fmt.Fprintf(&b, "\n## 3 %s\n\n", i18n.Appendix.DetectHeading)
 	b.WriteString(tableHeader(i18n.Appendix.DetectColumns))
 	for _, c := range clauses {
-		_, _, _, note := resolveClause(i18n, c)
+		note := resolveClause(i18n, c).note
 		fmt.Fprintf(&b, "| %s | %s |\n", c.ID, detectText(i18n.Render, c.Detect, note))
 	}
 	return b.String()
 }
 
+// clauseText is a clause's display text in one language.
+type clauseText struct {
+	summary   string
+	details   string
+	rationale string
+	note      string
+}
+
 // resolveClause gets a clause's display text: use the translation if present, otherwise fall back to the source language.
-func resolveClause(i18n *domain.I18n, c domain.Clause) (summary, details, rationale, note string) {
+func resolveClause(i18n *domain.I18n, c domain.Clause) clauseText {
 	if t, ok := i18n.Clauses[c.ID]; ok {
-		return t.Summary, t.Details, t.Rationale, t.DetectNote
+		return clauseText{summary: t.Summary, details: t.Details, rationale: t.Rationale, note: t.DetectNote}
 	}
+	var note string
 	if c.Detect != nil {
 		note = c.Detect.Note
 	}
-	return c.Summary, c.Details, c.Rationale, note
+	return clauseText{summary: c.Summary, details: c.Details, rationale: c.Rationale, note: note}
 }
 
 // resolveClauseText returns the clause with its text fields in the requested language.
 func resolveClauseText(i18n *domain.I18n, c domain.Clause) domain.Clause {
-	summary, details, rationale, _ := resolveClause(i18n, c)
-	c.Summary, c.Details, c.Rationale = summary, details, rationale
+	t := resolveClause(i18n, c)
+	c.Summary, c.Details, c.Rationale = t.summary, t.details, t.rationale
 	return c
 }
 

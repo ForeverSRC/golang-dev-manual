@@ -479,6 +479,51 @@ func split(sum int) (int, int) {
 
 **检测**：人工核对（核对返回值含义不自明时是否命名）
 
+### 【SHOULD】FUNC-003 入参超过 4 个或返回值超过 3 个时，改用结构体收束。
+
+- 归属：编程规约/函数与方法规约
+- 起始版本：Go 1.0
+- 主题：api-design
+
+入参 5 个及以上、或返回值 4 个及以上时，把同向的数据收进一个结构体，调用方按字段名传值。计数口径与收束方式如下：
+
+- 计数口径：入参按参数名计数，含 `ctx`，不含方法接收者；返回值按结果名计数，含 `error`。
+- 入参收束：业务参数收进一个入参结构体，`ctx` 仍留在签名第一位，不进结构体，与 `CTX-001` 一致。
+- 返回值收束：结果收进一个结果结构体，`error` 留在最后一个返回值位置，不进结构体。
+- 例外：签名由外部约定固定的位置不改，例如接口实现、`go:generate` 生成物、mock 生成物。
+- 与 `FUNC-002` 的分工：返回值含义不自明时用命名返回值，条数超限才收进结构体。
+
+**为什么**
+
+> Warns when a function receives more parameters than the maximum set by the rule's configuration. ... Specifies the maximum number of results a function can return. Functions returning too many results can be hard to understand/use.
+>
+> —— https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+
+`quote` 里的两条规则给的是可配置上限，Go 官方只说要控制参数数量，没有给数字。带数字的口径都来自工具与社区：revive 的 `argument-limit` 默认 8、`function-result-limit` 默认 3，go-critic 的 `tooManyResultsChecker` 默认 5 且默认关闭。本手册取入参 4、返回值 3 作为自定上限。依据是调用点的可读性：位置参数到第 5 个，读的人已经分不清哪个值对应哪个含义，只能回翻签名逐个对位；返回值到第 4 个同样要靠数位置。收进结构体后每个值都带字段名，调用点自解释，日后增减字段也不会静默错位。
+
+**正例**
+
+```go
+func (s *Service) List(ctx context.Context, q ListQuery) ([]ClauseView, error) {
+	return s.repo.Find(ctx, q)
+}
+```
+
+**反例**
+
+```go
+func (s *Service) List(ctx context.Context, lang string, levels []string, category string, tags []string) ([]ClauseView, error) {
+	return s.repo.Find(ctx, lang, levels, category, tags)
+}
+```
+
+**依据**
+
+- https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+- https://go-critic.com/overview.html#toomanyresultschecker
+
+**检测**：golangci-lint revive(argument-limit, function-result-limit)
+
 ## （五）数据结构规约
 
 ### 【SHOULD】DATA-001 声明空切片时用 var 得到 nil 切片。

@@ -14,11 +14,11 @@ type ManualService interface {
 	// Labels returns the CLI's field labels for the requested language.
 	Labels(ctx context.Context, lang string) (domain.I18nCli, error)
 	// List filters clauses by level, category, and tags, returning clause text in the requested language.
-	List(ctx context.Context, lang string, levels []string, category string, tags []string) ([]ClauseView, error)
+	List(ctx context.Context, q ClauseQuery) ([]ClauseView, error)
 	// Tags returns the tag vocabulary with each tag's description in the requested language.
 	Tags(ctx context.Context, lang string) ([]domain.Tag, error)
 	// Search scores the clauses against a query in the requested language, returning the hits in relevance order.
-	Search(ctx context.Context, lang, query string, levels []string, category string, tags []string) ([]SearchResult, error)
+	Search(ctx context.Context, q ClauseQuery) ([]SearchResult, error)
 	// Explain renders the clause with the given id in the requested language.
 	Explain(ctx context.Context, lang, id string) (ClauseView, error)
 	// Check runs the grep checks from the clauses against the Go files under root.
@@ -30,6 +30,15 @@ type ClauseView struct {
 	Clause   domain.Clause
 	Category string
 	Detect   string
+}
+
+// ClauseQuery holds the language and filters shared by List and Search; Search also fills in Query.
+type ClauseQuery struct {
+	Lang     string
+	Levels   []string
+	Category string
+	Tags     []string
+	Query    string
 }
 
 // Generator produces the bilingual markdown manual from the clause data.

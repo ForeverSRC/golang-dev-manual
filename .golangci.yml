@@ -21,9 +21,11 @@ linters:
     - modernize
     - testpackage
     - funcorder
-    # revive is not enabled: its exported and package-comments rules require a comment
-    # on every exported identifier and every package, which conflicts with writing
-    # comments only where the code cannot express the intent.
+    # revive is enabled only for its argument-limit and function-result-limit rules
+    # (see the settings below). Listing rules there means the default rule set is not
+    # loaded, so its comment rules (exported, package-comments) stay off, consistent
+    # with writing comments only where the code cannot express the intent.
+    - revive
     - gocritic
     - exhaustive
     - copyloopvar
@@ -54,6 +56,13 @@ linters:
       # Constructor placement (right after the type declaration) is only "may" in Uber, not enforced.
       constructor: false
       function: true
+    revive:
+      # Count limits for FUNC-003.
+      rules:
+        - name: argument-limit
+          arguments: [4]
+        - name: function-result-limit
+          arguments: [3]
 
 formatters:
   enable:
