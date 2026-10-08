@@ -49,7 +49,7 @@ func (r *Repository) Load(_ context.Context) (*domain.Manual, error) {
 	return manual, nil
 }
 
-// validate checks the data's internal references: ids are unique inside the table of contents,
+// validate checks the data's internal references: ids are unique inside the table of contents and across the clauses,
 // and every clause points at a chapter and a section that exist.
 func validate(manual *domain.Manual) error {
 	sections := make(map[string]map[string]bool, len(manual.ToC))
@@ -67,7 +67,14 @@ func validate(manual *domain.Manual) error {
 		sections[ch.ID] = own
 	}
 
+	clauseIDs := make(map[string]bool, len(manual.Clauses))
+
 	for _, c := range manual.Clauses {
+		if clauseIDs[c.ID] {
+			return fmt.Errorf("duplicate clause id %s", c.ID)
+		}
+		clauseIDs[c.ID] = true
+
 		own, ok := sections[c.Chapter]
 		if !ok {
 			return fmt.Errorf("clause %s references unknown chapter %s", c.ID, c.Chapter)
