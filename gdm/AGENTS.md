@@ -12,8 +12,9 @@
 | 目录 | 角色 |
 |------|------|
 | `gdm/data/` | 条款数据与 `//go:embed` 载体，编进两个命令的二进制 |
-| `gdm/di/` | wire 装配，端口与实现的绑定集中在一个 ProviderSet |
-| `gdm/cmd/gdm-cli/`、`gdm/cmd/gdm-gen/` | 两个入口，各自的 `wire/` 放注入器与容器 |
+| `gdm/di/` | wire 装配，端口与实现的绑定集中在 `ProviderSet`；`RealSet` 给生产入口提供内嵌数据树，`ITSet` 给集成测试提供 fixture 数据树 |
+| `gdm/internal/ittest/` | 集成测试的 fixture 数据树，`//go:embed testdata` 后按 `fs.FS` 提供 |
+| `gdm/cmd/gdm-cli/`、`gdm/cmd/gdm-gen/` | 两个入口，各自的 `wire/` 放生产注入器与容器，集成测试的注入器放同级 `wireit/`（当前只有 gdm-cli） |
 | `gdm/internal/domain/` | 领域类型与领域方法，不做 IO |
 | `gdm/internal/repository/jsonfile/` | 读条款与语言覆盖层 |
 | `gdm/internal/adapter/filesystem/` | 扫描 Go 源码、写手册文件 |

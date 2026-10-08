@@ -4,35 +4,32 @@
 //go:build !wireinject
 // +build !wireinject
 
-package wire
+package wireit
 
 import (
-	"github.com/ForeverSRC/golang-dev-manual/gdm/data"
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/adapter/filesystem"
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/api/clihandler"
+	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/ittest"
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/repository/jsonfile"
-	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/server"
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/service"
 )
 
 // Injectors from di.go:
 
-// InitializeCLI injects gdm's dependencies with wire over the embedded data tree.
-func InitializeCLI() (*CLIContainer, error) {
-	fs := _wireFSValue
+// InitializeCLIITTestContainer injects gdm-cli's integration-test dependencies with wire over the fixture data tree.
+func InitializeCLIITTestContainer() (*CLIITTestContainer, error) {
+	fs, err := ittest.ITProvideDataTree()
+	if err != nil {
+		return nil, err
+	}
 	repository := jsonfile.New(fs)
 	scanner := filesystem.NewScanner()
 	manualService := service.NewManualService(repository, repository, scanner)
 	writer := filesystem.NewWriter()
 	generator := service.NewGenerator(repository, repository, writer)
 	commandLineHandler := clihandler.New(manualService, generator)
-	cliCommand := server.ProvideCLICommand(commandLineHandler)
-	cliContainer := &CLIContainer{
-		RootCmd: cliCommand,
+	cliitTestContainer := &CLIITTestContainer{
+		Handler: commandLineHandler,
 	}
-	return cliContainer, nil
+	return cliitTestContainer, nil
 }
-
-var (
-	_wireFSValue = data.FS
-)

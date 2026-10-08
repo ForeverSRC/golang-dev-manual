@@ -1,0 +1,13 @@
+{
+  "NAMING-001": {
+    "summary": "Write package names as lowercase words run together.",
+    "details": "Keep package names in lowercase with no underscores or camel case; the same holds for identifiers.",
+    "rationale": "A package name appears at every external reference, so inconsistent naming keeps raising the reading cost.",
+    "detect_note": "check the package name identifier"
+  },
+  "COMMENT-001": {
+    "summary": "Comment only what the code cannot express.",
+    "details": "Use comments to state the intent and the constraints rather than restating what the code does.",
+    "rationale": "A comment that restates the code goes stale as the code changes, an identifier rename being the clearest case."
+  }
+}

@@ -15,10 +15,8 @@ import (
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/service"
 )
 
-// ProviderSet provides the implementations of each layer and binds the ports.
+// ProviderSet provides the implementations of each layer and binds the ports; the data tree comes from the injector.
 var ProviderSet = wire.NewSet(
-	wire.InterfaceValue(new(fs.FS), data.FS),
-
 	jsonfile.New,
 	wire.Bind(new(service.ClauseRepository), new(*jsonfile.Repository)),
 	wire.Bind(new(service.I18nRepository), new(*jsonfile.Repository)),
@@ -35,4 +33,9 @@ var ProviderSet = wire.NewSet(
 
 	server.ProvideCLICommand,
 	server.ProvideGeneratorCommand,
+)
+
+// RealSet provides the data tree compiled into the binary.
+var RealSet = wire.NewSet(
+	wire.InterfaceValue(new(fs.FS), data.FS),
 )

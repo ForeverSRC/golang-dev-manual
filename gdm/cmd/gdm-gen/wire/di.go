@@ -11,6 +11,7 @@ import (
 // InitializeGenerator injects gdm-gen's dependencies with wire.
 func InitializeGenerator() (*GeneratorContainer, error) {
 	wire.Build(
+		di.RealSet,
 		di.ProviderSet,
 		wire.Struct(new(GeneratorContainer), "*"),
 	)

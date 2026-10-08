@@ -1,0 +1,22 @@
+[
+  {
+    "id": "PERF-001",
+    "level": "MAY",
+    "chapter": "performance",
+    "tags": ["performance"],
+    "since_go": "1.21",
+    "summary": "元素数量已知时用 make 指定切片容量。",
+    "details": "用 make([]T, 0, n) 初始化准备 append 的切片。",
+    "rationale": "容量不足会触发多次扩容与整体复制。",
+    "examples": {
+      "good": "ids := make([]string, 0, len(clauses))",
+      "bad": "var ids []string"
+    },
+    "sources": ["https://go.dev/wiki/CodeReviewComments#declaring-empty-slices"],
+    "detect": {
+      "tool": "grep",
+      "pattern": "make\\(\\[\\][^,]+, 0\\)",
+      "note": "核对是否给了容量"
+    }
+  }
+]

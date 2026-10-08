@@ -34,7 +34,7 @@
 - **可判定**：每条条款要能回答"怎么判定违反"，无法判定的不收录。
 - **依据优先**：每条条款的 `sources` 指向可直接对应的上游官方深链，不搬通用资料。
 - **干净终态**：条款正文不保留修订痕迹，版本演进由 `updated` 与 git 历史体现。
-- **工具统一**：静态检查走 golangci-lint，配置在 `.golangci.yml`，版本由 `go.mod` 的 `tool` 指令固定，命令为 `make lint`；命令行程序用 cobra 组织子命令，输出写 `cmd.OutOrStdout()`；依赖装配走 wire，端口绑定集中在 di 包的一处 ProviderSet，改装配后 `make generate` 重新生成。
+- **工具统一**：静态检查走 golangci-lint，配置在 `.golangci.yml`，版本由 `go.mod` 的 `tool` 指令固定，命令为 `make lint`；命令行程序用 cobra 组织子命令，输出写 `cmd.OutOrStdout()`；依赖装配走 wire，端口绑定集中在 di 包的 `ProviderSet`，生产入口与集成测试的数据源分别由 `RealSet`、`ITSet` 提供，改装配后 `make generate` 重新生成。
 
 ## 4. 人机协作
 

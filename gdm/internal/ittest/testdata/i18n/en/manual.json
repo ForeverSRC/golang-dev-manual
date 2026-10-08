@@ -1,0 +1,67 @@
+{
+  "toc": {
+    "programming-conventions": {
+      "name": "Programming Conventions",
+      "sections": {
+        "naming": "Naming",
+        "comments": "Comments"
+      }
+    },
+    "performance": {
+      "name": "Performance"
+    }
+  },
+  "tags": {
+    "comments": "How comments and doc comments are written",
+    "naming": "Package, identifier, and import naming",
+    "performance": "Capacity preallocation, string concatenation, and slice cloning"
+  },
+  "manual": {
+    "title": "Golang Development Manual",
+    "intro": "A personal Golang development manual. Clauses are graded MUST / SHOULD / MAY; the table of contents and the clauses share a single source in `gdm/data/`.",
+    "baseline_line": "Baseline: Go {v}",
+    "count_line": "Clauses: {v}",
+    "toc_heading": "Table of Contents"
+  },
+  "appendix": {
+    "slug": "appendix",
+    "title": "Appendix",
+    "index_heading": "Clause Index",
+    "sources_heading": "Sources",
+    "detect_heading": "Detection Map",
+    "index_columns": ["ID", "Level", "Category", "Summary"],
+    "detect_columns": ["ID", "Detection"]
+  },
+  "render": {
+    "number_style": "arabic",
+    "separator": ": ",
+    "empty_section": "Clauses for this section are pending.",
+    "why": "Why",
+    "good": "Good",
+    "bad": "Bad",
+    "sources": "References",
+    "category_line": "Category: {v}",
+    "since_go_line": "Since: Go {v}",
+    "tags_line": "Tags: {v}",
+    "detect_line": "**Detection**: {v}",
+    "quote_mark": "—",
+    "detect_grep": "grep regex {v}",
+    "detect_lint": "golangci-lint {v}",
+    "detect_manual": "manual review",
+    "detect_note": " ({v})"
+  },
+  "cli": {
+    "details": "Details",
+    "why": "Why",
+    "quote": "Quote",
+    "source": "Source",
+    "good": "Good",
+    "bad": "Bad",
+    "references": "References",
+    "detection": "Detection",
+    "category": "Category",
+    "since_go": "Since",
+    "no_hits": "No hits found.",
+    "uncovered": "Clauses without an automated check:"
+  }
+}
