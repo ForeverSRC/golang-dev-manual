@@ -6,6 +6,7 @@
 
 - Category: Static Analysis/Configuration and Running
 - Since: Go 1.0
+- Tags: tooling
 
 Keep a single .golangci.yml across the whole repository, and run the same command locally and in CI; the `golangci-lint` version is pinned by the tool directive in go.mod, not relying on a global installation on each machine.
 
@@ -42,6 +43,7 @@ lint:
 
 - Category: Static Analysis/Configuration and Running
 - Since: Go 1.0
+- Tags: tooling
 
 After confirming a false positive, write //nolint:<checker> // reason at the triggering site, where the checker name and the reason are both indispensable; do not write a bare //nolint or //nolint:all, since they do not indicate which check is being suppressed; also do not turn off checks wholesale at the top of a file or package. Enable nolintlint in the configuration, enforced by the three settings require-specific, require-explanation, and allow-unused.
 
@@ -78,6 +80,7 @@ raw, err := os.ReadFile(path) //nolint
 
 - Category: Static Analysis/Required Rules
 - Since: Go 1.0
+- Tags: tooling
 
 The standard set is the five checkers enabled by default in `golangci-lint`; do not turn them off in the configuration, and do not keep only some of them:
 
@@ -123,6 +126,7 @@ linters:
 
 - Category: Static Analysis/Recommended Rules
 - Since: Go 1.22
+- Tags: modernization, tooling
 
 After a Go version upgrade, modernize points out the places where old code can be simplified; without it enabled, these idioms rely solely on human memory.
 
@@ -160,6 +164,7 @@ for i := 0; i < n; i++ {
 
 - Category: Static Analysis/Recommended Rules
 - Since: Go 1.0
+- Tags: testing, tooling
 
 testifylint blocks high-frequency misuses such as judging errors with `assert.Nil` and reversed argument order; projects that do not use `testify` need not enable it.
 
@@ -193,6 +198,7 @@ assert.Nil(t, err)
 
 - Category: Static Analysis/Recommended Rules
 - Since: Go 1.0
+- Tags: tooling
 
 Beyond the standard set, enable the following analyzers:
 

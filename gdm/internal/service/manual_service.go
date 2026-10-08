@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/domain"
@@ -29,21 +30,64 @@ func (s *manualService) Labels(ctx context.Context, lang string) (domain.I18nCli
 	return overlay.Cli, nil
 }
 
-func (s *manualService) List(ctx context.Context, lang string, levels []string, category string) ([]domain.Clause, error) {
+func (s *manualService) List(ctx context.Context, lang string, levels []string, category string, tags []string) ([]ClauseView, error) {
 	manual, overlay, err := s.load(ctx, lang)
 	if err != nil {
 		return nil, err
 	}
-	if category != "" && !slices.Contains(manual.CategoryIDs(), category) {
-		return nil, fmt.Errorf("unknown category %s; available: %s", category, strings.Join(manual.CategoryIDs(), ", "))
+	if err := validateFilters(manual, category, tags); err != nil {
+		return nil, err
 	}
 
-	clauses := manual.Filter(levels, category)
-	resolved := make([]domain.Clause, 0, len(clauses))
+	clauses := manual.Filter(levels, category, tags)
+	views := make([]ClauseView, 0, len(clauses))
 	for _, c := range clauses {
-		resolved = append(resolved, resolveClauseText(overlay, c))
+		views = append(views, clauseView(manual, overlay, c))
 	}
-	return resolved, nil
+	return views, nil
+}
+
+func (s *manualService) Tags(ctx context.Context, lang string) ([]domain.Tag, error) {
+	manual, overlay, err := s.load(ctx, lang)
+	if err != nil {
+		return nil, err
+	}
+	tags := make([]domain.Tag, 0, len(manual.Tags))
+	for _, t := range manual.Tags {
+		tags = append(tags, domain.Tag{ID: t.ID, Description: tagDescription(overlay, t)})
+	}
+	return tags, nil
+}
+
+func (s *manualService) Search(ctx context.Context, lang, query string, levels []string, category string, tags []string) ([]SearchResult, error) {
+	manual, overlay, err := s.load(ctx, lang)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateFilters(manual, category, tags); err != nil {
+		return nil, err
+	}
+
+	terms := domain.Tokenize(query)
+	results := make([]SearchResult, 0, len(manual.Clauses))
+	for _, c := range manual.Filter(levels, category, tags) {
+		view := clauseView(manual, overlay, c)
+		score, matched := view.Clause.MatchScore(terms)
+		if score == 0 {
+			continue
+		}
+		results = append(results, SearchResult{ClauseView: view, Score: score, Matched: matched})
+	}
+	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].Score != results[j].Score {
+			return results[i].Score > results[j].Score
+		}
+		if results[i].Clause.Level.Rank() != results[j].Clause.Level.Rank() {
+			return results[i].Clause.Level.Rank() < results[j].Clause.Level.Rank()
+		}
+		return results[i].Clause.ID < results[j].Clause.ID
+	})
+	return results, nil
 }
 
 func (s *manualService) Explain(ctx context.Context, lang, id string) (ClauseView, error) {
@@ -77,6 +121,19 @@ func (s *manualService) Check(ctx context.Context, lang, root string) (*CheckRep
 		views = append(views, clauseView(manual, overlay, c))
 	}
 	return &CheckReport{Hits: hits, Uncovered: views}, nil
+}
+
+// validateFilters rejects a category or a tag the manual does not define, listing the available values.
+func validateFilters(manual *domain.Manual, category string, tags []string) error {
+	if category != "" && !slices.Contains(manual.CategoryIDs(), category) {
+		return fmt.Errorf("unknown category %s; available: %s", category, strings.Join(manual.CategoryIDs(), ", "))
+	}
+	for _, t := range tags {
+		if !slices.Contains(manual.TagIDs(), t) {
+			return fmt.Errorf("unknown tag %s; available: %s", t, strings.Join(manual.TagIDs(), ", "))
+		}
+	}
+	return nil
 }
 
 // load reads the manual and the requested language's overlay.

@@ -4,6 +4,7 @@
 
 - Category: Performance
 - Since: Go 1.0
+- Tags: performance
 
 Use `make([]T, 0, n)` to initialize a slice that will be appended to, with n set to the known length or a reasonable upper bound. It is not required when the count cannot be estimated at all, or the slice is usually very small or short-lived.
 
@@ -44,6 +45,7 @@ for _, it := range items {
 
 - Category: Performance
 - Since: Go 1.0
+- Tags: performance
 
 Use `make(map[K]V, n)`, with n set to the known element count or a reasonable upper bound. It is not required when the count is unknown, or the map usually holds only a few elements. When the element set is fixed, write it out in one map literal rather than calling make first and assigning entry by entry.
 
@@ -83,6 +85,7 @@ for _, it := range items {
 
 - Category: Performance
 - Since: Go 1.24
+- Tags: performance, testing
 
 Before changing performance-related code, use `go test -bench`, `go tool pprof`, or `runtime/pprof` to get data and confirm which section the hotspot falls in. A rewrite without data to support it does not enter the code: it may land on a path that is rarely taken, or sacrifice the readability of the common path for a rare case.
 
@@ -123,6 +126,7 @@ func BenchmarkRender(b *testing.B) {
 
 - Category: Performance
 - Since: Go 1.0
+- Tags: performance
 
 Convert between int, uint, float, bool, and strings with `strconv` functions such as `Itoa`, `Atoi`, `FormatInt`, `ParseFloat`, and `FormatBool`. Use `fmt.Sprintf` only when multiple values and a complex format (such as a `%v` combination, width, and precision) are genuinely needed.
 
@@ -156,6 +160,7 @@ s := fmt.Sprint(n)
 
 - Category: Performance
 - Since: Go 1.22
+- Tags: performance
 
 When a loop or hot path repeatedly converts the same string literal or variable to `[]byte`, hoist the conversion out of the loop and reuse the result of that single conversion. When the string's content changes each iteration, or a slice that can be modified independently is needed, keep converting inside the loop.
 
@@ -194,6 +199,7 @@ for range n {
 
 - Category: Performance
 - Since: Go 1.10
+- Tags: performance
 
 Use `strings.Builder` when building a string piece by piece (inside a loop, across many branches, with an indefinite count), and call `Grow` first when the result length can be estimated. Keep using `+` for a small, fixed inline concatenation. Use `bytes.Buffer` when a read-write buffer or `Bytes` access is needed.
 
@@ -235,6 +241,7 @@ for _, part := range parts {
 
 - Category: Performance
 - Since: Go 1.21
+- Tags: performance
 
 `s[i:j]` shares the backing array with the original slice, so while the sub-slice is still referenced the whole array cannot be reclaimed. When the sub-slice lives long, or the original slice is far larger than the section needed, use `slices.Clone` (since Go 1.21) or `make` plus `copy` to produce an independent slice. When the sub-slice is released as the function returns, or covers most of the elements anyway, slicing directly is enough.
 
@@ -270,6 +277,7 @@ return line
 
 - Category: Performance
 - Since: Go 1.0
+- Tags: performance
 
 A string, an interface value, and a small struct are themselves only a machine word in size, so passing by value and passing a pointer cost about the same to copy. Pass by value when the function body only reads through `*p` and never writes. Pass a pointer when the caller's data must be modified, or the struct is clearly large.
 

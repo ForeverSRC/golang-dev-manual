@@ -25,6 +25,7 @@
     "sources": "依据",
     "category_line": "归属：{v}",
     "since_go_line": "起始版本：Go {v}",
+    "tags_line": "主题：{v}",
     "detect_line": "**检测**：{v}",
     "quote_mark": "——",
     "detect_grep": "grep 正则 {v}",

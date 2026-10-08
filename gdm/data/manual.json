@@ -1,6 +1,29 @@
 {
-  "version": "3.0",
+  "version": "3.1",
   "go_baseline": "1.27.1",
+  "tags": [
+    { "id": "api-design", "description": "接口抽象、组合复用与对外契约" },
+    { "id": "assertion", "description": "断言写法与测试数据" },
+    { "id": "code-generation", "description": "生成物约定与生成工具" },
+    { "id": "code-organization", "description": "文件内元素次序与 import 分组" },
+    { "id": "comments", "description": "注释与文档注释的写法" },
+    { "id": "concurrency", "description": "goroutine 退出、channel、同步原语与结构体拷贝" },
+    { "id": "constants", "description": "常量与枚举取值生成" },
+    { "id": "context", "description": "context 作为参数、日志带 Context" },
+    { "id": "control-flow", "description": "错误与边界的提前返回" },
+    { "id": "data-structures", "description": "切片、映射与结构体的写法" },
+    { "id": "dependency-injection", "description": "wire 装配与构造函数注入" },
+    { "id": "error-handling", "description": "错误包装、判定与只处理一次" },
+    { "id": "layering", "description": "分层依赖方向、接口落位与项目布局" },
+    { "id": "logging", "description": "slog 用法与日志字段" },
+    { "id": "mock", "description": "mock 生成与测试替身" },
+    { "id": "modernization", "description": "any、slices/maps、循环变量与 go fix" },
+    { "id": "naming", "description": "包名、标识符与导入的命名" },
+    { "id": "performance", "description": "容量预分配、字符串拼接与切片克隆" },
+    { "id": "security", "description": "SQL、命令执行、路径、随机数、TLS 与口令比较" },
+    { "id": "testing", "description": "单元测试组织、testify 与 testifylint 规则、基准测试" },
+    { "id": "tooling", "description": "golangci-lint 配置、依赖管理与命令行工具" }
+  ],
   "toc": [
     {
       "id": "programming-conventions",

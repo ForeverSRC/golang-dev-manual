@@ -6,6 +6,7 @@
 
 - Category: Dependencies and Project Layout/Layering
 - Since: Go 1.0
+- Tags: layering
 
 The domain model layer contains no IO and does not import other layers; the application service layer depends on the domain model and declares the external capabilities it needs through interfaces; the adapter layer implements those interfaces and handles persistence, files, and network access; the entry layer only parses arguments and renders output. Outer layers import inner layers, and the names of outer packages never appear in inner-layer code.
 
@@ -53,6 +54,7 @@ type manualService struct {
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: naming
 
 The directory name and the package clause are written as the same name, and multi-word directories are likewise written without separators. There are only three exceptions:
 
@@ -93,6 +95,7 @@ package jsonrepo
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: code-organization
 
 Sort by path within each group, and do not mix imports from different sources into the same group. This project's gci configuration defines three groups: standard, default, and the module prefix of this repository, left to the formatter to organize automatically.
 
@@ -138,6 +141,7 @@ import (
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: naming
 
 The only exception is when an external test package cannot sit at the same level as the package under test because of an import cycle, in which case the package under test may be brought in with import . in a _test file. Ordinary code always writes the package name prefix explicitly.
 
@@ -175,6 +179,7 @@ var m Manual
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: naming
 
 A package name should let callers see the domain boundary. A package whose name carries only the meaning of "utility" or "general" has no criteria for what belongs in it, so anything can be put there. Existing general-purpose logic should be split into named packages by its real responsibility, for example set operations in stringset and retries in retry.
 
@@ -209,6 +214,7 @@ package util
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: naming
 
 Callers already use the package name as a prefix, so repeating it in an exported type or method name only adds length. Use `New` when the package contains a single type, or when the constructor returns the type that shares the package's name; only when it returns another type in the package should that type appear in the name.
 
@@ -247,6 +253,7 @@ func NewManual() *Manual
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: naming
 
 A package imported solely for one side effect (registering a driver, initializing a global table) is by convention placed only at the program entry point or in the tests that need it. A blank import in library code imposes that side effect on every caller that imports it.
 
@@ -282,6 +289,7 @@ import _ "net/http/pprof"
 
 - Category: Dependencies and Project Layout/Package Organization
 - Since: Go 1.0
+- Tags: naming
 
 On a collision, rename the local or project-internal import and keep the upstream canonical name. The alias itself must follow the package name rules: all lowercase, with no underscores.
 
@@ -323,6 +331,7 @@ import (
 
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.11
+- Tags: tooling
 
 Add or remove dependencies with `go get`, change require and replace with `go mod edit`, tidy with `go mod tidy`, and let only the tooling write go.sum. Editing version numbers or checksums by hand will not match the dependency graph or the module cache.
 
@@ -359,6 +368,7 @@ require github.com/spf13/cobra v1.10.2
 
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.11
+- Tags: tooling
 
 Commit go.mod and go.sum together. When fetching private modules fails, widen the verification scope with environment variables such as GOPRIVATE and GONOSUMDB rather than deleting or ignoring go.sum.
 
@@ -395,6 +405,7 @@ go.sum
 
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.11
+- Tags: tooling
 
 For local integration work, replace may point at a sibling directory or your own fork, and must be removed before merging. When a long-term replacement is genuinely needed, write the reason and the removal condition into a comment in go.mod, and periodically check whether upstream has merged the change.
 
@@ -433,6 +444,7 @@ replace example.com/lib => ../lib
 
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.24
+- Tags: tooling
 
 Command-line tools declare their package path with the tool directive and run via `go tool <name>`, with the version pinned by go.mod and go.sum. A version obtained from a global `go install` varies by machine and by when it was run, so CI and local environments cannot be brought into line.
 
@@ -471,6 +483,7 @@ $ golangci-lint run ./...
 
 - Category: Dependencies and Project Layout/Dependency Management
 - Since: Go 1.0
+- Tags: tooling
 
 Write it yourself when it fits in one line of code or the standard library already has equivalent capability; general-purpose and non-trivial capabilities (CLI frameworks, test assertions, structured logging) are worth pulling in only when the benefit is real. Before adding anything, first confirm the standard library has no ready-made capability.
 
@@ -506,6 +519,7 @@ n, err := convert.ToInt(s) // pull in the convert module for a single type conve
 
 - Category: Dependencies and Project Layout/Project Layout
 - Since: Go 1.11
+- Tags: layering
 
 Import paths are measured from the module root, and the source tree unfolds at the same level as its parent directories. A src/ carried over from the GOPATH era or from Java habits inserts a meaningless prefix between the repository path and the import path.
 
@@ -546,6 +560,7 @@ project-root/
 
 - Category: Dependencies and Project Layout/Project Layout
 - Since: Go 1.4
+- Tags: layering
 
 An internal directory is visible only within the subtree of the directory that contains it, and when the repository has a single module the top-level internal/ covers the whole repository. Implementation details, adapters, and types used only by this program all go inside; only packages genuinely meant for external reuse are placed outside internal.
 
@@ -582,6 +597,7 @@ import "github.com/ForeverSRC/golang-dev-manual/repository/jsonfile"
 
 - Category: Dependencies and Project Layout/Project Layout
 - Since: Go 1.0
+- Tags: layering
 
 When a repository holds both importable packages and executables, main packages are collected uniformly into cmd/<program name>/, with the directory name matching the generated executable. Only when there is a single program and the repository contains no importable packages may main.go be placed at the module root.
 
@@ -625,6 +641,7 @@ project-root/
 
 - Category: Dependencies and Project Layout/Project Layout
 - Since: Go 1.11
+- Tags: layering
 
 Create cmd, internal, pkg, configs, and scripts only once there is real content for them, and do not create empty directories or directories holding only a placeholder file. Directories grow along with the code, and their names come from real content.
 

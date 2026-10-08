@@ -12,11 +12,11 @@ func (cli *CommandLineHandler) Check(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	lang, err := cmd.Flags().GetString("lang")
+	jsonOut, err := cmd.Flags().GetBool("json")
 	if err != nil {
 		return err
 	}
-	labels, err := cli.manualSvc.Labels(cmd.Context(), lang)
+	lang, err := cmd.Flags().GetString("lang")
 	if err != nil {
 		return err
 	}
@@ -27,6 +27,13 @@ func (cli *CommandLineHandler) Check(cmd *cobra.Command, args []string) error {
 	}
 
 	out := cmd.OutOrStdout()
+	if jsonOut {
+		return writeJSON(out, checkReportJSON(report))
+	}
+	labels, err := cli.manualSvc.Labels(cmd.Context(), lang)
+	if err != nil {
+		return err
+	}
 	if len(report.Hits) == 0 {
 		if _, err := fmt.Fprintln(out, labels.NoHits); err != nil {
 			return err

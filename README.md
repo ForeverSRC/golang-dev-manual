@@ -33,9 +33,12 @@ go install github.com/ForeverSRC/golang-dev-manual/gdm/cmd/gdm-cli@latest
 ```
 
 ```bash
-gdm-cli list --level MUST     # 每条条款一行
-gdm-cli explain NAMING-001    # 展开详情、正反例与依据
-gdm-cli check ./some/package  # 执行可自动化的检测
+gdm-cli list --level MUST      # 每条条款一行
+gdm-cli list --tag concurrency # 按横向主题过滤
+gdm-cli search 切片容量        # 按主题搜索，按相关度排序
+gdm-cli tags                   # 列出主题 tag 与每个 tag 的解释
+gdm-cli explain NAMING-001     # 展开详情、正反例与依据
+gdm-cli check ./some/package   # 执行可自动化的检测
 ```
 
 条款数据已编入二进制，装好的 `gdm-cli` 不需要 clone 仓库。
@@ -72,6 +75,20 @@ NAMING-001: 包名使用小写单词连写，不使用下划线、驼峰或复�
 NAMING-002: 标识符不使用下划线分隔单词。
 ```
 
+`gdm-cli search` 按查询词在条款的 `summary`、`tags`、`details`、`rationale` 上打分，按相关度排序输出。查询词与条款正文用同一套分词：ASCII 段切整词，中文段切相邻二字组合。
+
+```console
+$ gdm-cli search 切片容量
+PERF-004: 元素数量已知或可估算时，用 make 指定切片容量。
+PERF-007: 长期保留大切片的一小段时，用 slices.Clone 切断底层数组引用。
+PERF-005: 元素数量已知或可估算时，给 make(map) 传容量提示。
+DATA-001: 声明空切片时用 var 得到 nil 切片。
+```
+
+条款除归属外还带横向主题 `tags`，一条可以有多个，取值来自 `gdm/data/manual.json` 的受控词表，以英文 id 直出，中英两版一致；手册正文里每条条款的「主题」一行就是它。
+
+`gdm-cli tags` 列出词表里的每个 tag 与它的一句话解释，其他 Agent 用它可以先问清有哪些主题、各自管什么，再决定 `--tag` 与 `search` 传什么；加 `--json` 输出 `[{"id","description"}]`。
+
 `gdm-cli explain` 展开一条或多条条款的详情、正反例与依据。
 
 ```console
@@ -106,17 +123,19 @@ $ gdm-cli check ./gdm --verbose
   [NAMING-001] golangci-lint stylecheck(ST1003)（检查包名标识符）
 ```
 
-`list` 另接受：
+`list` 与 `search` 另接受：
 
 - `--level`：按级别过滤，如 `MUST,SHOULD`。
 - `--category`：按归属 id 过滤，如 `programming-conventions` 或 `programming-conventions/naming`；取值非法时报错并列出全部可选 id。
+- `--tag`：按横向主题过滤，逗号分隔，命中任一即可，如 `concurrency,testing`；取值非法时报错并列出全部可选 tag。
+- `--json`：改输出单个 JSON 文档，`list` 给条款字段，`search` 另附 `score` 与 `matched`，`check` 给 `hits` 与 `uncovered` 两段。`tags` 的 `--json` 给 `id` 与 `description`。
 
 ## 仓库结构
 
 - `manual/zh/`、`manual/en/`：生成的双语 markdown 手册，已入库并直接作为站点数据源，请勿手工修改。
 - `gdm/`：Go 工具链。
   - `gdm/data/`：唯一事实来源。`gdm/data/data.go` 把它编入 `gdm-cli` 与 `gdm-gen` 二进制。
-    - `gdm/data/manual.json`：版本、Go 基准与目录结构。
+    - `gdm/data/manual.json`：版本、Go 基准、主题词表与目录结构。
     - `gdm/data/clauses/<章节 id>.json`：按章节拆分的条款，一个章节一个文件。
     - `gdm/data/i18n/<lang>/`：语言覆盖层，中文是事实来源，其余语言挂翻译。
   - `gdm/cmd/gdm-cli`：对外发布的 CLI，分为 `internal/domain`、`internal/service`、`internal/repository`、`internal/adapter`、`internal/api`、`internal/server`，装配在 `di/`。
@@ -134,6 +153,7 @@ $ gdm-cli check ./gdm --verbose
 | `level` | `MUST` / `SHOULD` / `MAY` |
 | `chapter` | 章节 id，必须能在 `toc` 中找到 |
 | `section` | 小节 id，可省略，省略时归属整个章节 |
+| `tags` | 横向主题标签，取值来自 `manual.json` 的词表，可省略 |
 | `since_go` | 条款可落地的最低 Go 版本 |
 | `summary` | 一句话条款，`gdm-cli list` 只输出它 |
 | `details` | 适用范围与例外 |

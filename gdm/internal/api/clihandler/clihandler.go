@@ -4,6 +4,8 @@ package clihandler
 import (
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/ForeverSRC/golang-dev-manual/gdm/internal/service"
 )
 
@@ -31,4 +33,44 @@ func splitList(s string) []string {
 		}
 	}
 	return out
+}
+
+// clauseFilters holds the filters list and search share, with the comma-separated arguments already split.
+type clauseFilters struct {
+	lang     string
+	levels   []string
+	category string
+	tags     []string
+	jsonOut  bool
+}
+
+// readFilters collects the flags shared by list and search.
+func readFilters(cmd *cobra.Command) (clauseFilters, error) {
+	lang, err := cmd.Flags().GetString("lang")
+	if err != nil {
+		return clauseFilters{}, err
+	}
+	level, err := cmd.Flags().GetString("level")
+	if err != nil {
+		return clauseFilters{}, err
+	}
+	category, err := cmd.Flags().GetString("category")
+	if err != nil {
+		return clauseFilters{}, err
+	}
+	tag, err := cmd.Flags().GetString("tag")
+	if err != nil {
+		return clauseFilters{}, err
+	}
+	jsonOut, err := cmd.Flags().GetBool("json")
+	if err != nil {
+		return clauseFilters{}, err
+	}
+	return clauseFilters{
+		lang:     lang,
+		levels:   splitList(level),
+		category: category,
+		tags:     splitList(tag),
+		jsonOut:  jsonOut,
+	}, nil
 }

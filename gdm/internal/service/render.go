@@ -89,7 +89,11 @@ func writeClause(b *strings.Builder, m *domain.Manual, i18n *domain.I18n, c doma
 	summary, details, rationale, note := resolveClause(i18n, c)
 	fmt.Fprintf(b, "### 【%s】%s %s\n\n", c.Level, c.ID, summary)
 	fmt.Fprintf(b, "- %s\n", expand(i18n.Render.CategoryLine, categoryName(m, i18n, c)))
-	fmt.Fprintf(b, "- %s\n\n", expand(i18n.Render.SinceGoLine, c.SinceGo))
+	fmt.Fprintf(b, "- %s\n", expand(i18n.Render.SinceGoLine, c.SinceGo))
+	if len(c.Tags) > 0 {
+		fmt.Fprintf(b, "- %s\n", expand(i18n.Render.TagsLine, strings.Join(c.Tags, ", ")))
+	}
+	b.WriteString("\n")
 	if details != "" {
 		fmt.Fprintf(b, "%s\n\n", details)
 	}
@@ -194,6 +198,14 @@ func chapterName(m *domain.Manual, i18n *domain.I18n, ci int) string {
 	return m.ToC[ci].Name
 }
 
+// tagDescription returns a tag's description in the requested language.
+func tagDescription(i18n *domain.I18n, t domain.Tag) string {
+	if d := i18n.Tags[t.ID]; d != "" {
+		return d
+	}
+	return t.Description
+}
+
 // sectionName returns a section's display name in the requested language.
 func sectionName(m *domain.Manual, i18n *domain.I18n, ci, si int) string {
 	s := m.ToC[ci].Sections[si]
@@ -231,6 +243,11 @@ func checkI18n(m *domain.Manual, i18n *domain.I18n, lang string) error {
 			if t.Sections[s.ID] == "" {
 				missing = append(missing, ch.ID+"/"+s.ID)
 			}
+		}
+	}
+	for _, t := range m.Tags {
+		if i18n.Tags[t.ID] == "" {
+			missing = append(missing, t.ID)
 		}
 	}
 	for _, c := range m.Clauses {

@@ -33,9 +33,12 @@ go install github.com/ForeverSRC/golang-dev-manual/gdm/cmd/gdm-cli@latest
 ```
 
 ```bash
-gdm-cli list --level MUST     # one line per clause
-gdm-cli explain NAMING-001    # details, examples, and references
-gdm-cli check ./some/package  # run the automatable checks
+gdm-cli list --level MUST          # one line per clause
+gdm-cli list --tag concurrency     # filter by cross-cutting theme
+gdm-cli search "slice capacity"    # search by topic, ranked by relevance
+gdm-cli tags                       # list the themes and what each one covers
+gdm-cli explain NAMING-001         # details, examples, and references
+gdm-cli check ./some/package       # run the automatable checks
 ```
 
 The clause data is embedded in the binary, so the installed `gdm-cli` needs no checkout.
@@ -72,6 +75,20 @@ NAMING-001: Package names use lowercase words written together, without undersco
 NAMING-002: Identifiers do not use underscores to separate words.
 ```
 
+`gdm-cli search` scores every clause against the query across `summary`, `tags`, `details`, and `rationale`, and prints the hits by relevance. Query and clause text share one tokenizer: an ASCII run becomes whole words, and a Han run becomes adjacent character pairs.
+
+```console
+$ gdm-cli search "slice capacity" --lang en
+PERF-004: When the number of elements is known or can be estimated, specify the slice capacity with make.
+PERF-007: When keeping a small section of a large slice for a long time, use slices.Clone to cut the reference to the backing array.
+PERF-005: When the number of elements is known or can be estimated, pass a capacity hint to make(map).
+DATA-001: Declare empty slices with var to get a nil slice.
+```
+
+Beyond its category, a clause carries cross-cutting `tags`, possibly several, drawn from the vocabulary in `gdm/data/manual.json`. Tags are plain English ids, identical in both languages, and the `Tags` line of each clause in the manual comes from them.
+
+`gdm-cli tags` lists every theme with a one-line description, which is how another agent asks what themes exist and what each covers before choosing a value for `--tag` or `search`; add `--json` to get `[{"id","description"}]`.
+
 `gdm-cli explain` expands one or more clauses with details, examples, and references.
 
 ```console
@@ -106,17 +123,19 @@ Clauses without an automated check:
   [NAMING-001] golangci-lint stylecheck(ST1003) (Check the package name identifier)
 ```
 
-`gdm-cli list` also takes:
+`gdm-cli list` and `gdm-cli search` also take:
 
 - `--level`: filter by level, e.g. `MUST,SHOULD`.
 - `--category`: filter by category id, e.g. `programming-conventions` or `programming-conventions/naming`. An unknown value fails and lists every available id.
+- `--tag`: filter by cross-cutting theme, comma-separated, keeping the clauses that carry any of them, e.g. `concurrency,testing`. An unknown value fails and lists every available tag.
+- `--json`: print a single JSON document instead. `list` gives the clause fields, `search` adds `score` and `matched`, `check` gives `hits` and `uncovered`, and `tags` gives `id` and `description`.
 
 ## Repository layout
 
 - `manual/zh/`, `manual/en/` — the generated bilingual markdown manual. Committed, and read directly as the site source. Do not edit by hand.
 - `gdm/` — the Go tooling.
   - `gdm/data/` — the single source of truth. `gdm/data/data.go` embeds it into the `gdm-cli` and `gdm-gen` binaries.
-    - `gdm/data/manual.json` — version, Go baseline, table of contents.
+    - `gdm/data/manual.json` — version, Go baseline, tag vocabulary, table of contents.
     - `gdm/data/clauses/<chapter id>.json` — clauses, one file per chapter.
     - `gdm/data/i18n/<lang>/` — language overlays. Chinese is the source; other languages hang translations off it.
   - `gdm/cmd/gdm-cli` — the published CLI, layered as `internal/domain`, `internal/service`, `internal/repository`, `internal/adapter`, `internal/api`, `internal/server`, with wiring under `di/`.
@@ -134,6 +153,7 @@ Clauses without an automated check:
 | `level` | `MUST` / `SHOULD` / `MAY` |
 | `chapter` | Chapter id, must exist in `toc` |
 | `section` | Section id, optional; omitted means the whole chapter |
+| `tags` | Cross-cutting theme tags, values drawn from the `manual.json` vocabulary, optional |
 | `since_go` | Lowest Go version the clause can be applied with |
 | `summary` | One-line requirement, what `gdm-cli list` prints |
 | `details` | Scope and exceptions |

@@ -82,7 +82,48 @@ func TestFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, manual.Filter(tt.levels, tt.category))
+			assert.Equal(t, tt.want, manual.Filter(tt.levels, tt.category, nil))
+		})
+	}
+}
+
+func TestFilterByTag(t *testing.T) {
+	manual := &domain.Manual{
+		Clauses: []domain.Clause{
+			{ID: "A-001", Tags: []string{"naming", "comments"}},
+			{ID: "A-002", Tags: []string{"comments"}},
+			{ID: "B-001"},
+		},
+	}
+
+	tests := []struct {
+		name string
+		tags []string
+		want []domain.Clause
+	}{
+		{
+			name: "should keep the clauses carrying the given tag",
+			tags: []string{"naming"},
+			want: []domain.Clause{{ID: "A-001", Tags: []string{"naming", "comments"}}},
+		},
+		{
+			name: "should keep the clauses carrying any of several tags",
+			tags: []string{"naming", "comments"},
+			want: []domain.Clause{
+				{ID: "A-001", Tags: []string{"naming", "comments"}},
+				{ID: "A-002", Tags: []string{"comments"}},
+			},
+		},
+		{
+			name: "should drop the clauses without tags when filtering by tag",
+			tags: []string{"nope"},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, manual.Filter(nil, "", tt.tags))
 		})
 	}
 }

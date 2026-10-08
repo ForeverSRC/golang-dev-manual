@@ -13,8 +13,12 @@ import (
 type ManualService interface {
 	// Labels returns the CLI's field labels for the requested language.
 	Labels(ctx context.Context, lang string) (domain.I18nCli, error)
-	// List filters clauses by level and category, returning clause text in the requested language.
-	List(ctx context.Context, lang string, levels []string, category string) ([]domain.Clause, error)
+	// List filters clauses by level, category, and tags, returning clause text in the requested language.
+	List(ctx context.Context, lang string, levels []string, category string, tags []string) ([]ClauseView, error)
+	// Tags returns the tag vocabulary with each tag's description in the requested language.
+	Tags(ctx context.Context, lang string) ([]domain.Tag, error)
+	// Search scores the clauses against a query in the requested language, returning the hits in relevance order.
+	Search(ctx context.Context, lang, query string, levels []string, category string, tags []string) ([]SearchResult, error)
 	// Explain renders the clause with the given id in the requested language.
 	Explain(ctx context.Context, lang, id string) (ClauseView, error)
 	// Check runs the grep checks from the clauses against the Go files under root.

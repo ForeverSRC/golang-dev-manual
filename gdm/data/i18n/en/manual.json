@@ -73,6 +73,29 @@
       }
     }
   },
+  "tags": {
+    "api-design": "Interface abstraction, composition, and the contract exposed to callers",
+    "assertion": "Assertion style and test data",
+    "code-generation": "Conventions and tools for generated code",
+    "code-organization": "Element order within a file and import grouping",
+    "comments": "How comments and doc comments are written",
+    "concurrency": "Goroutine lifetime, channels, synchronization primitives, and struct copying",
+    "constants": "Constant and enum value generation",
+    "context": "context as a parameter, and logging with a Context",
+    "control-flow": "Early returns for errors and edge cases",
+    "data-structures": "How slices, maps, and structs are written",
+    "dependency-injection": "Wire assembly and constructor injection",
+    "error-handling": "Error wrapping, matching, and handling an error only once",
+    "layering": "Dependency direction, interface placement, and project layout",
+    "logging": "slog usage and log fields",
+    "mock": "Mock generation and test doubles",
+    "modernization": "any, slices/maps, loop variables, and go fix",
+    "naming": "Package, identifier, and import naming",
+    "performance": "Capacity preallocation, string concatenation, and slice cloning",
+    "security": "SQL, command execution, paths, randomness, TLS, and credential comparison",
+    "testing": "Test organization, testify and testifylint rules, and benchmarks",
+    "tooling": "golangci-lint configuration, dependency management, and command-line tools"
+  },
   "manual": {
     "title": "Golang Development Manual",
     "intro": "A personal Golang development manual. Clauses are graded MUST / SHOULD / MAY; the table of contents and the clauses share a single source in `gdm/data/`.",
@@ -99,6 +122,7 @@
     "sources": "References",
     "category_line": "Category: {v}",
     "since_go_line": "Since: Go {v}",
+    "tags_line": "Tags: {v}",
     "detect_line": "**Detection**: {v}",
     "quote_mark": "—",
     "detect_grep": "grep regex {v}",

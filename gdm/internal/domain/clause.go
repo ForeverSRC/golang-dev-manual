@@ -1,7 +1,10 @@
 // Package domain defines the manual's domain models and domain methods, with no IO.
 package domain
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Level is a clause's requirement level.
 type Level string
@@ -30,6 +33,12 @@ func (l Level) Rank() int {
 type Section struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// Tag is one cross-cutting theme in the manual's controlled vocabulary. ID is a language-independent ASCII identifier.
+type Tag struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
 }
 
 // Chapter is one part of the manual table of contents and its sections. ID is a language-independent ASCII identifier used to derive file names.
@@ -74,6 +83,7 @@ type Clause struct {
 	Level     Level    `json:"level"`
 	Chapter   string   `json:"chapter"`
 	Section   string   `json:"section,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
 	SinceGo   string   `json:"since_go"`
 	Summary   string   `json:"summary"`
 	Details   string   `json:"details"`
@@ -88,6 +98,7 @@ type Clause struct {
 type Manual struct {
 	Version    string    `json:"version"`
 	GoBaseline string    `json:"go_baseline"`
+	Tags       []Tag     `json:"tags,omitempty"`
 	ToC        []Chapter `json:"toc"`
 	Clauses    []Clause  `json:"clauses"`
 }
@@ -146,6 +157,7 @@ type I18nRender struct {
 	Sources      string `json:"sources"`
 	CategoryLine string `json:"category_line"`
 	SinceGoLine  string `json:"since_go_line"`
+	TagsLine     string `json:"tags_line"`
 	DetectLine   string `json:"detect_line"`
 	QuoteMark    string `json:"quote_mark"`
 	DetectGrep   string `json:"detect_grep"`
@@ -170,10 +182,11 @@ type I18nCli struct {
 	Uncovered  string `json:"uncovered"`
 }
 
-// I18n is the render overlay for one language. ToC and Clauses are only needed for non-source languages, falling back to the source language when missing.
+// I18n is the render overlay for one language. ToC, Clauses, and Tags are only needed for non-source languages, falling back to the source language when missing.
 type I18n struct {
 	ToC      map[string]I18nChapter `json:"toc,omitempty"`
 	Clauses  map[string]I18nClause  `json:"clauses,omitempty"`
+	Tags     map[string]string      `json:"tags,omitempty"`
 	Manual   I18nManual             `json:"manual"`
 	Appendix I18nAppendix           `json:"appendix"`
 	Render   I18nRender             `json:"render"`
@@ -198,6 +211,15 @@ func (m *Manual) ByID(id string) (Clause, bool) {
 	return Clause{}, false
 }
 
+// TagIDs lists every valid tag id in the vocabulary.
+func (m *Manual) TagIDs() []string {
+	ids := make([]string, 0, len(m.Tags))
+	for _, t := range m.Tags {
+		ids = append(ids, t.ID)
+	}
+	return ids
+}
+
 // CategoryIDs lists every valid category id: each chapter id and, for chapters with sections, each "chapter/section" id.
 func (m *Manual) CategoryIDs() []string {
 	ids := make([]string, 0, len(m.ToC))
@@ -210,12 +232,17 @@ func (m *Manual) CategoryIDs() []string {
 	return ids
 }
 
-// Filter filters clauses by level and category; an empty condition means no filtering.
+// Filter filters clauses by level, category, and tags; an empty condition means no filtering.
 // category accepts either a chapter id or a two-level "chapter/section" id.
-func (m *Manual) Filter(levels []string, category string) []Clause {
+// tags keep a clause that carries any of the given tags.
+func (m *Manual) Filter(levels []string, category string, tags []string) []Clause {
 	wanted := make(map[string]bool, len(levels))
 	for _, l := range levels {
 		wanted[strings.ToUpper(strings.TrimSpace(l))] = true
+	}
+	wantedTags := make(map[string]bool, len(tags))
+	for _, t := range tags {
+		wantedTags[t] = true
 	}
 	var result []Clause
 	for _, c := range m.Clauses {
@@ -223,6 +250,9 @@ func (m *Manual) Filter(levels []string, category string) []Clause {
 			continue
 		}
 		if category != "" && c.Chapter != category && c.CategoryID() != category {
+			continue
+		}
+		if len(wantedTags) > 0 && !slices.ContainsFunc(c.Tags, func(t string) bool { return wantedTags[t] }) {
 			continue
 		}
 		result = append(result, c)

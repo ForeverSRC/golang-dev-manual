@@ -27,3 +27,10 @@ type CheckReport struct {
 	Hits      []GrepHit
 	Uncovered []ClauseView
 }
+
+// SearchResult is one clause matched by a search, with its relevance score and the terms behind it.
+type SearchResult struct {
+	ClauseView
+	Score   int
+	Matched []domain.Match
+}

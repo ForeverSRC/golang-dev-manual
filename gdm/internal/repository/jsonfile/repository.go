@@ -50,7 +50,7 @@ func (r *Repository) Load(_ context.Context) (*domain.Manual, error) {
 }
 
 // validate checks the data's internal references: ids are unique inside the table of contents and across the clauses,
-// and every clause points at a chapter and a section that exist.
+// every clause points at a chapter and a section that exist, and the clause tags stay within the vocabulary.
 func validate(manual *domain.Manual) error {
 	sections := make(map[string]map[string]bool, len(manual.ToC))
 	for _, ch := range manual.ToC {
@@ -67,6 +67,11 @@ func validate(manual *domain.Manual) error {
 		sections[ch.ID] = own
 	}
 
+	vocabulary := make(map[string]bool, len(manual.Tags))
+	for _, t := range manual.Tags {
+		vocabulary[t.ID] = true
+	}
+	used := make(map[string]bool, len(vocabulary))
 	clauseIDs := make(map[string]bool, len(manual.Clauses))
 
 	for _, c := range manual.Clauses {
@@ -81,6 +86,22 @@ func validate(manual *domain.Manual) error {
 		}
 		if c.Section != "" && !own[c.Section] {
 			return fmt.Errorf("clause %s references unknown section %s in chapter %s", c.ID, c.Section, c.Chapter)
+		}
+		seen := make(map[string]bool, len(c.Tags))
+		for _, t := range c.Tags {
+			if !vocabulary[t] {
+				return fmt.Errorf("clause %s references unknown tag %s", c.ID, t)
+			}
+			if seen[t] {
+				return fmt.Errorf("duplicate tag %s in clause %s", t, c.ID)
+			}
+			seen[t] = true
+			used[t] = true
+		}
+	}
+	for _, t := range manual.Tags {
+		if !used[t.ID] {
+			return fmt.Errorf("tag %s is not used by any clause", t.ID)
 		}
 	}
 	return nil
