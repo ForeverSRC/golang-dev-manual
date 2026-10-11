@@ -3,7 +3,7 @@ name: gdm-workflows
 description: 用 gdm-cli 按 Golang 开发手册的条款核对代码、按主题检索条款、展开某条 Go 规约。当需要按级别或主题拉取 Go 条款清单、按主题搜索条款、展开某条规约的正反例，或对 Go 代码做手册级 review 时触发。
 allowed-tools:
   - Bash
-version: 0.1.0
+version: 0.2.0
 ---
 
 # gdm-cli 工作流
@@ -36,11 +36,7 @@ go install github.com/ForeverSRC/golang-dev-manual/gdm/cmd/gdm-cli@latest
 
 ## review 流程
 
-1. 先缩小候选：先跑 `gdm-cli tags` 看清有哪些主题，再按改动主题取 `--tag`（如并发改动用 `--tag concurrency`），或用 `search <改动里的关键词>` 搜出相关条款，拿到编号与一句话。
-2. 需要强制条款时补 `--level MUST`，对当前改动逐条核对，命中疑点的记下编号。
-3. 只对疑点编号调 `explain`，展开详情与正反例。
-4. 需要机器检测时调 `check <改动目录> --verbose`，按命中项定位。
-5. 报告问题时给出编号与条款一句话，便于回到手册查证。
+对当前改动做手册级 review 时，按 [references/review-workflow.md](references/review-workflow.md) 的分步命令执行：先缩小候选条款，逐条核对后只展开疑点，需要时机器检测。
 
 ## 纪律
 
