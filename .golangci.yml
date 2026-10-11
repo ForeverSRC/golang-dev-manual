@@ -21,6 +21,10 @@ linters:
     - modernize
     - testpackage
     - funcorder
+    - predeclared
+    - forcetypeassert
+    # predeclared detects NAMING-011 (identifiers shadowing predeclared names);
+    # forcetypeassert detects DATA-003 (single-value type assertions).
     # revive is enabled only for its argument-limit and function-result-limit rules
     # (see the settings below). Listing rules there means the default rule set is not
     # loaded, so its comment rules (exported, package-comments) stay off, consistent

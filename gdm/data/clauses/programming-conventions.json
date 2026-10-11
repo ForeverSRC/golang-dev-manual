@@ -644,5 +644,968 @@
       "tool": "golangci-lint",
       "rule": "copyloopvar"
     }
+  },
+  {
+    "id": "NAMING-007",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "naming",
+    "tags": [
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "布尔谓词方法用 Is、Has、Can 等前缀命名。",
+    "details": "返回 bool 的方法按语义选前缀，让名字读成真假问句。\n\n- 状态判定用 Is：IsHealthy、IsEmpty\n- 持有判定用 Has：HasExpired、HasPrefix\n- 能力判定用 Can：CanRetry、CanClose\n- 标准库既有的非前缀谓词（如 `strings.Contains`）按原惯例保留",
+    "quote": {
+      "text": "it's neither idiomatic nor necessary to put Get into the getter's name",
+      "source": "https://go.dev/doc/effective_go#Getters"
+    },
+    "rationale": "标准库对命名方法的立场是让名字直接表达语义，谓词类方法同理：IsConnected 把调用处读成一个真假问句，而裸形容词 Connected 分不清「已连接」与「连接」，读者必须回查类型才能确认它是否为布尔值。",
+    "examples": {
+      "good": "func (s *Server) IsHealthy() bool { return s.err == nil }",
+      "bad": "func (s *Server) Healthy() bool { return s.err == nil }"
+    },
+    "sources": [
+      "https://go.dev/doc/effective_go#Getters"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对返回 bool 的方法是否带谓词前缀"
+    }
+  },
+  {
+    "id": "NAMING-008",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "naming",
+    "tags": [
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "布尔变量与结构体字段用 Is、Has、Can 前缀命名。",
+    "details": "bool 类型的变量与字段用系动词前缀表达判断语义。\n\n- IsConnected、HasCache、CanRetry\n- 不用裸形容词或名词：Connected、Cache、Retry\n- 临时布尔变量同样适用：isValid、hasMore",
+    "quote": {
+      "text": "it's neither idiomatic nor necessary to put Get into the getter's name",
+      "source": "https://go.dev/doc/effective_go#Getters"
+    },
+    "rationale": "裸形容词与对象名混淆：cfg.Cache 既可能是「缓存配置」也可能是「启用缓存」的布尔值；加 Is/Has/Can 后类型语义在名字里自明，读 if 条件时不再需要跳转到定义确认类型。",
+    "examples": {
+      "good": "type Config struct { IsVerbose bool }",
+      "bad": "type Config struct { Verbose bool }"
+    },
+    "sources": [
+      "https://go.dev/doc/effective_go#Getters"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 bool 类型字段与变量的命名前缀"
+    }
+  },
+  {
+    "id": "NAMING-009",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "naming",
+    "tags": [
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "单方法接口名用方法名加 er 后缀。",
+    "details": "单方法接口按「方法名 + er」构成行为者名词。\n\n- Reader、Writer、Closer、Stringer、CloseNotifier\n- 多方法接口才用具象领域名词：Conn、Pool、Store\n- 方法名不便加 er 时允许相近变体，如 Recognize 对应 Recognizer",
+    "quote": {
+      "text": "By convention, one-method interfaces are named by the method name plus an -er suffix or similar modification to construct an agent noun: Reader, Writer, Formatter, CloseNotifier.",
+      "source": "https://go.dev/wiki/CodeReviewComments#interface-names"
+    },
+    "rationale": "er 后缀让接口名与它唯一的方法形成直接对应，读者看到名字即知契约；标准库全部遵循该惯例，偏离它会让同族接口出现两套命名风格。",
+    "examples": {
+      "good": "type Reader interface { Read(p []byte) (n int, err error) }",
+      "bad": "type DataFetcher interface { Read(p []byte) (n int, err error) }"
+    },
+    "sources": [
+      "https://go.dev/wiki/CodeReviewComments#interface-names"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对单方法接口类型名与方法名的对应"
+    }
+  },
+  {
+    "id": "NAMING-010",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "naming",
+    "tags": [
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "变体函数用 Must、f、WithContext 等固定标记命名。",
+    "details": "同一功能的变体函数靠固定前后缀区分行为差异。\n\n- Must 前缀：失败即 panic，如 `regexp.MustCompile`\n- f 后缀：接受格式串与可变参数，如 `errors.Errorf`\n- WithContext 后缀：携带 context 的版本，如 `http.NewRequestWithContext`\n- 命名标记与标准库保持一致，不自造变体",
+    "quote": {
+      "text": "MustCompile is like Compile but panics if the expression cannot be parsed. It simplifies safe initialization of global variables holding compiled regular expressions.",
+      "source": "https://pkg.go.dev/regexp#MustCompile"
+    },
+    "rationale": "调用方在 code review 与 IDE 提示里往往只看函数名不看签名，Must 前缀告知「这里会 panic」、f 后缀告知「参数是格式串」、WithContext 告知「取消随 ctx 传播」；变体行为若不进名字，误用只能靠读实现发现。",
+    "examples": {
+      "good": "var re = regexp.MustCompile(`^v\\d+$`)",
+      "bad": "func MustParseTime(s string) time.Time { t, _ := time.Parse(time.RFC3339, s); return t }"
+    },
+    "sources": [
+      "https://pkg.go.dev/regexp#MustCompile"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对同族变体函数的命名标记是否与标准库一致"
+    }
+  },
+  {
+    "id": "NAMING-011",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "naming",
+    "tags": [
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "标识符不遮蔽 len、cap、error、min 等预声明名。",
+    "details": "局部变量、参数与字段不使用预声明标识符的名字。\n\n- 预声明名包括 len、cap、new、make、min、max、clear、error、any 等\n- 误用被遮蔽的名字不产生编译错误，语义静默改变\n- 确需同名时（如代码生成）需在评审中说明",
+    "quote": {
+      "text": "The following identifiers are implicitly declared in the universe block:",
+      "source": "https://go.dev/ref/spec#Predeclared_identifiers"
+    },
+    "rationale": "预声明标识符属于所有作用域的兜底名字，局部遮蔽后 min(x, y) 变成调用用户函数、error 变成局部变量，这类覆盖没有编译提示，只表现为行为异常；predeclared 检查器把它变成可机检项。",
+    "examples": {
+      "good": "func dedup(items []int) []int { maxSeen := 0; _ = maxSeen; return items }",
+      "bad": "func dedup(items []int) []int { max := 0; _ = max; return items }"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#Predeclared_identifiers"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "predeclared"
+    }
+  },
+  {
+    "id": "CONST-004",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "constants",
+    "tags": [
+      "constants",
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "iota 枚举零值留 Unknown 哨兵或从 iota+1 起步。",
+    "details": "枚举类型的零值不承载业务含义。\n\n- 首个成员定义 StatusUnknown，或首个业务成员从 iota+1 起步\n- 零值作为「未初始化/无效」哨兵，序列化与校验时把它与业务状态区分开\n- 例外：零值有明确业务语义的类型（如 GenderMale 为 0）可保留，需在评审中确认",
+    "quote": {
+      "text": "Within a const declaration a name not explicitly initialized is implicitly initialized to iota, which is the line number of the corresponding ConstSpec.",
+      "source": "https://go.dev/ref/spec#Iota"
+    },
+    "rationale": "var s Status 的零值静默等于首个 const 成员，未初始化的字段被当成第一个业务状态通过校验，排障时无法区分「默认值」与「真实状态」；把零值留给 Unknown 后，未初始化的状态在校验处显式暴露。",
+    "examples": {
+      "good": "type Status int\nconst (\n  StatusUnknown Status = iota\n  StatusActive\n  StatusClosed\n)",
+      "bad": "type Status int\nconst (\n  StatusActive Status = iota\n  StatusClosed\n)"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#Iota"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 iota 枚举首个成员是否占用零值"
+    }
+  },
+  {
+    "id": "DATA-003",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "data-structures",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "类型断言用 comma-ok 形式，不用单值形式。",
+    "details": "断言结果可能不是期望类型时必须取 ok 值分支处理。\n\n- 用 `v, ok := x.(T)`，按 ok 分支处理\n- 单值形式 `v := x.(T)` 仅限断言失败即属程序错误的场景，且需注释说明\n- 类型 switch 不受本条约束",
+    "quote": {
+      "text": "If it does not hold, a run-time panic occurs.",
+      "source": "https://go.dev/ref/spec#Type_assertions"
+    },
+    "rationale": "单值断言在类型不匹配时直接 panic，把「值不是这个类型」这一可预期分支变成进程崩溃；comma-ok 把判定权留给代码，调用方可以走降级或报错路径。",
+    "examples": {
+      "good": "v, ok := x.(string)\nif !ok {\n  return fmt.Errorf(\"unexpected type %T\", x)\n}",
+      "bad": "v := x.(string)"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#Type_assertions"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "forcetypeassert"
+    }
+  },
+  {
+    "id": "DATA-004",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "data-structures",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "nil map 初始化后再写入。",
+    "details": "写入 map 前确认它已通过 make 或字面量初始化。\n\n- 读取 nil map 合法，返回零值\n- 写入 nil map 直接 panic\n- 结构体字段的 map 可在构造函数或方法内惰性初始化，使零值可用",
+    "quote": {
+      "text": "A nil map is equivalent to an empty map except no elements may be added.",
+      "source": "https://go.dev/blog/maps"
+    },
+    "rationale": "`var m map[string]int` 的零值可读不可写，写入路径一旦到达就 panic，且编译期无任何提示；先初始化或让类型的零值可用，二选一写清楚。",
+    "examples": {
+      "good": "m := make(map[string]int)\nm[\"k\"] = 1",
+      "bad": "var m map[string]int\nm[\"k\"] = 1"
+    },
+    "sources": [
+      "https://go.dev/blog/maps"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 map 的写入路径是否发生在已初始化的 map 上"
+    }
+  },
+  {
+    "id": "DATA-005",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "data-structures",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "不依赖 map 遍历顺序，需确定序先排序 key。",
+    "details": "range map 的输出顺序不构成任何契约。\n\n- 需要稳定输出的序列化、比对、展示场景先对 key 排序\n- 依赖顺序的逻辑在 CI 与生产都可能间歇性失败\n- Go 运行时对 map 遍历做随机化，属语言保证而非实现细节",
+    "quote": {
+      "text": "The iteration order over maps is not specified and is not guaranteed to be the same from one iteration to the next.",
+      "source": "https://go.dev/ref/spec#For_range"
+    },
+    "rationale": "语言规范明确不保证遍历顺序，依赖顺序的代码在同一进程两次运行结果都可能不同，测试通过只是随机性恰好 favor 它；需要确定性时显式排序才构成契约。",
+    "examples": {
+      "good": "keys := slices.Sorted(maps.Keys(m))\nfor _, k := range keys {\n  fmt.Println(k, m[k])\n}",
+      "bad": "for k, v := range m {\n  fmt.Println(k, v)\n}"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#For_range"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 range map 之后的输出与比对逻辑是否依赖顺序"
+    }
+  },
+  {
+    "id": "DATA-006",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "data-structures",
+    "tags": [
+      "data-structures",
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "窄化整型转换前检查数值范围。",
+    "details": "int64 到 int32、uint 到 int 等缩窄转换需显式校验。\n\n- 校验值落在目标类型可表示范围内后再转换\n- 转换值来自外部输入时必查（`gosec G115` 覆盖的场景）\n- 高位信息明确无意义的位运算场景可豁免并注释",
+    "quote": {
+      "text": "When converting between integer types, if the value is a signed integer, it is sign extended to infinite precision and then truncated to fit in the result type's size; if the value is an unsigned integer, it is zero-extended and then truncated to fit in the result type's size.",
+      "source": "https://go.dev/ref/spec#Conversions_to_and_from_integer_string_types"
+    },
+    "rationale": "缩窄转换静默截断回绕，30 亿的 int64 转 int32 变成负数且无任何报错；外部输入驱动这类转换时，截断结果直接变成业务错误或安全漏洞。",
+    "examples": {
+      "good": "if v > math.MaxInt32 {\n  return fmt.Errorf(\"value %d overflows int32\", v)\n}\nn := int32(v)",
+      "bad": "n := int32(v)"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#Conversions_to_and_from_integer_string_types"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "gosec(G115)"
+    }
+  },
+  {
+    "id": "DATA-007",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "data-structures",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "依赖 JSON 序列化的结构体字段必须导出。",
+    "details": "需要出现在 JSON 中的字段用导出标识符，未导出字段一律静默忽略。\n\n- 未导出字段无法被 `encoding/json` 编码与解码\n- 携带 key 映射时配 field tag（见 STRUCT-004）\n- 解析到 `interface{}` 的数字一律是 `float64`，大整数经 `json.Number` 或类型化结构体承接",
+    "quote": {
+      "text": "Unmarshal matches incoming object keys to the keys used by Marshal (either the struct field name or its tag), preferring an exact match but also accepting a case-insensitive match.",
+      "source": "https://pkg.go.dev/encoding/json#Unmarshal"
+    },
+    "rationale": "未导出字段对 encoding/json 不可访问，线上 JSON 悄悄缺字段而本地测试若从未校验契约就发现不了；导出并打 tag 让契约显式落在结构体定义处。",
+    "examples": {
+      "good": "type User struct {\n  Name string `json:\"name\"`\n}",
+      "bad": "type User struct {\n  name string `json:\"name\"`\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/encoding/json#Unmarshal"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "对照结构体字段与序列化契约，核对未导出字段"
+    }
+  },
+  {
+    "id": "STD-001",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "standard-library",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "time.Duration 不得与 time.Duration 相乘。",
+    "details": "Duration 参与运算时只允许与标量相乘。\n\n- 用 `d * n`（n 为整数）表达倍数\n- `d * d` 或 `d * (x * time.Second)` 都是量纲错误\n- 由变量构造 Duration 用 `time.Duration(n) * time.Second` 这类标量乘法",
+    "quote": {
+      "text": "A Duration represents the elapsed time between two instants as an int64 nanosecond count.",
+      "source": "https://pkg.go.dev/time#Duration"
+    },
+    "rationale": "`time.Duration` 的底层是纳秒数，两个 Duration 相乘得到「纳秒的平方」，与直觉相差多个数量级：`5 * time.Second * time.Second` 不是 25 秒而是 2.5 万亿纳秒；durationcheck 检查器把它变成可机检项。",
+    "examples": {
+      "good": "timeout := 5 * time.Second\nresult := timeout * attempts",
+      "bad": "timeout := 5 * time.Second * time.Second"
+    },
+    "sources": [
+      "https://pkg.go.dev/time#Duration"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "durationcheck"
+    }
+  },
+  {
+    "id": "STD-002",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "standard-library",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "time.Time 比较用 Equal，不用 ==。",
+    "details": "判断同一时刻用 Equal 或 Compare。\n\n- `==` 同时比较墙钟、时区与单调时钟读数\n- 解析自字符串、经网络传输的 time.Time 不带单调时钟，但混用来源时 `==` 不可靠\n- 零值判定用 `IsZero`，先后比较用 `Before`/`After`",
+    "quote": {
+      "text": "Equal reports whether t and u represent the same time instant. Two times can be equal even if they are in different locations.",
+      "source": "https://pkg.go.dev/time#Time.Equal"
+    },
+    "rationale": "time.Time 内部携带单调时钟读数，== 把读数差异也算进相等判定，同一墙钟时刻可能判为不等；Equal 只比较时间瞬间，语义与业务预期一致。",
+    "examples": {
+      "good": "if t1.Equal(t2) {\n  return true\n}",
+      "bad": "if t1 == t2 {\n  return true\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/time#Time.Equal"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 time.Time 的比较表达式"
+    }
+  },
+  {
+    "id": "STD-003",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "standard-library",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "去前后缀用 strings.TrimPrefix 与 TrimSuffix。",
+    "details": "按子串裁剪时不用 strings.Trim 系列函数。\n\n- `strings.TrimPrefix`/`strings.TrimSuffix` 精确去掉一次子串：`strings.TrimPrefix(s, \"api/\")`\n- `strings.Trim`/`TrimLeft`/`TrimRight` 的参数是字符集合，会反复去掉两端所有命中字符\n- 混用两者是常见过度裁剪来源",
+    "quote": {
+      "text": "Trim returns a slice of the string s with all leading and trailing Unicode code points contained in cutset removed.",
+      "source": "https://pkg.go.dev/strings#Trim"
+    },
+    "rationale": "Trim 的第二个参数是字符集合而非子串：strings.Trim(s, \"ab\") 会去掉两端所有 a 和 b 字符，与「去掉前缀 ab」的意图完全不同；字符集语义藏在函数名背后，误用只表现为偶发裁剪过头。",
+    "examples": {
+      "good": "path := strings.TrimPrefix(raw, \"/api/\")",
+      "bad": "path := strings.Trim(raw, \"/api/\")"
+    },
+    "sources": [
+      "https://pkg.go.dev/strings#Trim"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对字符串裁剪意图与所用 API 是否匹配"
+    }
+  },
+  {
+    "id": "FUNC-004",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "functions",
+    "tags": [
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "返回接口类型的 nil 分支显式 return nil。",
+    "details": "返回值类型是接口（含 error）时，不得返回有类型的 nil 指针变量。\n\n- 确无错误直接 return nil\n- 需要返回具体错误类型时，构造后判空再决定返回值\n- 适用一切接口返回值，error 是最高频场景",
+    "quote": {
+      "text": "If we store a nil pointer of type *int inside an interface value, the inner type will be *int regardless of the value of the pointer: (*int)(nil). Thus, the interface value will be non-nil even when the pointer value is inside.",
+      "source": "https://go.dev/doc/faq#nil_error"
+    },
+    "rationale": "接口值携带 (类型, 值) 二元组，typed nil 指针装入后接口非 nil，调用方 err != nil 判定成立、进入错误分支，解引用 nil 字段时 panic；显式 return nil 从根上避免这个判定陷阱。",
+    "examples": {
+      "good": "func validate(c Config) error {\n  if c.Host == \"\" {\n    return ErrMissingHost\n  }\n  return nil\n}",
+      "bad": "func validate(c Config) error {\n  var vErr *ValidationError\n  if c.Host == \"\" {\n    vErr = &ValidationError{Field: \"host\"}\n  }\n  return vErr\n}"
+    },
+    "sources": [
+      "https://go.dev/doc/faq#nil_error"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对返回接口类型的函数中 nil 分支的写法"
+    }
+  },
+  {
+    "id": "CTRL-003",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "control-flow",
+    "tags": [
+      "control-flow",
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "循环体内不得 defer 资源释放。",
+    "details": "defer 绑定函数而非循环迭代。\n\n- 循环内打开的资源在当次迭代内用完即关，或把循环体抽成函数\n- 长循环内 defer 会在函数返回时一次性释放，文件描述符与连接累积耗尽\n- 需要「循环结束统一清理」时用显式收集再统一关闭",
+    "quote": {
+      "text": "The deferred call's arguments are evaluated immediately, but the function call is not executed until the surrounding function returns.",
+      "source": "https://go.dev/doc/effective_go#defer"
+    },
+    "rationale": "defer 的执行时机是所在函数返回，循环一千次就推迟一千次释放，句柄在函数存活期内只增不减；服务器进程在长循环场景下表现为 fd 用尽、连接池占死。",
+    "examples": {
+      "good": "for _, name := range names {\n  func() {\n    f, err := os.Open(name)\n    if err != nil {\n      return\n    }\n    defer f.Close()\n    process(f)\n  }()\n}",
+      "bad": "for _, name := range names {\n  f, err := os.Open(name)\n  if err != nil {\n    return\n  }\n  defer f.Close()\n  process(f)\n}"
+    },
+    "sources": [
+      "https://go.dev/doc/effective_go#defer"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "grep for 循环体内的 defer 语句"
+    }
+  },
+  {
+    "id": "CTRL-004",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "control-flow",
+    "tags": [
+      "control-flow",
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "HTTP handler 写出错误响应后立即 return。",
+    "details": "http.Error 或 w.Write 之后不得继续执行业务逻辑。\n\n- 错误分支写响应后必须 return，避免二次写响应\n- 继续执行的代码可能再次 `WriteHeader`，触发 superfluous WriteHeader 警告\n- 中间件改写响应的场景同样适用",
+    "quote": {
+      "text": "Changing the header map after a call to WriteHeader (or Write) has no effect.",
+      "source": "https://pkg.go.dev/net/http#ResponseWriter"
+    },
+    "rationale": "写出响应后再执行的代码或者二次 WriteHeader（响应头已发出，改动无效并打日志），或者把本该保密的错误细节写进响应体；立即 return 让错误分支封闭。",
+    "examples": {
+      "good": "if err := parse(r); err != nil {\n  http.Error(w, \"bad request\", http.StatusBadRequest)\n  return\n}",
+      "bad": "if err := parse(r); err != nil {\n  http.Error(w, \"bad request\", http.StatusBadRequest)\n}\nprocess(r)"
+    },
+    "sources": [
+      "https://pkg.go.dev/net/http#ResponseWriter"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 handler 内 http.Error/w.Write 之后是否 return"
+    }
+  },
+  {
+    "id": "CTRL-005",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "control-flow",
+    "tags": [
+      "control-flow",
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "内层作用域不用 := 遮蔽外层 err。",
+    "details": "错误变量跨作用域时保持同一个标识符。\n\n- `if v, err := f(); err != nil` 的 err 与外层 err 无关，赋值不会带到外层\n- 需要把内层结果带出作用域时先声明再赋值\n- shadow 检查器需显式开启，误报场景用 nolint 注明",
+    "quote": {
+      "text": "check for shadowed variables",
+      "source": "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/shadow"
+    },
+    "rationale": ":= 在新作用域声明新变量，if 语句里的 err 是全新变量，检查它之后外层 err 仍是 nil，错误处理被静默架空；这类缺陷在编译期与运行期都不报错，只有评审或 shadow 检查能拦住。",
+    "examples": {
+      "good": "var err error\nfor _, p := range paths {\n  data, err := os.ReadFile(p)\n  if err != nil {\n    return err\n  }\n  _ = data\n}\nreturn err",
+      "bad": "var err error\nfor _, p := range paths {\n  data, err := os.ReadFile(p)\n  if err != nil {\n    return err\n  }\n  _ = data\n}\nreturn nil"
+    },
+    "sources": [
+      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/shadow"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "govet(shadow)"
+    }
+  },
+  {
+    "id": "CONC-005",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "函数签名中的 channel 参数标注单向类型。",
+    "details": "按参数实际用途选用 chan<- 或 <-chan。\n\n- 只发送的参数用 `chan<- T`，只接收的用 `<-chan T`\n- 单向约束在编译期拦截误发送与误关闭\n- 返回值与结构体字段按同样口径",
+    "quote": {
+      "text": "The optional <- operator specifies the channel direction, send or receive. If a direction is given, the channel is directional, otherwise it is bidirectional.",
+      "source": "https://go.dev/ref/spec#Channel_types"
+    },
+    "rationale": "双向 chan T 对误发送与误关闭没有任何编译期约束，误关闭生产者的 channel 会让消费方 panic；单向类型把使用边界写进签名，误用直接编译失败。",
+    "examples": {
+      "good": "func consume(in <-chan int) { for v := range in { process(v) } }",
+      "bad": "func consume(in chan int) { for v := range in { process(v) } }"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#Channel_types"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对公开函数的 channel 参数方向"
+    }
+  },
+  {
+    "id": "CONC-006",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "缓冲 channel 容量大于 1 时注释容量依据与写满行为。",
+    "details": "缓冲容量是并发设计决策，不是随意数字。\n\n- 默认无缓冲；缓冲大于 1 须注释容量依据与写满时的行为（阻塞、丢弃还是降级）\n- 大缓冲掩盖背压问题，堆积的任务无界增长\n- 生产者消费者速率对齐的设计说明写在 make 语句旁",
+    "quote": {
+      "text": "Channels should usually be size one or give an unbuffered implementation. A channel size of zero or one is sufficient in most scenarios.",
+      "source": "https://github.com/uber-go/guide/blob/master/style.md#channel-size"
+    },
+    "rationale": "无缓冲 channel 天然提供背压，写满的缓冲 channel 把「生产过快」的信号推迟到堆积之后；没有注释的容量值无法区分「有意为之」与「随手写的」，评审无从判断写满后的行为是否安全。",
+    "examples": {
+      "good": "// 容量 64 对齐下游批处理批次；写满时生产端阻塞，保证背压\njobs := make(chan Job, 64)",
+      "bad": "jobs := make(chan Job, 1000)"
+    },
+    "sources": [
+      "https://github.com/uber-go/guide/blob/master/style.md#channel-size"
+    ],
+    "detect": {
+      "tool": "grep",
+      "pattern": "make\\(chan[^)]*,\\s*([^)1][^)]*)\\)"
+    }
+  },
+  {
+    "id": "CONC-007",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency",
+      "context"
+    ],
+    "since_go": "1.7",
+    "summary": "可取消路径上的 select 必须包含 ctx.Done() 分支。",
+    "details": "长驻 goroutine 的 select 循环要有取消出口。\n\n- select 的 case 集合里放 `ctx.Done()`，收到取消后退出\n- 只有一次性、确定会结束的 select 可省略\n- 缺失取消分支的 goroutine 在服务停止时无法退出",
+    "quote": {
+      "text": "Done returns a channel that's closed when work done on behalf of this context should be canceled. Done is provided for use in select statements",
+      "source": "https://pkg.go.dev/context#Context.Done"
+    },
+    "rationale": "select 阻塞在多个 channel 上，取消信号若不在 case 集合里，调用方 cancel 后该 goroutine 仍然阻塞，服务优雅停机时这些 goroutine 全部泄漏。",
+    "examples": {
+      "good": "for {\n  select {\n  case <-ctx.Done():\n    return\n  case v := <-in:\n    process(v)\n  }\n}",
+      "bad": "for {\n  select {\n  case v := <-in:\n    process(v)\n  }\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/context#Context.Done"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对长驻 goroutine 的 select 分支集合"
+    }
+  },
+  {
+    "id": "CONC-008",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "for 循环内的 select 不得用 default 制造忙等。",
+    "details": "循环内 select 的 default 分支会让循环空转。\n\n- 需要等待数据时去掉 `default`，让 select 阻塞\n- 需要非阻塞轮询时在 `default` 分支 sleep 或退避\n- 接收方发现 channel 关闭后将其置 nil，退出多路复用",
+    "quote": {
+      "text": "Execution of a \"select\" statement proceeds in several steps: ... If multiple cases can proceed, a uniform pseudo-random choice is made",
+      "source": "https://go.dev/ref/spec#Select_statements"
+    },
+    "rationale": "`for { select { default: } }` 在没有 case 就绪时立即重试，这个空转循环会一直占用一个 CPU 核；被关闭的 channel 永远就绪，混进 select 后同样占用 CPU，把 channel 置 nil 是标准的退出方法。",
+    "examples": {
+      "good": "for {\n  select {\n  case <-ctx.Done():\n    return\n  case v, ok := <-in:\n    if !ok {\n      in = nil\n      continue\n    }\n    process(v)\n  }\n}",
+      "bad": "for {\n  select {\n  case v := <-in:\n    process(v)\n  default:\n  }\n}"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#Select_statements"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对循环内 select 的 default 分支"
+    }
+  },
+  {
+    "id": "CONC-009",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "循环内周期触发用 time.NewTicker 加 Stop。",
+    "details": "需要停止的周期任务不用 time.After 与 time.Tick。\n\n- 循环内每次 `time.After` 新建定时器，旧计时器触发前不可回收\n- `time.Tick` 的 ticker 无法停止，永久泄漏\n- 用 `ticker := time.NewTicker(d)` 加 `defer ticker.Stop()`",
+    "quote": {
+      "text": "While Tick is useful for clients that have no need to shut down the Ticker, be aware that without a way to shut it down the underlying Ticker can never be recovered by the garbage collector; it \"leaks\".",
+      "source": "https://pkg.go.dev/time#Tick"
+    },
+    "rationale": "time.After 在循环里每轮分配一个新定时器，触发前 GC 无法回收，长循环表现为内存与定时器堆积；官方文档对 time.Tick 直接标注 leak，需要停止语义时只有 NewTicker + Stop 一条路。",
+    "examples": {
+      "good": "ticker := time.NewTicker(interval)\ndefer ticker.Stop()\nfor {\n  select {\n  case <-ticker.C:\n    tick()\n  case <-ctx.Done():\n    return\n  }\n}",
+      "bad": "for {\n  select {\n  case <-time.After(interval):\n    tick()\n  case <-ctx.Done():\n    return\n  }\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/time#Tick"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对循环体内的 time.After 与 time.Tick"
+    }
+  },
+  {
+    "id": "CONC-010",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.25",
+    "summary": "wg 并发等待用 wg.Go，手工 Add 必须在 go 语句之前。",
+    "details": "Go 1.25+ 优先用 wg.Go(f) 替代手工 Add/go/Done 配对。\n\n- `wg.Go(f)` 把 Add、goroutine 启动与 Done 封装成一步，消除配对错误\n- 手工使用时 `wg.Add(1)` 必须写在 go 语句之前，写在协程内会与 Wait 竞争\n- 需要收集每个任务的 error 时用 `errgroup`；Go 1.25 以下仍手工配对",
+    "quote": {
+      "text": "Go calls the given function in a new goroutine. It blocks until all goroutines have exited.",
+      "source": "https://pkg.go.dev/sync#WaitGroup.Go"
+    },
+    "rationale": "Add 写在协程内时，主 goroutine 的 Wait 可能在 Add 执行前就通过计数为零的检查提前返回，等待形同虚设；wg.Go 由标准库保证配对时序，从根上消除这类间歇性竞态。",
+    "examples": {
+      "good": "var wg sync.WaitGroup\nfor _, t := range tasks {\n  wg.Go(func() { handle(t) })\n}\nwg.Wait()",
+      "bad": "var wg sync.WaitGroup\nfor _, t := range tasks {\n  go func() {\n    wg.Add(1)\n    defer wg.Done()\n    handle(t)\n  }()\n}\nwg.Wait()"
+    },
+    "sources": [
+      "https://pkg.go.dev/sync#WaitGroup.Go",
+      "https://go.dev/doc/go1.25"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 wg.Add 与 go 语句的相对位置"
+    }
+  },
+  {
+    "id": "CONC-011",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "临界区内不执行 I/O、网络调用与 channel 操作。",
+    "details": "锁的持有时间只覆盖内存操作。\n\n- 网络、磁盘、数据库等阻塞调用放在锁外\n- 需要锁内数据做 I/O 时，先拷贝出结果再释放锁\n- channel 收发可能无限期阻塞，同样移出临界区",
+    "quote": {
+      "text": "Programs that modify data being simultaneously accessed by multiple goroutines must serialize such access.",
+      "source": "https://go.dev/ref/mem"
+    },
+    "rationale": "锁内做网络调用时持锁时长等于网络往返，毫秒级 I/O 把其他所有等待该锁的 goroutine 串行化；把 I/O 移出临界区后，持锁时长回到纳秒级，并发度不随外部延迟衰减。",
+    "examples": {
+      "good": "resp, err := http.Get(url)\nif err != nil {\n  return err\n}\nmu.Lock()\ncache[key] = resp\nmu.Unlock()",
+      "bad": "mu.Lock()\nresp, err := http.Get(url)\nif err != nil {\n  mu.Unlock()\n  return err\n}\ncache[key] = resp\nmu.Unlock()"
+    },
+    "sources": [
+      "https://go.dev/ref/mem"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 Lock 与 Unlock 之间的阻塞调用"
+    }
+  },
+  {
+    "id": "CONC-012",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "持有 RLock 时不请求同一 RWMutex 的 Lock。",
+    "details": "RWMutex 不可升级，读写锁请求次序要单向。\n\n- 持 RLock 期间需要写操作时，先 `RUnlock` 再 `Lock`\n- 需要读改写原子性时直接用 `Lock`\n- 递归读锁同样禁止",
+    "quote": {
+      "text": "If a goroutine holds a RWMutex for reading and another goroutine might call Lock, no goroutine should expect to be able to acquire a read lock until the initial read lock is released.",
+      "source": "https://pkg.go.dev/sync#RWMutex"
+    },
+    "rationale": "RWMutex 的写锁请求会阻塞后续读锁，持读锁再请求写锁形成自等待死锁：自己等自己释放读锁；文档明确把递归读锁一并禁止，升级语义必须拆成两步或改用写锁。",
+    "examples": {
+      "good": "mu.RLock()\nv := m[key]\nmu.RUnlock()\nif needUpdate(v) {\n  mu.Lock()\n  m[key] = compute()\n  mu.Unlock()\n}",
+      "bad": "mu.RLock()\nif needUpdate(m[key]) {\n  mu.Lock()\n  m[key] = compute()\n  mu.Unlock()\n}\nmu.RUnlock()"
+    },
+    "sources": [
+      "https://pkg.go.dev/sync#RWMutex"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 RLock 与 Lock 的嵌套持有"
+    }
+  },
+  {
+    "id": "CONC-013",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.19",
+    "summary": "简单计数与标志位用类型化原子类型。",
+    "details": "atomic.Int64、atomic.Bool 等类型化原子替代函数式原子调用。\n\n- 计数、开关、版本号等单值状态用 `atomic.Int64`/`atomic.Int32`/`atomic.Bool`/`atomic.Pointer`\n- 不用裸 `atomic.AddInt64(&counter, 1)` 的函数式写法\n- 复合状态仍用互斥锁保护",
+    "quote": {
+      "text": "Int64 is an atomically operated int64 value.",
+      "source": "https://pkg.go.dev/sync/atomic#Int64"
+    },
+    "rationale": "类型化原子把「这个字段是原子访问的」写进类型本身，误传普通 int64 的编译期即可发现；函数式原子调用的目标字段与普通字段在类型上无区别，新增访问点时容易漏用原子操作。",
+    "examples": {
+      "good": "var counter atomic.Int64\ncounter.Add(1)",
+      "bad": "var counter int64\natomic.AddInt64(&counter, 1)"
+    },
+    "sources": [
+      "https://pkg.go.dev/sync/atomic#Int64"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对原子操作的使用形式"
+    }
+  },
+  {
+    "id": "CONC-014",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency",
+      "data-structures"
+    ],
+    "since_go": "1.9",
+    "summary": "写入密集场景不用 sync.Map。",
+    "details": "sync.Map 只服务两类访问模式。\n\n- 键一次写入多次读取（只增的缓存）\n- 多个 goroutine 操作不相交的键集合\n- 其余场景用 `map` 加 `RWMutex`，写入密集时 `sync.Map` 更慢且类型不安全",
+    "quote": {
+      "text": "The Map type is optimized for two common use cases: (1) when the entry for a given key is only ever written once but read many times, as in caches that only grow, or (2) when multiple goroutines read, write, and overwrite entries for disjoint keys.",
+      "source": "https://pkg.go.dev/sync#Map"
+    },
+    "rationale": "sync.Map 用读多写少的内部结构换取无锁读，写入密集时维护成本高于 map+RWMutex；官方文档明确只优化两种模式，超出这两种模式的选用没有性能依据且失去编译期类型检查。",
+    "examples": {
+      "good": "mu.Lock()\nm[key] = value\nmu.Unlock()",
+      "bad": "sm.Store(key, value)"
+    },
+    "sources": [
+      "https://pkg.go.dev/sync#Map"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 sync.Map 的读写比与键集模式"
+    }
+  },
+  {
+    "id": "CONC-015",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "批量并发任务设置并发上限。",
+    "details": "按输入规模无界启动 goroutine 会耗尽资源。\n\n- 用 `errgroup.Group` 的 `SetLimit` 或带缓冲 channel 信号量限流\n- 上限依据下游容量（连接池、下游 QPS）确定并注释\n- 一次性小任务（如有界输入的 fan-out）可豁免并说明",
+    "quote": {
+      "text": "SetLimit limits the number of active goroutines in this group to at most n.",
+      "source": "https://pkg.go.dev/golang.org/x/sync/errgroup#Group.SetLimit"
+    },
+    "rationale": "每个 goroutine 都占用栈内存与调度成本，输入一万条就启动一万个 goroutine 时，内存和下游连接很快耗尽；设上限后并发度固定，错误也能经 errgroup 统一收集。",
+    "examples": {
+      "good": "g, ctx := errgroup.WithContext(ctx)\ng.SetLimit(8)\nfor _, t := range tasks {\n  g.Go(func() error { return handle(ctx, t) })\n}\nerr := g.Wait()",
+      "bad": "for _, t := range tasks {\n  go handle(ctx, t)\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/golang.org/x/sync/errgroup#Group.SetLimit"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对批量任务的并发创建是否设上限"
+    }
+  },
+  {
+    "id": "CONC-016",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency",
+      "performance"
+    ],
+    "since_go": "1.3",
+    "summary": "sync.Pool 对象放回前 Reset。",
+    "details": "放回池中的对象必须清掉内部状态。\n\n- `Reset` 清空 slice、map、指针字段等引用，避免脏数据带入下一次 `Get`\n- 不假设 `Get` 返回零值对象\n- 池化对象文档需注明 `Reset` 义务",
+    "quote": {
+      "text": "Pool's purpose is to cache allocated but unused items for later reuse, relieving pressure on the garbage collector.",
+      "source": "https://pkg.go.dev/sync#Pool"
+    },
+    "rationale": "Pool 只缓存内存不复位状态，脏对象把上一次使用的数据带进下一次，跨请求泄漏用户数据或造成逻辑错乱；Get 的语义是「拿到可用内存」而非「拿到零值」，复位义务在使用方。",
+    "examples": {
+      "good": "buf := pool.Get().(*bytes.Buffer)\ndefer func() {\n  buf.Reset()\n  pool.Put(buf)\n}()",
+      "bad": "buf := pool.Get().(*bytes.Buffer)\ndefer pool.Put(buf)"
+    },
+    "sources": [
+      "https://pkg.go.dev/sync#Pool"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 Pool.Put 前是否 Reset"
+    }
+  },
+  {
+    "id": "DB-001",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "database-access",
+    "tags": [
+      "data-structures",
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "sql.Rows 迭代结束检查 rows.Err 并 Close。",
+    "details": "rows 的生命周期跟随整个迭代。\n\n- `for rows.Scan` 循环结束后检查 `rows.Err()`\n- rows 用完即 `Close`，或 `defer rows.Close()` 紧跟查询\n- 不返回行的语句（INSERT/UPDATE/DELETE）用 `Exec`，不用 `Query`",
+    "quote": {
+      "text": "Err returns the error, if any, that was encountered during iteration. Err should be checked explicitly after the iteration is done.",
+      "source": "https://pkg.go.dev/database/sql#Rows.Err"
+    },
+    "rationale": "漏 Close 会让连接一直被占用，不归还连接池；漏 Err 会吞掉迭代中途的 I/O 中断（网络抖动时循环悄悄少读行）；Err 的错误不会从 Scan 冒出来，只能显式检查。",
+    "examples": {
+      "good": "rows, err := db.QueryContext(ctx, q)\nif err != nil {\n  return err\n}\ndefer rows.Close()\nfor rows.Next() {\n  if err := rows.Scan(&id); err != nil {\n    return err\n  }\n}\nreturn rows.Err()",
+      "bad": "rows, err := db.QueryContext(ctx, q)\nif err != nil {\n  return err\n}\nfor rows.Next() {\n  if err := rows.Scan(&id); err != nil {\n    return err\n  }\n}\nreturn nil"
+    },
+    "sources": [
+      "https://pkg.go.dev/database/sql#Rows.Err"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "rowserrcheck, sqlclosecheck"
+    }
+  },
+  {
+    "id": "DB-002",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "database-access",
+    "tags": [
+      "data-structures",
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "多语句写操作包事务，Begin 后立即 defer Rollback。",
+    "details": "事务必须有统一的收尾路径。\n\n- `tx := db.BeginTx(ctx, nil)` 后紧跟 `defer tx.Rollback()`\n- 提交成功后 Rollback 返回 `ErrTxDone`，无害\n- panic 或提前 return 的路径不会悬挂事务",
+    "quote": {
+      "text": "After calling Commit or Rollback, all operations on the transaction fail with ErrTxDone.",
+      "source": "https://pkg.go.dev/database/sql#Tx"
+    },
+    "rationale": "没有 defer Rollback 的事务在 panic 或提前 return 时悬挂到连接回收，中间的行锁持续占用；Rollback 在 Commit 之后调用只返回 ErrTxDone，作为兜底总是安全。",
+    "examples": {
+      "good": "tx, err := db.BeginTx(ctx, nil)\nif err != nil {\n  return err\n}\ndefer tx.Rollback()\nif _, err := tx.ExecContext(ctx, q1); err != nil {\n  return err\n}\nreturn tx.Commit()",
+      "bad": "tx, err := db.BeginTx(ctx, nil)\nif err != nil {\n  return err\n}\nif _, err := tx.ExecContext(ctx, q1); err != nil {\n  return err\n}\nreturn tx.Commit()"
+    },
+    "sources": [
+      "https://pkg.go.dev/database/sql#Tx"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对事务开启后是否紧跟 defer Rollback"
+    }
+  },
+  {
+    "id": "DB-003",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "database-access",
+    "tags": [
+      "data-structures"
+    ],
+    "since_go": "1.22",
+    "summary": "可空列用指针或 sql.Null 承接。",
+    "details": "NULL 与 Go 零值是不同语义。\n\n- 列可空时 Scan 目标用 `*T` 或 `sql.Null[T]`（Go 1.22+ 泛型）\n- NULL 扫进裸基础类型直接报错\n- 表结构变化（新增可空列）时同步检查 Scan 目标",
+    "quote": {
+      "text": "NullString represents a string that may be null. NullString provides a convenient way of dealing with NULL string values.",
+      "source": "https://pkg.go.dev/database/sql#NullString"
+    },
+    "rationale": "裸类型 Scan 到 NULL 直接报 conversion 错误，且报错位置在运行期数据边界，靠下游 DDL 变更触发；指针与 sql.Null[T] 把「可空」写进类型，承接语义与数据库一致。",
+    "examples": {
+      "good": "var nick *string\nif err := rows.Scan(&id, &nick); err != nil {\n  return err\n}",
+      "bad": "var nick string\nif err := rows.Scan(&id, &nick); err != nil {\n  return err\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/database/sql#NullString"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "对照 DDL 的可空列与 Scan 目标类型"
+    }
+  },
+  {
+    "id": "DB-004",
+    "level": "MUST",
+    "chapter": "programming-conventions",
+    "section": "database-access",
+    "tags": [
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "sql.ErrNoRows 用 errors.Is 判别。",
+    "details": "「没查到」是领域结果不是普通错误。\n\n- 用 `errors.Is(err, sql.ErrNoRows)` 判别后转成领域语义（如返回不存在标记）\n- 直接 `==` 比较在错误被包装后失效\n- `QueryRow` 的单行查询是 ErrNoRows 的主要来源",
+    "quote": {
+      "text": "ErrNoRows is returned by Scan when QueryRow doesn't return a row. In this case, QueryRow will return this error.",
+      "source": "https://pkg.go.dev/database/sql#ErrNoRows"
+    },
+    "rationale": "把 ErrNoRows 当普通错误上抛，上游无法区分「查无此人」与「数据库故障」，往往表现为一次不存在的请求触发 5xx；errors.Is 判别后转成「不存在」结果，错误链语义才完整。",
+    "examples": {
+      "good": "err := db.QueryRowContext(ctx, q, id).Scan(&name)\nif errors.Is(err, sql.ErrNoRows) {\n  return ErrNotFound\n}\nif err != nil {\n  return err\n}",
+      "bad": "err := db.QueryRowContext(ctx, q, id).Scan(&name)\nif err == sql.ErrNoRows {\n  return ErrNotFound\n}\nif err != nil {\n  return err\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/database/sql#ErrNoRows"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 ErrNoRows 的判定方式"
+    }
   }
 ]

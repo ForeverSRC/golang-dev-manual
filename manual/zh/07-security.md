@@ -222,6 +222,433 @@ apiKey := "sk-live-9f3c1d2e4b5a6c7d"
 
 **检测**：golangci-lint gosec(G101)（命中处确认是否真实凭证，误报用 #nosec G101 标注理由）
 
+### 【MUST】SEC-012 用户可控的 SQL 标识符用白名单校验后拼接。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+占位符只覆盖值，不覆盖列名、表名、排序方向等结构片段。
+
+- 动态选择的列名、表名、`ORDER BY` 方向用白名单映射后再进语句
+- 占位符参数化的对象是值，标识符不能走 `?` 传递
+- 与 SEC-001（值参数化）互补，两者覆盖面不同
+
+**为什么**
+
+> That snippet could complete the SQL statement in unpredictable ways that are dangerous to your application.
+>
+> —— https://go.dev/doc/database/sql-injection
+
+参数化把值与语句分离，但 ORDER BY 与表名必须是语句的一部分，直接拼接用户输入的标识符与拼接值同样可注入；白名单把「可选结构」限定在代码枚举的集合内，输入只做选择不做拼接。
+
+**正例**
+
+```go
+var allowed = map[string]string{"name": "name", "created": "created_at"}
+col, ok := allowed[req.Sort]
+if !ok {
+  return fmt.Errorf("invalid sort field")
+}
+q := "SELECT id, name FROM users ORDER BY " + col
+```
+
+**反例**
+
+```go
+q := "SELECT id, name FROM users ORDER BY " + req.Sort
+```
+
+**依据**
+
+- https://go.dev/doc/database/sql-injection
+
+**检测**：人工核对（核对动态 SQL 的标识符来源）
+
+### 【MUST】SEC-013 不可信输入强制大小上限，请求体用 http.MaxBytesReader。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+读取路径的输入必须有上限。
+
+- 请求体用 `http.MaxBytesReader` 包裹 `w` 与 `r.Body`
+- 解压（gzip、zip）目标大小设上限，防解压炸弹
+- 解码 JSON 等格式前先限读，再解析
+
+**为什么**
+
+> MaxBytesReader is similar to io.LimitReader but is intended for limiting the size of incoming request bodies.
+>
+> —— https://pkg.go.dev/net/http#MaxBytesReader
+
+无上限的读取把内存峰值交给对端：小压缩文件可以展开成 GB 级明文，超大请求体直接耗尽进程内存；上限把「对端想给多大」变成「我们收多大」。
+
+**正例**
+
+```go
+r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+  http.Error(w, "payload too large or invalid", http.StatusRequestEntityTooLarge)
+  return
+}
+```
+
+**反例**
+
+```go
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+  http.Error(w, err.Error(), http.StatusBadRequest)
+  return
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/net/http#MaxBytesReader
+
+**检测**：人工核对（核对解压与读入路径的上限）
+
+### 【MUST】SEC-014 临时文件用 os.CreateTemp 创建。
+
+- 归属：安全规约
+- 起始版本：Go 1.16
+- 主题：security
+
+临时文件名由系统生成，不手工拼固定路径。
+
+- `os.CreateTemp(dir, pattern)` 生成随机名，并发创建不冲突
+- 固定路径可被抢占（symlink 攻击）与并发互写
+- 用完即删，清理失败要记录
+
+**为什么**
+
+> Permissive temporary file creation.
+>
+> —— https://docs.bearer.com/reference/rules/go_gosec_filesystem_tempfile/
+
+固定路径的临时文件名可预测：攻击者可先创建同名符号链接劫持写入目标，或两个实例互踩同一个文件；CreateTemp 由内核保证名字唯一，抢占面消失。
+
+**正例**
+
+```go
+f, err := os.CreateTemp("", "report-*.tmp")
+if err != nil {
+  return err
+}
+defer os.Remove(f.Name())
+```
+
+**反例**
+
+```go
+f, err := os.Create("/tmp/report.tmp")
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_gosec_filesystem_tempfile/
+- https://pkg.go.dev/os#CreateTemp
+
+**检测**：golangci-lint gosec(G302, G304)
+
+### 【MUST】SEC-015 tls.Config 显式设置 MinVersion 为 TLS 1.2 以上。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+TLS 最低版本不依赖库默认值。
+
+- 自建 `tls.Config` 时显式写 `MinVersion: tls.VersionTLS12`
+- 库默认值随版本变化，显式声明让安全基线固定
+- gosec G402 可机检缺省与过旧版本
+
+**为什么**
+
+> Missing TLS MinVersion.
+>
+> —— https://docs.bearer.com/reference/rules/go_lang_missing_tls_minversion/
+
+TLS 1.0/1.1 有已公开的攻击（BEAST、POODLE 类），且 crypto/tls 的默认最低版本随 Go 版本演进；不显式设置时，安全基线实际由编译时选的 Go 版本决定，升级降级都不受控。
+
+**正例**
+
+```go
+cfg := &tls.Config{
+  MinVersion: tls.VersionTLS12,
+}
+```
+
+**反例**
+
+```go
+cfg := &tls.Config{}
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_lang_missing_tls_minversion/
+- https://pkg.go.dev/crypto/tls#Config
+
+**检测**：golangci-lint gosec(G402)
+
+### 【MUST】SEC-016 SSH 连接必须校验主机密钥，禁用 InsecureIgnoreHostKey。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+SSH 客户端必须验证对端身份。
+
+- `HostKeyCallback` 用 `ssh.FixedHostKey` 或 known_hosts 校验
+- `ssh.InsecureIgnoreHostKey` 放弃中间人防护，仅限测试
+- 校验失败的连接必须终止
+
+**为什么**
+
+> Missing verification of host keys.
+>
+> —— https://docs.bearer.com/reference/rules/go_gosec_crypto_insecure_ignore_host_key/
+
+跳过主机密钥校验后，客户端无法分辨真实服务器与中间人：凭据、命令与传输数据全部暴露给拦截方；gosec G106 与 Bearer 规则都把它列为高危，仅测试环境可豁免。
+
+**正例**
+
+```go
+config := &ssh.ClientConfig{
+  HostKeyCallback: ssh.FixedHostKey(hostKey),
+}
+```
+
+**反例**
+
+```go
+config := &ssh.ClientConfig{
+  HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+}
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_gosec_crypto_insecure_ignore_host_key/
+
+**检测**：golangci-lint gosec(G106)
+
+### 【MUST】SEC-017 口令存储用 Argon2id、bcrypt 等慢哈希。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+口令哈希算法必须为暴力破解设计成本。
+
+- 口令用 `golang.org/x/crypto/argon2` 或 `golang.org/x/crypto/bcrypt`
+- 单轮 MD5/SHA-256 允许 GPU 每秒数十亿次尝试
+- 哈希参数（cost、内存）按硬件定期复核
+
+**为什么**
+
+> Usage of weak hashing library on a password (MD5).
+>
+> —— https://docs.bearer.com/reference/rules/go_lang_weak_password_encryption_md5/
+
+通用哈希函数为速度设计，口令哈希要为速度设计开销：Argon2id/bcrypt 的计算成本让离线爆破从秒级变成年级别；数据库泄露时这一层直接决定口令是否等于明文泄露。
+
+**正例**
+
+```go
+hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+```
+
+**反例**
+
+```go
+sum := md5.Sum([]byte(pwd))
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_lang_weak_password_encryption_md5/
+- https://pkg.go.dev/golang.org/x/crypto/bcrypt
+
+**检测**：人工核对（核对口令存储的哈希算法）
+
+### 【MUST】SEC-018 对称加密用认证模式，nonce 每次随机不复用。
+
+- 归属：安全规约
+- 起始版本：Go 1.2
+- 主题：security
+
+加密模式必须同时提供机密性与完整性。
+
+- 用 AES-GCM 等 AEAD 模式，禁用 ECB 与未认证模式裸用
+- nonce 每次随机生成，同一密钥下不复用
+- Go 1.24+ 可用 `cipher.NewGCMWithRandomNonce` 让库管理 nonce
+
+**为什么**
+
+> The nonce must be NonceSize() bytes long and unique for all time, for a given key.
+>
+> —— https://pkg.go.dev/crypto/cipher#AEAD
+
+无认证模式可被篡改而不被发现，ECB 还会泄露明文模式；GCM 下同一密钥复用 nonce 会同时泄露密钥流并破坏认证，官方文档把 nonce 唯一性写成必须项。
+
+**正例**
+
+```go
+gcm, err := cipher.NewGCM(block)
+if err != nil {
+  return err
+}
+nonce := make([]byte, gcm.NonceSize())
+if _, err := rand.Read(nonce); err != nil {
+  return err
+}
+ct := gcm.Seal(nil, nonce, plaintext, nil)
+```
+
+**反例**
+
+```go
+iv := make([]byte, 16)
+ct := gcm.Seal(nil, iv, plaintext, nil)
+```
+
+**依据**
+
+- https://pkg.go.dev/crypto/cipher#AEAD
+
+**检测**：人工核对（核对加密模式与 nonce 生成）
+
+### 【MUST】SEC-019 会话 cookie 设置 HttpOnly、Secure 与 SameSite。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+认证类 cookie 的三个属性缺一不可。
+
+- `HttpOnly` 阻止脚本读取，`Secure` 强制仅 HTTPS 传输，`SameSite` 限制跨站携带
+- 会话、令牌、认证类 cookie 全部适用
+- 非敏感的功能 cookie 可豁免并在评审中说明
+
+**为什么**
+
+> Missing HTTP Only option in cookie configuration.
+>
+> —— https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/
+
+缺 HttpOnly 时 XSS 脚本可直接读走会话令牌；缺 Secure 时令牌随明文 HTTP 传输；缺 SameSite 时跨站请求自动携带 cookie 构成 CSRF，三项分别封堵一类攻击路径。
+
+**正例**
+
+```go
+http.SetCookie(w, &http.Cookie{
+  Name: "session",
+  Value: tok,
+  HttpOnly: true,
+  Secure: true,
+  SameSite: http.SameSiteLaxMode,
+})
+```
+
+**反例**
+
+```go
+http.SetCookie(w, &http.Cookie{
+  Name: "session",
+  Value: tok,
+})
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/
+- https://docs.bearer.com/reference/rules/go_lang_insecure_cookie/
+
+**检测**：人工核对（核对 cookie 属性设置）
+
+### 【MUST】SEC-020 JWT 校验固定签名算法白名单，不信任令牌 alg 字段。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+可接受的签名算法由代码枚举。
+
+- 解析器显式配置算法白名单（如只允许 `RS256`）
+- 不按令牌自带的 `alg` 字段选择验证算法
+- `none` 算法除明确受控场景外一律拒绝
+
+**为什么**
+
+> Libraries MUST enable the caller to specify a supported set of algorithms and MUST NOT use any other algorithms when performing cryptographic operations.
+>
+> —— https://datatracker.ietf.org/doc/html/rfc8725#section-3.1
+
+信任令牌 alg 字段即接受攻击者改写算法：改为 none 绕过验签，RS256 换 HS256 用公钥当 HMAC 密钥伪造签名，两者都是已公开利用的攻击；算法白名单让令牌声称的算法不在集合内即拒绝。
+
+**正例**
+
+```go
+tok, err := jwt.Parse(tokenStr, keyFunc, jwt.WithValidMethods([]string{"RS256"}))
+```
+
+**反例**
+
+```go
+tok, err := jwt.Parse(tokenStr, keyFunc)
+```
+
+**依据**
+
+- https://datatracker.ietf.org/doc/html/rfc8725#section-3.1
+
+**检测**：人工核对（核对 JWT 解析配置）
+
+### 【MUST】SEC-021 应用代码不使用 unsafe 绕过内存安全。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+unsafe 只属于经过专门审查的低层库。
+
+- 业务代码不 import `unsafe` 绕过类型与边界检查
+- 确需零拷贝等场景封装在经审的低层包内并写明不变量
+- 引入 unsafe 的评审按最高级别对待
+
+**为什么**
+
+> Package unsafe contains operations that step around the type safety of Go programs.
+>
+> —— https://pkg.go.dev/unsafe
+
+Go 的内存安全由编译器与 GC 保证，unsafe 绕过这套保护后，越界与别名问题从「编译失败或 panic」变成「未定义行为」，且逃过所有静态检查；收益只有极低层场景才配得上这个代价。
+
+**正例**
+
+```go
+func toBytes(s string) []byte { return []byte(s) }
+```
+
+**反例**
+
+```go
+func toBytes(s string) []byte {
+  return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/unsafe
+- https://docs.bearer.com/reference/rules/go_gosec_unsafe_unsafe/
+
+**检测**：grep 正则 \bunsafe\.
+
 ### 【SHOULD】SEC-005 不设 InsecureSkipVerify 跳过 TLS 证书校验。
 
 - 归属：安全规约

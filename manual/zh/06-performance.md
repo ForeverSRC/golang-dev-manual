@@ -311,3 +311,295 @@ func printName(name *string) {
 
 **检测**：人工核对（核对只做解引用读取的参数是否用了指针）
 
+### 【SHOULD】PERF-009 生产代码不用 reflect.DeepEqual 做比较。
+
+- 归属：性能规约
+- 起始版本：Go 1.21
+- 主题：performance
+
+类型明确的比较用类型化 Equal 函数。
+
+- 切片用 `slices.Equal`，map 用 `maps.Equal`，字节串用 `bytes.Equal`
+- `reflect.DeepEqual` 走反射，慢 50–200 倍
+- 测试代码比较预期值不在此列（保持语义优先）
+
+**为什么**
+
+> Equal reports whether two slices are equal: the same length and all elements equal. If the lengths are different, Equal returns false.
+>
+> —— https://pkg.go.dev/slices#Equal
+
+DeepEqual 在运行期对值结构做反射遍历，生产热路径上代价是类型化比较的一到两个数量级；slices/maps 包的类型化 Equal 由编译器特化，语义相同代价趋近于手写循环。
+
+**正例**
+
+```go
+if slices.Equal(want, got) {
+  return true
+}
+```
+
+**反例**
+
+```go
+if reflect.DeepEqual(want, got) {
+  return true
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/slices#Equal
+
+**检测**：人工核对（核对生产路径的 DeepEqual 调用）
+
+### 【SHOULD】PERF-010 regexp 与 template 在包级编译一次。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+- 主题：performance
+
+编译产物复用，不进函数体。
+
+- 包级 `var re = regexp.MustCompile(...)`，函数内只引用
+- 函数内重复 Compile 每次约多耗一个数量级且必分配
+- template 的 `Parse` 同口径
+
+**为什么**
+
+> MustCompile is like Compile but panics if the expression cannot be parsed. It simplifies safe initialization of global variables holding compiled regular expressions.
+>
+> —— https://pkg.go.dev/regexp#MustCompile
+
+Compile 每次执行都要解析正则并构建状态机，热路径上每请求编译一次的开销与匹配本身相当；官方文档把包级初始化场景写在 MustCompile 的说明里，编译一次复用是它的设计用途。
+
+**正例**
+
+```go
+var idRe = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+func valid(id string) bool { return idRe.MatchString(id) }
+```
+
+**反例**
+
+```go
+func valid(id string) bool {
+  return regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(id)
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/regexp#MustCompile
+
+**检测**：人工核对（核对函数体内的 regexp.Compile 与 template.Parse）
+
+### 【SHOULD】PERF-011 无上界输入流式处理，不用 io.ReadAll 全量载入。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+- 主题：performance
+
+内存峰值随输入上界而不是输入现值走。
+
+- 大文件、无上界网络响应用 `bufio.Scanner`、`io.Copy` 流式处理
+- `io.ReadAll` 只用于输入有界且小的场景（如读完一个小配置）
+- 「无上界」的口径：无法在调用前确定最大尺寸的输入
+
+**为什么**
+
+> Copy copies from src to dst until either EOF is reached on src or an error occurs.
+>
+> —— https://pkg.go.dev/io#Copy
+
+ReadAll 把整个输入堆进内存，无上界输入（外部 URL、用户上传）直接把内存峰值交给攻击者或对端；流式处理让内存占用恒定，与输入规模解耦。
+
+**正例**
+
+```go
+if _, err := io.Copy(out, resp.Body); err != nil {
+  return err
+}
+```
+
+**反例**
+
+```go
+data, err := io.ReadAll(resp.Body)
+```
+
+**依据**
+
+- https://pkg.go.dev/io#Copy
+
+**检测**：人工核对（核对 io.ReadAll 的输入是否有界）
+
+### 【SHOULD】PERF-012 复用的 http.Client 显式设置 Timeout 并自定义 Transport。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+- 主题：performance, security
+
+Client 与 Transport 是进程级配置点。
+
+- 零值 Client 无超时，请求可能永久挂起
+- 默认 Transport 的 `MaxIdleConnsPerHost` 仅 2，高并发下排队等连接
+- 包级单例 Client 集中配置，不在调用点临时创建
+
+**为什么**
+
+> The Client's Transport typically has internal state (cached TCP connections), so Clients should be reused instead of created as needed.
+>
+> —— https://pkg.go.dev/net/http#Client
+
+连接池是 Client 内部状态：临时创建 Client 等于每次重建连接池，复用已有的 keep-alive 连接全部作废；零值 Client 无超时则把「下游永不响应」直接转成 goroutine 泄漏。
+
+**正例**
+
+```go
+var client = &http.Client{
+  Timeout: 5 * time.Second,
+  Transport: &http.Transport{
+    MaxIdleConnsPerHost: 32,
+  },
+}
+```
+
+**反例**
+
+```go
+resp, err := (&http.Client{}).Get(url)
+```
+
+**依据**
+
+- https://pkg.go.dev/net/http#Client
+
+**检测**：人工核对（核对包级 http.Client 的配置）
+
+### 【SHOULD】PERF-013 resp.Body 按版本处理：Go 1.27+ 关闭即回收，更早版本需读尽。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+- 主题：performance
+
+连接回收依赖 body 的读取状态。
+
+- Go 1.27+ 关闭 Body 时自动读尽未读内容（保守上限内），无需手动读尽
+- 主动放弃超大 body 或 Go 1.26 及以下版本，先 `io.Copy(io.Discard, resp.Body)` 再 `Close`
+- 每个响应必须 `Close`，无论是否读内容
+
+**为什么**
+
+> Response.Body now automatically drains any unread content upon being closed, up to a conservative limit, to allow better connection reuse.
+>
+> —— https://go.dev/doc/go1.27
+
+keep-alive 连接只有 body 读尽后才能回池复用，未读尽的连接被直接关闭重建；Go 1.27 起 Close 自动 drain 修复了这个性能陷阱，超大 body 超出自动上限时仍需显式处理。
+
+**正例**
+
+```go
+defer resp.Body.Close()
+_, err = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+```
+
+**反例**
+
+```go
+defer resp.Body.Close()
+return
+```
+
+**依据**
+
+- https://go.dev/doc/go1.27
+- https://pkg.go.dev/net/http#Response.Body
+
+**检测**：人工核对（核对 HTTP 客户端代码的 body 处理）
+
+### 【SHOULD】PERF-014 range map 直接取值变量，不二次下标查找。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+- 主题：performance, data-structures
+
+for k, v := range m 一次循环只做一次哈希查找。
+
+- 需要 value 时用循环变量 v，不写 `m[k]`
+- 只需要 key 时用 `for k := range m`
+- `m[k]` 在循环体内每轮重复哈希
+
+**为什么**
+
+> The iteration order over maps is not specified and is not guaranteed to be the same from one iteration to the next.
+>
+> —— https://go.dev/ref/spec#For_range
+
+range 的第二个变量是遍历时已经取出的元素，m[k] 则每轮重新做一次哈希定位；热点循环里这是纯浪费，且写法没有任何补偿收益。
+
+**正例**
+
+```go
+for k, v := range m {
+  fmt.Println(k, v)
+}
+```
+
+**反例**
+
+```go
+for k := range m {
+  fmt.Println(k, m[k])
+}
+```
+
+**依据**
+
+- https://go.dev/ref/spec#For_range
+
+**检测**：人工核对（核对 range map 的循环体）
+
+### 【SHOULD】PERF-016 sql.DB 连接池显式配置上限与生命周期。
+
+- 归属：性能规约
+- 起始版本：Go 1.0
+- 主题：performance, data-structures
+
+连接池参数默认不设防。
+
+- `MaxOpenConns`、`MaxIdleConns`、`ConnMaxLifetime`、`ConnMaxIdleTime` 显式设置
+- 默认无连接上限且连接不过期，故障时连接堆积拖垮数据库
+- 参数依据数据库连接上限与实例副本数确定并注释
+
+**为什么**
+
+> DB is a database handle representing a pool of zero or more underlying connections. It's safe for concurrent use by multiple goroutines.
+>
+> —— https://pkg.go.dev/database/sql#DB
+
+默认无上限意味着每个 goroutine 都可能持有连接，故障放大时数据库先于应用被打垮；显式上限让故障表现可控，ConnMaxLifetime 让连接定期轮换避开数据库侧的连接老化。
+
+**正例**
+
+```go
+db.SetMaxOpenConns(64)
+db.SetMaxIdleConns(16)
+db.SetConnMaxLifetime(time.Hour)
+db.SetConnMaxIdleTime(10 * time.Minute)
+```
+
+**反例**
+
+```go
+db, _ := sql.Open("pgx", dsn)
+// 未配置任何池参数
+```
+
+**依据**
+
+- https://pkg.go.dev/database/sql#DB
+
+**检测**：人工核对（核对 sql.Open 后的池配置）
+

@@ -105,5 +105,65 @@
     "details": "Arguments that are not matchers match by equality, so writing the literal directly suffices, with no extra layer of `gomock.Eq`; use `AssignableToTypeOf` to constrain the type, and `Cond`, `Len`, or `Nil` to match by condition. Use `Any()` only for values that are not asserted on, such as `context.Context`, and state the reason for relaxing the match there.",
     "rationale": "A bare `Any()` only checks that the method was called, so a wrong argument still passes; writing the argument into the expectation lets argument errors at the call site be caught, and the case shows what this call should look like. An extra layer of `Eq` changes no matching semantics and only adds noise.",
     "detect_note": "Except for context.Context, switch the matches to Eq or AssignableToTypeOf."
+  },
+  "TEST-020": {
+    "summary": "Table-driven cases run through t.Run as named subtests.",
+    "details": "One named subtest per case, so failures point straight at it.\n\n- Wrap each case with `t.Run(name, func(t *testing.T))`\n- Case names carry business semantics (such as `invalid email`), not `case1` or `case2`\n- The loop-variable capture issue is fixed by the language since Go 1.22; older versions need a copy",
+    "rationale": "A bare loop reports failures by line number only, and locating one requires walking the case table; a t.Run subtest name appears directly in the failure output, and go test -run can replay a single case.",
+    "detect_note": "Check that table-driven tests run through t.Run"
+  },
+  "TEST-021": {
+    "summary": "Tests do not depend on execution order; every case runs on its own.",
+    "details": "Every case prepares the data it needs itself.\n\n- Every case passes when run alone, without depending on data left by earlier cases\n- Database records and temp files needed by a case are created and cleaned up inside the case\n- Running a single case (`go test -run TestX`) gives the same result as running the whole suite",
+    "rationale": "`go test` offers the `-shuffle` option to randomize the execution order of tests, which shows the order was never a guaranteed behavior. When a case depends on data left by another case, it fails when run alone and passes only in the full suite — the cause is the execution order, not the code under test. Once every case prepares its own data, any order and any subset give the same result, and a failure can only mean a problem in the code under test.",
+    "detect_note": "Check whether cases depend on data left by other cases"
+  },
+  "TEST-022": {
+    "summary": "Tests wait on synchronization primitives, never on time.Sleep.",
+    "details": "Wait for events, not fixed durations.\n\n- Await concurrent completion with channels, `WaitGroup`, or synctest\n- `time.Sleep` waiting for what should have happened is a flakiness source\n- Where framework limits (such as consumer-group rebalancing) prevent eventing, note the exception in the test",
+    "rationale": "Sleep expresses a duration, not an event: on slow machines the duration is too short and the test fails, on fast machines it is wasted time, and both ends are unstable; waiting for an event to happen means waiting on the event itself (channels, WaitGroup, callbacks) — a duration can never replace it.",
+    "detect_note": "Check the purpose of time.Sleep in tests"
+  },
+  "TEST-023": {
+    "summary": "Test files are named after the source file under test.",
+    "details": "The tests for foo.go live in foo_test.go.\n\n- Not named after the tested function (no parse_test.go holding tests for many functions)\n- `go test`, coverage, and IDE jumps all map by file\n- Tests for one source file stay in one place for the cheapest lookup",
+    "rationale": "The file mapping is Go's default index for test organization: looking for Parse's tests starts at parse_test.go, and coverage reports and failure output land along the same mapping; scattering test files by function name breaks all three indexes.",
+    "detect_note": "Check the naming mapping between test files and source files"
+  },
+  "TEST-024": {
+    "summary": "Test files are written into t.TempDir.",
+    "details": "Test artifacts land in a per-test temporary directory.\n\n- `t.TempDir()` cleans up automatically and isolates cases\n- Never write to /tmp or repository paths shared across cases\n- Parallel cases each get their own directory with no path conflicts",
+    "rationale": "Fixed-name files in a shared temp directory get written by parallel cases simultaneously, and leftover files feed stale data into the next run; the t.TempDir directory is removed automatically when the test completes, so isolation and cleanup are both framework guarantees.",
+    "detect_note": "Check temporary directory creation in tests"
+  },
+  "TEST-025": {
+    "summary": "Tests take their ctx from t.Context.",
+    "details": "The context bound to the test lifecycle precedes Background.\n\n- `t.Context()` is canceled automatically just before cleanup functions run\n- Pass it to functions under test so goroutines exit with the test\n- Replaces the manual defer cancel boilerplate",
+    "rationale": "A ctx built from `context.Background()` never cancels, so goroutines leaked by a test live until process exit and pollute the next test; `t.Context` cancels with the test, and the goroutines exit with it.",
+    "detect_note": "Check the ctx source inside tests"
+  },
+  "TEST-026": {
+    "summary": "Benchmarks use b.Loop, not hand-written b.N loops.",
+    "details": "The Go 1.24+ benchmark loop replaces the manual b.N loop.\n\n- Code inside `b.Loop` is timed automatically; setup stays outside the loop\n- Hand-written `b.N` loops can time the setup or let the compiler eliminate dead code\n- Older Go versions still use the `b.N` form",
+    "rationale": "The `b.N` loop leaves timing boundaries and dead-code elimination to user discipline: setup inside the loop, or an unconsumed result optimized away, and the numbers lie; `b.Loop` lets the framework own both, so the mistakes are structurally impossible.",
+    "detect_note": "Check the loop form of benchmark functions"
+  },
+  "TEST-027": {
+    "summary": "Benchmark comparisons use benchstat with enough samples for significance.",
+    "details": "Performance conclusions need a statistical basis.\n\n- Take at least 10 samples per side and summarize with `benchstat`\n- Never conclude from one run, never re-run until significant\n- State conclusions with confidence intervals, not absolute values",
+    "rationale": "The variance of a single benchmark run is on the order of machine noise, so a faster-or-slower conclusion is sampling error; re-running until significant is selection bias that can prove anything. benchstat reports confidence intervals, and only differences outside them count.",
+    "detect_note": "Check the sampling and judgment behind performance conclusions"
+  },
+  "TEST-028": {
+    "summary": "Benchmark functions live in a separate _bench_test.go file.",
+    "details": "Measurement tests and correctness tests split by file.\n\n- Benchmarks go in `<file>_bench_test.go`, named after the source file\n- Benchmark output stays free of ordinary test noise\n- `go test ./...` does not execute benchmarks by default, keeping repo defaults intact",
+    "rationale": "Benchmarks mixed with unit tests drown their data in test logs and slow down go test; splitting the files keeps run-tests and run-benchmarks each clean.",
+    "detect_note": "Check which file benchmarks belong to"
+  },
+  "TEST-029": {
+    "summary": "require guards preconditions; assert collects result checks.",
+    "details": "The two assertion families split by post-failure behavior.\n\n- require stops on failure: once a precondition fails, later assertions are meaningless\n- assert continues on failure: result checks collect all failures at once\n- Do not mix the two styles for the same check point in one test",
+    "rationale": "Continuing with assert after a precondition failure reports every assertion while there is only one root cause, drowning the signal in noise; the reverse — require for result checks — stops at the first failure and forces fix-then-hit-next rounds.",
+    "detect_note": "Check the require/assert split in test bodies"
   }
 }

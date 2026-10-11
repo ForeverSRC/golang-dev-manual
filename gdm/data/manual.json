@@ -34,6 +34,8 @@
         { "id": "formatting", "name": "格式化与代码风格规约" },
         { "id": "functions", "name": "函数与方法规约" },
         { "id": "data-structures", "name": "数据结构规约" },
+        { "id": "standard-library", "name": "标准库使用规约" },
+        { "id": "database-access", "name": "数据库访问规约" },
         { "id": "concurrency", "name": "并发规约" },
         { "id": "control-flow", "name": "控制语句规约" },
         { "id": "comments", "name": "注释规约" }

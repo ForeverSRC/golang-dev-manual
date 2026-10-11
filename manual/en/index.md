@@ -3,7 +3,7 @@
 A personal Golang development manual. Clauses are graded MUST / SHOULD / MAY; the table of contents and the clauses share a single source in `gdm/data/`.
 
 - Baseline: Go 1.27.1
-- Clauses: 114
+- Clauses: 196
 
 ## Table of Contents
 
@@ -13,6 +13,8 @@ A personal Golang development manual. Clauses are graded MUST / SHOULD / MAY; th
     - Formatting and Style
     - Functions and Methods
     - Data Structures
+    - Standard Library Usage
+    - Database Access
     - Concurrency
     - Control Flow
     - Comments

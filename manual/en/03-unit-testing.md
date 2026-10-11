@@ -148,6 +148,311 @@ func TestLoad(t *testing.T) {
 
 **Detection**: manual review (Check whether tests that read real files, the network, or a database end with _it_test.go.)
 
+### 【SHOULD】TEST-021 Tests do not depend on execution order; every case runs on its own.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.0
+- Tags: testing
+
+Every case prepares the data it needs itself.
+
+- Every case passes when run alone, without depending on data left by earlier cases
+- Database records and temp files needed by a case are created and cleaned up inside the case
+- Running a single case (`go test -run TestX`) gives the same result as running the whole suite
+
+**Why**
+
+> Shuffle both, the order of tests and the order of benchmarks
+>
+> — https://pkg.go.dev/cmd/go
+
+`go test` offers the `-shuffle` option to randomize the execution order of tests, which shows the order was never a guaranteed behavior. When a case depends on data left by another case, it fails when run alone and passes only in the full suite — the cause is the execution order, not the code under test. Once every case prepares its own data, any order and any subset give the same result, and a failure can only mean a problem in the code under test.
+
+**Good**
+
+```go
+func TestDelete(t *testing.T) {
+  id := createUser(t)
+  err := Delete(t.Context(), id)
+  assert.NoError(t, err)
+}
+```
+
+**Bad**
+
+```go
+func TestDelete(t *testing.T) {
+  // 依赖 TestCreate 已经插入了 id=1 的记录
+  err := Delete(t.Context(), 1)
+  assert.NoError(t, err)
+}
+```
+
+**References**
+
+- https://pkg.go.dev/cmd/go
+
+**Detection**: manual review (Check whether cases depend on data left by other cases)
+
+### 【SHOULD】TEST-022 Tests wait on synchronization primitives, never on time.Sleep.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.0
+- Tags: testing, concurrency
+
+Wait for events, not fixed durations.
+
+- Await concurrent completion with channels, `WaitGroup`, or synctest
+- `time.Sleep` waiting for what should have happened is a flakiness source
+- Where framework limits (such as consumer-group rebalancing) prevent eventing, note the exception in the test
+
+**Why**
+
+> Sleep pauses the current goroutine for at least the duration d.
+>
+> — https://pkg.go.dev/time#Sleep
+
+Sleep expresses a duration, not an event: on slow machines the duration is too short and the test fails, on fast machines it is wasted time, and both ends are unstable; waiting for an event to happen means waiting on the event itself (channels, WaitGroup, callbacks) — a duration can never replace it.
+
+**Good**
+
+```go
+done := make(chan struct{})
+go func() {
+  defer close(done)
+  worker()
+}()
+select {
+case <-done:
+case <-time.After(5 * time.Second):
+  t.Fatal("worker did not finish")
+}
+```
+
+**Bad**
+
+```go
+go worker()
+time.Sleep(100 * time.Millisecond)
+```
+
+**References**
+
+- https://pkg.go.dev/time#Sleep
+
+**Detection**: manual review (Check the purpose of time.Sleep in tests)
+
+### 【SHOULD】TEST-023 Test files are named after the source file under test.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.0
+- Tags: testing, naming
+
+The tests for foo.go live in foo_test.go.
+
+- Not named after the tested function (no parse_test.go holding tests for many functions)
+- `go test`, coverage, and IDE jumps all map by file
+- Tests for one source file stay in one place for the cheapest lookup
+
+**Why**
+
+> To write a new test suite, create a file whose name ends in _test.go that contains the TestXxx functions as described. Put the file in the same package as the one being tested.
+>
+> — https://pkg.go.dev/testing
+
+The file mapping is Go's default index for test organization: looking for Parse's tests starts at parse_test.go, and coverage reports and failure output land along the same mapping; scattering test files by function name breaks all three indexes.
+
+**Good**
+
+```go
+parse.go / parse_test.go
+```
+
+**Bad**
+
+```go
+parse.go / util_test.go（内含 Parse 的测试）
+```
+
+**References**
+
+- https://pkg.go.dev/testing
+
+**Detection**: manual review (Check the naming mapping between test files and source files)
+
+### 【SHOULD】TEST-024 Test files are written into t.TempDir.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.15
+- Tags: testing
+
+Test artifacts land in a per-test temporary directory.
+
+- `t.TempDir()` cleans up automatically and isolates cases
+- Never write to /tmp or repository paths shared across cases
+- Parallel cases each get their own directory with no path conflicts
+
+**Why**
+
+> TempDir returns a new directory for the test to use. The directory is automatically removed when the test and all its subtests complete.
+>
+> — https://pkg.go.dev/testing#T.TempDir
+
+Fixed-name files in a shared temp directory get written by parallel cases simultaneously, and leftover files feed stale data into the next run; the t.TempDir directory is removed automatically when the test completes, so isolation and cleanup are both framework guarantees.
+
+**Good**
+
+```go
+dir := t.TempDir()
+f, err := os.Create(filepath.Join(dir, "out.txt"))
+```
+
+**Bad**
+
+```go
+f, err := os.Create("/tmp/out.txt")
+```
+
+**References**
+
+- https://pkg.go.dev/testing#T.TempDir
+
+**Detection**: manual review (Check temporary directory creation in tests)
+
+### 【SHOULD】TEST-025 Tests take their ctx from t.Context.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.24
+- Tags: testing, context
+
+The context bound to the test lifecycle precedes Background.
+
+- `t.Context()` is canceled automatically just before cleanup functions run
+- Pass it to functions under test so goroutines exit with the test
+- Replaces the manual defer cancel boilerplate
+
+**Why**
+
+> Context returns a context that is canceled just before Cleanup-registered functions are called.
+>
+> — https://pkg.go.dev/testing#T.Context
+
+A ctx built from `context.Background()` never cancels, so goroutines leaked by a test live until process exit and pollute the next test; `t.Context` cancels with the test, and the goroutines exit with it.
+
+**Good**
+
+```go
+func TestQuery(t *testing.T) {
+  got, err := store.Get(t.Context(), "id")
+  assert.NoError(t, err)
+  _ = got
+}
+```
+
+**Bad**
+
+```go
+func TestQuery(t *testing.T) {
+  got, err := store.Get(context.Background(), "id")
+  assert.NoError(t, err)
+  _ = got
+}
+```
+
+**References**
+
+- https://pkg.go.dev/testing#T.Context
+
+**Detection**: manual review (Check the ctx source inside tests)
+
+### 【SHOULD】TEST-026 Benchmarks use b.Loop, not hand-written b.N loops.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.24
+- Tags: testing, performance
+
+The Go 1.24+ benchmark loop replaces the manual b.N loop.
+
+- Code inside `b.Loop` is timed automatically; setup stays outside the loop
+- Hand-written `b.N` loops can time the setup or let the compiler eliminate dead code
+- Older Go versions still use the `b.N` form
+
+**Why**
+
+> Loop executes the given function as a benchmark loop, resetting the timer appropriately.
+>
+> — https://pkg.go.dev/testing#B.Loop
+
+The `b.N` loop leaves timing boundaries and dead-code elimination to user discipline: setup inside the loop, or an unconsumed result optimized away, and the numbers lie; `b.Loop` lets the framework own both, so the mistakes are structurally impossible.
+
+**Good**
+
+```go
+func BenchmarkParse(b *testing.B) {
+  in := makeInput()
+  for b.Loop() {
+    _ = Parse(in)
+  }
+}
+```
+
+**Bad**
+
+```go
+func BenchmarkParse(b *testing.B) {
+  for i := 0; i < b.N; i++ {
+    _ = Parse(makeInput())
+  }
+}
+```
+
+**References**
+
+- https://pkg.go.dev/testing#B.Loop
+
+**Detection**: manual review (Check the loop form of benchmark functions)
+
+### 【SHOULD】TEST-027 Benchmark comparisons use benchstat with enough samples for significance.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.0
+- Tags: testing, performance
+
+Performance conclusions need a statistical basis.
+
+- Take at least 10 samples per side and summarize with `benchstat`
+- Never conclude from one run, never re-run until significant
+- State conclusions with confidence intervals, not absolute values
+
+**Why**
+
+> Command benchstat computes and compares statistics of benchmarks.
+>
+> — https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
+
+The variance of a single benchmark run is on the order of machine noise, so a faster-or-slower conclusion is sampling error; re-running until significant is selection bias that can prove anything. benchstat reports confidence intervals, and only differences outside them count.
+
+**Good**
+
+```go
+go test -bench=. -count=10 ./... > old.txt
+# 应用变更后
+go test -bench=. -count=10 ./... > new.txt
+benchstat old.txt new.txt
+```
+
+**Bad**
+
+```go
+go test -bench=. -run=^$ ./... # 单次运行即下结论
+```
+
+**References**
+
+- https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
+
+**Detection**: manual review (Check the sampling and judgment behind performance conclusions)
+
 ### 【MAY】TEST-008 Test case names preferably follow the should-plus-outcome, when-plus-condition pattern.
 
 - Category: Unit Testing/Test Naming and Structure
@@ -181,6 +486,44 @@ Subtest names go straight into `go test` output, and people judge which one fail
 - https://go.dev/wiki/TestComments#choose-human-readable-subtest-names
 
 **Detection**: manual review (Check whether t.Run names and table name fields state the expected outcome and the triggering condition clearly.)
+
+### 【MAY】TEST-028 Benchmark functions live in a separate _bench_test.go file.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.0
+- Tags: testing
+
+Measurement tests and correctness tests split by file.
+
+- Benchmarks go in `<file>_bench_test.go`, named after the source file
+- Benchmark output stays free of ordinary test noise
+- `go test ./...` does not execute benchmarks by default, keeping repo defaults intact
+
+**Why**
+
+> To write a new test suite, create a file whose name ends in _test.go that contains the TestXxx functions as described. Put the file in the same package as the one being tested.
+>
+> — https://pkg.go.dev/testing
+
+Benchmarks mixed with unit tests drown their data in test logs and slow down go test; splitting the files keeps run-tests and run-benchmarks each clean.
+
+**Good**
+
+```go
+parse.go / parse_test.go / parse_bench_test.go
+```
+
+**Bad**
+
+```go
+parse.go / parse_test.go（内含 BenchmarkParse）
+```
+
+**References**
+
+- https://pkg.go.dev/testing
+
+**Detection**: manual review (Check which file benchmarks belong to)
 
 ## (2) Table-Driven and Case Design
 
@@ -421,6 +764,52 @@ func TestFilterByID(t *testing.T) {
 
 **Detection**: manual review (Check whether a commit that fixes a defect carries a case matching the triggering conditions.)
 
+### 【SHOULD】TEST-020 Table-driven cases run through t.Run as named subtests.
+
+- Category: Unit Testing/Table-Driven and Case Design
+- Since: Go 1.7
+- Tags: testing
+
+One named subtest per case, so failures point straight at it.
+
+- Wrap each case with `t.Run(name, func(t *testing.T))`
+- Case names carry business semantics (such as `invalid email`), not `case1` or `case2`
+- The loop-variable capture issue is fixed by the language since Go 1.22; older versions need a copy
+
+**Why**
+
+> Run runs f as a subtest of t called name.
+>
+> — https://pkg.go.dev/testing#T.Run
+
+A bare loop reports failures by line number only, and locating one requires walking the case table; a t.Run subtest name appears directly in the failure output, and go test -run can replay a single case.
+
+**Good**
+
+```go
+for name, tc := range cases {
+  t.Run(name, func(t *testing.T) {
+    got := Parse(tc.in)
+    assert.Equal(t, tc.want, got)
+  })
+}
+```
+
+**Bad**
+
+```go
+for _, tc := range cases {
+  got := Parse(tc.in)
+  assert.Equal(t, tc.want, got)
+}
+```
+
+**References**
+
+- https://pkg.go.dev/testing#T.Run
+
+**Detection**: manual review (Check that table-driven tests run through t.Run)
+
 ## (3) Assertions and Test Data
 
 ### 【SHOULD】TEST-003 Compare the complete result in one shot; do not break it apart field by field or trim it into a subset.
@@ -540,6 +929,49 @@ require.ErrorContains(t, err, "load")
 - https://go.dev/blog/go1.13-errors
 
 **Detection**: manual review (Check whether cases judge the kind of error by error message text, and whether sentinels and error types are checked with errors.Is / errors.As.)
+
+### 【SHOULD】TEST-029 require guards preconditions; assert collects result checks.
+
+- Category: Unit Testing/Assertions and Test Data
+- Since: Go 1.0
+- Tags: assertion
+
+The two assertion families split by post-failure behavior.
+
+- require stops on failure: once a precondition fails, later assertions are meaningless
+- assert continues on failure: result checks collect all failures at once
+- Do not mix the two styles for the same check point in one test
+
+**Why**
+
+> The require package provides the same functions as assert package but stops test execution when a check fails.
+>
+> — https://pkg.go.dev/github.com/stretchr/testify/require
+
+Continuing with assert after a precondition failure reports every assertion while there is only one root cause, drowning the signal in noise; the reverse — require for result checks — stops at the first failure and forces fix-then-hit-next rounds.
+
+**Good**
+
+```go
+u, err := CreateUser(t.Context(), req)
+require.NoError(t, err)
+assert.Equal(t, "alice", u.Name)
+assert.False(t, u.IsAdmin)
+```
+
+**Bad**
+
+```go
+u, err := CreateUser(t.Context(), req)
+assert.NoError(t, err)
+assert.Equal(t, "alice", u.Name)
+```
+
+**References**
+
+- https://pkg.go.dev/github.com/stretchr/testify/require
+
+**Detection**: golangci-lint testifylint (Check the require/assert split in test bodies)
 
 ## (4) Mocks and Test Doubles
 

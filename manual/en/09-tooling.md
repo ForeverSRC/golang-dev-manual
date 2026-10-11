@@ -2,6 +2,46 @@
 
 ## (1) Command Line
 
+### 【MUST】TOOL-012 cobra programs write output through cmd.OutOrStdout and ErrOrStderr.
+
+- Category: Tooling/Command Line
+- Since: Go 1.0
+- Tags: tooling
+
+Output streams split by purpose.
+
+- Result data goes to stdout (`cmd.OutOrStdout()`); diagnostics, logs, and progress go to stderr (`cmd.ErrOrStderr()`)
+- stdout stays pure data so pipes and redirection work
+- Never use `os.Stdout`/`os.Stderr` directly
+
+**Why**
+
+> OutOrStdout returns out, stdOut, or stdout.
+>
+> — https://pkg.go.dev/github.com/spf13/cobra#Command.OutOrStdout
+
+cobra's output accessors inherit from the parent command and are replaceable in tests; output written straight to `os.Stdout` cannot be captured by tests, and logs mixed into stdout feed `| jq` style pipelines dirty data.
+
+**Good**
+
+```go
+fmt.Fprintln(cmd.OutOrStdout(), result)
+fmt.Fprintf(cmd.ErrOrStderr(), "loading config from %s\n", path)
+```
+
+**Bad**
+
+```go
+fmt.Println(result)
+log.Printf("loading config from %s", path)
+```
+
+**References**
+
+- https://pkg.go.dev/github.com/spf13/cobra#Command.OutOrStdout
+
+**Detection**: manual review (Check output writing in cobra commands)
+
 ### 【SHOULD】TOOL-004 Command line programs organize subcommands with `cobra`.
 
 - Category: Tooling/Command Line
@@ -91,6 +131,92 @@ $ go vet ./...
 
 **Detection**: manual review (Check whether `go fix` was run after the Go version upgrade)
 
+### 【SHOULD】TOOL-014 govulncheck runs as part of routine dependency vulnerability scanning.
+
+- Category: Tooling/Command Line
+- Since: Go 1.0
+- Tags: security, tooling
+
+Known vulnerabilities in the dependency tree are scanned periodically.
+
+- A CI scheduled task runs `govulncheck ./...`
+- govulncheck reports reachable vulnerabilities only, with a better signal-to-noise ratio than manual CVE lists
+- High-severity reachable findings get dependency upgrades or documented waivers
+
+**Why**
+
+> Regularly scanning your code and binaries for vulnerabilities helps identify potential security risks early.
+>
+> — https://go.dev/doc/security/best-practices
+
+Vulnerability disclosures precede impact assessments, and tracking CVE lists by hand always lags; govulncheck is driven by the official vulnerability database and analyzes call reachability, filtering the needs-handling subset out of hundreds of advisories.
+
+**Good**
+
+```go
+govulncheck ./...
+```
+
+**Bad**
+
+```go
+# CI 无任何依赖漏洞扫描步骤
+```
+
+**References**
+
+- https://go.dev/doc/security/best-practices
+- https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck
+
+**Detection**: manual review (Check CI configuration)
+
+### 【SHOULD】TOOL-015 Signal handling uses signal.NotifyContext into the context cancellation chain.
+
+- Category: Tooling/Command Line
+- Since: Go 1.16
+- Tags: tooling, context
+
+Signals, timeouts, and graceful shutdown share one context.
+
+- main creates the root ctx with `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)`
+- Graceful shutdown propagates through ctx cancellation to every component
+- No more manual channel-based signal forwarding
+
+**Why**
+
+> NotifyContext returns a copy of the parent context that is marked done (its Done channel is closed) when one of the listed signals arrives.
+>
+> — https://pkg.go.dev/os/signal#NotifyContext
+
+Manual signal forwarding needs hand-built channels, broadcasting, and timeout logic in every component, easy to miss; NotifyContext turns the signal into ctx cancellation, reusing the timeout and shutdown logic already on the context propagation chain.
+
+**Good**
+
+```go
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+if err := run(ctx); err != nil {
+  log.Fatal(err)
+}
+```
+
+**Bad**
+
+```go
+sigCh := make(chan os.Signal, 1)
+signal.Notify(sigCh, os.Interrupt)
+go func() {
+  <-sigCh
+  os.Exit(0)
+}()
+```
+
+**References**
+
+- https://pkg.go.dev/os/signal#NotifyContext
+
+**Detection**: manual review (Check signal handling in main)
+
 ## (2) Testing Tools
 
 ### 【MUST】TOOL-005 Unit test assertions uniformly use `testify`.
@@ -128,6 +254,45 @@ if got != want {
 - https://github.com/stretchr/testify#assert-package
 
 **Detection**: grep regex \bt\.(Errorf|Fatalf)\( (Matches should be replaced with `testify` assertions)
+
+### 【SHOULD】TOOL-013 Tests and CI run with go test -race.
+
+- Category: Tooling/Testing Tools
+- Since: Go 1.0
+- Tags: testing, concurrency, tooling
+
+The race detector covers all tests, not only concurrent code.
+
+- Local and CI `go test` runs carry `-race` by default
+- race reports only races actually triggered at runtime; insufficient coverage gets more tests
+- Performance-sensitive scenarios run non-race benchmarks separately
+
+**Why**
+
+> To use the race detector, add the -race flag when running your tests or building your application, for example, go test -race.
+>
+> — https://go.dev/doc/security/best-practices
+
+Data races cannot be excluded reliably by eye, and the race detector checks every memory access at runtime; the official security best practices list -race as standard configuration, and since it reports only executed paths, full test runs provide the needed coverage.
+
+**Good**
+
+```go
+go test -race ./...
+```
+
+**Bad**
+
+```go
+go test ./...
+```
+
+**References**
+
+- https://go.dev/doc/security/best-practices
+- https://go.dev/blog/race-detector
+
+**Detection**: manual review (Check CI configuration)
 
 ## (3) Code Generation
 

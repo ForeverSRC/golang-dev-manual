@@ -290,5 +290,280 @@
       "tool": "manual",
       "note": "核对秘密比较处是否用了常量时间函数"
     }
+  },
+  {
+    "id": "SEC-012",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "用户可控的 SQL 标识符用白名单校验后拼接。",
+    "details": "占位符只覆盖值，不覆盖列名、表名、排序方向等结构片段。\n\n- 动态选择的列名、表名、`ORDER BY` 方向用白名单映射后再进语句\n- 占位符参数化的对象是值，标识符不能走 `?` 传递\n- 与 SEC-001（值参数化）互补，两者覆盖面不同",
+    "quote": {
+      "text": "That snippet could complete the SQL statement in unpredictable ways that are dangerous to your application.",
+      "source": "https://go.dev/doc/database/sql-injection"
+    },
+    "rationale": "参数化把值与语句分离，但 ORDER BY 与表名必须是语句的一部分，直接拼接用户输入的标识符与拼接值同样可注入；白名单把「可选结构」限定在代码枚举的集合内，输入只做选择不做拼接。",
+    "examples": {
+      "good": "var allowed = map[string]string{\"name\": \"name\", \"created\": \"created_at\"}\ncol, ok := allowed[req.Sort]\nif !ok {\n  return fmt.Errorf(\"invalid sort field\")\n}\nq := \"SELECT id, name FROM users ORDER BY \" + col",
+      "bad": "q := \"SELECT id, name FROM users ORDER BY \" + req.Sort"
+    },
+    "sources": [
+      "https://go.dev/doc/database/sql-injection"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对动态 SQL 的标识符来源"
+    }
+  },
+  {
+    "id": "SEC-013",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "不可信输入强制大小上限，请求体用 http.MaxBytesReader。",
+    "details": "读取路径的输入必须有上限。\n\n- 请求体用 `http.MaxBytesReader` 包裹 `w` 与 `r.Body`\n- 解压（gzip、zip）目标大小设上限，防解压炸弹\n- 解码 JSON 等格式前先限读，再解析",
+    "quote": {
+      "text": "MaxBytesReader is similar to io.LimitReader but is intended for limiting the size of incoming request bodies.",
+      "source": "https://pkg.go.dev/net/http#MaxBytesReader"
+    },
+    "rationale": "无上限的读取把内存峰值交给对端：小压缩文件可以展开成 GB 级明文，超大请求体直接耗尽进程内存；上限把「对端想给多大」变成「我们收多大」。",
+    "examples": {
+      "good": "r.Body = http.MaxBytesReader(w, r.Body, 1<<20)\nif err := json.NewDecoder(r.Body).Decode(&req); err != nil {\n  http.Error(w, \"payload too large or invalid\", http.StatusRequestEntityTooLarge)\n  return\n}",
+      "bad": "if err := json.NewDecoder(r.Body).Decode(&req); err != nil {\n  http.Error(w, err.Error(), http.StatusBadRequest)\n  return\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/net/http#MaxBytesReader"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对解压与读入路径的上限"
+    }
+  },
+  {
+    "id": "SEC-014",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.16",
+    "summary": "临时文件用 os.CreateTemp 创建。",
+    "details": "临时文件名由系统生成，不手工拼固定路径。\n\n- `os.CreateTemp(dir, pattern)` 生成随机名，并发创建不冲突\n- 固定路径可被抢占（symlink 攻击）与并发互写\n- 用完即删，清理失败要记录",
+    "quote": {
+      "text": "Permissive temporary file creation.",
+      "source": "https://docs.bearer.com/reference/rules/go_gosec_filesystem_tempfile/"
+    },
+    "rationale": "固定路径的临时文件名可预测：攻击者可先创建同名符号链接劫持写入目标，或两个实例互踩同一个文件；CreateTemp 由内核保证名字唯一，抢占面消失。",
+    "examples": {
+      "good": "f, err := os.CreateTemp(\"\", \"report-*.tmp\")\nif err != nil {\n  return err\n}\ndefer os.Remove(f.Name())",
+      "bad": "f, err := os.Create(\"/tmp/report.tmp\")"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_gosec_filesystem_tempfile/",
+      "https://pkg.go.dev/os#CreateTemp"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "gosec(G302, G304)"
+    }
+  },
+  {
+    "id": "SEC-015",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "tls.Config 显式设置 MinVersion 为 TLS 1.2 以上。",
+    "details": "TLS 最低版本不依赖库默认值。\n\n- 自建 `tls.Config` 时显式写 `MinVersion: tls.VersionTLS12`\n- 库默认值随版本变化，显式声明让安全基线固定\n- gosec G402 可机检缺省与过旧版本",
+    "quote": {
+      "text": "Missing TLS MinVersion.",
+      "source": "https://docs.bearer.com/reference/rules/go_lang_missing_tls_minversion/"
+    },
+    "rationale": "TLS 1.0/1.1 有已公开的攻击（BEAST、POODLE 类），且 crypto/tls 的默认最低版本随 Go 版本演进；不显式设置时，安全基线实际由编译时选的 Go 版本决定，升级降级都不受控。",
+    "examples": {
+      "good": "cfg := &tls.Config{\n  MinVersion: tls.VersionTLS12,\n}",
+      "bad": "cfg := &tls.Config{}"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_lang_missing_tls_minversion/",
+      "https://pkg.go.dev/crypto/tls#Config"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "gosec(G402)"
+    }
+  },
+  {
+    "id": "SEC-016",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "SSH 连接必须校验主机密钥，禁用 InsecureIgnoreHostKey。",
+    "details": "SSH 客户端必须验证对端身份。\n\n- `HostKeyCallback` 用 `ssh.FixedHostKey` 或 known_hosts 校验\n- `ssh.InsecureIgnoreHostKey` 放弃中间人防护，仅限测试\n- 校验失败的连接必须终止",
+    "quote": {
+      "text": "Missing verification of host keys.",
+      "source": "https://docs.bearer.com/reference/rules/go_gosec_crypto_insecure_ignore_host_key/"
+    },
+    "rationale": "跳过主机密钥校验后，客户端无法分辨真实服务器与中间人：凭据、命令与传输数据全部暴露给拦截方；gosec G106 与 Bearer 规则都把它列为高危，仅测试环境可豁免。",
+    "examples": {
+      "good": "config := &ssh.ClientConfig{\n  HostKeyCallback: ssh.FixedHostKey(hostKey),\n}",
+      "bad": "config := &ssh.ClientConfig{\n  HostKeyCallback: ssh.InsecureIgnoreHostKey(),\n}"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_gosec_crypto_insecure_ignore_host_key/"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "gosec(G106)"
+    }
+  },
+  {
+    "id": "SEC-017",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "口令存储用 Argon2id、bcrypt 等慢哈希。",
+    "details": "口令哈希算法必须为暴力破解设计成本。\n\n- 口令用 `golang.org/x/crypto/argon2` 或 `golang.org/x/crypto/bcrypt`\n- 单轮 MD5/SHA-256 允许 GPU 每秒数十亿次尝试\n- 哈希参数（cost、内存）按硬件定期复核",
+    "quote": {
+      "text": "Usage of weak hashing library on a password (MD5).",
+      "source": "https://docs.bearer.com/reference/rules/go_lang_weak_password_encryption_md5/"
+    },
+    "rationale": "通用哈希函数为速度设计，口令哈希要为速度设计开销：Argon2id/bcrypt 的计算成本让离线爆破从秒级变成年级别；数据库泄露时这一层直接决定口令是否等于明文泄露。",
+    "examples": {
+      "good": "hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)",
+      "bad": "sum := md5.Sum([]byte(pwd))"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_lang_weak_password_encryption_md5/",
+      "https://pkg.go.dev/golang.org/x/crypto/bcrypt"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对口令存储的哈希算法"
+    }
+  },
+  {
+    "id": "SEC-018",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.2",
+    "summary": "对称加密用认证模式，nonce 每次随机不复用。",
+    "details": "加密模式必须同时提供机密性与完整性。\n\n- 用 AES-GCM 等 AEAD 模式，禁用 ECB 与未认证模式裸用\n- nonce 每次随机生成，同一密钥下不复用\n- Go 1.24+ 可用 `cipher.NewGCMWithRandomNonce` 让库管理 nonce",
+    "quote": {
+      "text": "The nonce must be NonceSize() bytes long and unique for all time, for a given key.",
+      "source": "https://pkg.go.dev/crypto/cipher#AEAD"
+    },
+    "rationale": "无认证模式可被篡改而不被发现，ECB 还会泄露明文模式；GCM 下同一密钥复用 nonce 会同时泄露密钥流并破坏认证，官方文档把 nonce 唯一性写成必须项。",
+    "examples": {
+      "good": "gcm, err := cipher.NewGCM(block)\nif err != nil {\n  return err\n}\nnonce := make([]byte, gcm.NonceSize())\nif _, err := rand.Read(nonce); err != nil {\n  return err\n}\nct := gcm.Seal(nil, nonce, plaintext, nil)",
+      "bad": "iv := make([]byte, 16)\nct := gcm.Seal(nil, iv, plaintext, nil)"
+    },
+    "sources": [
+      "https://pkg.go.dev/crypto/cipher#AEAD"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对加密模式与 nonce 生成"
+    }
+  },
+  {
+    "id": "SEC-019",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "会话 cookie 设置 HttpOnly、Secure 与 SameSite。",
+    "details": "认证类 cookie 的三个属性缺一不可。\n\n- `HttpOnly` 阻止脚本读取，`Secure` 强制仅 HTTPS 传输，`SameSite` 限制跨站携带\n- 会话、令牌、认证类 cookie 全部适用\n- 非敏感的功能 cookie 可豁免并在评审中说明",
+    "quote": {
+      "text": "Missing HTTP Only option in cookie configuration.",
+      "source": "https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/"
+    },
+    "rationale": "缺 HttpOnly 时 XSS 脚本可直接读走会话令牌；缺 Secure 时令牌随明文 HTTP 传输；缺 SameSite 时跨站请求自动携带 cookie 构成 CSRF，三项分别封堵一类攻击路径。",
+    "examples": {
+      "good": "http.SetCookie(w, &http.Cookie{\n  Name: \"session\",\n  Value: tok,\n  HttpOnly: true,\n  Secure: true,\n  SameSite: http.SameSiteLaxMode,\n})",
+      "bad": "http.SetCookie(w, &http.Cookie{\n  Name: \"session\",\n  Value: tok,\n})"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/",
+      "https://docs.bearer.com/reference/rules/go_lang_insecure_cookie/"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 cookie 属性设置"
+    }
+  },
+  {
+    "id": "SEC-020",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "JWT 校验固定签名算法白名单，不信任令牌 alg 字段。",
+    "details": "可接受的签名算法由代码枚举。\n\n- 解析器显式配置算法白名单（如只允许 `RS256`）\n- 不按令牌自带的 `alg` 字段选择验证算法\n- `none` 算法除明确受控场景外一律拒绝",
+    "quote": {
+      "text": "Libraries MUST enable the caller to specify a supported set of algorithms and MUST NOT use any other algorithms when performing cryptographic operations.",
+      "source": "https://datatracker.ietf.org/doc/html/rfc8725#section-3.1"
+    },
+    "rationale": "信任令牌 alg 字段即接受攻击者改写算法：改为 none 绕过验签，RS256 换 HS256 用公钥当 HMAC 密钥伪造签名，两者都是已公开利用的攻击；算法白名单让令牌声称的算法不在集合内即拒绝。",
+    "examples": {
+      "good": "tok, err := jwt.Parse(tokenStr, keyFunc, jwt.WithValidMethods([]string{\"RS256\"}))",
+      "bad": "tok, err := jwt.Parse(tokenStr, keyFunc)"
+    },
+    "sources": [
+      "https://datatracker.ietf.org/doc/html/rfc8725#section-3.1"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 JWT 解析配置"
+    }
+  },
+  {
+    "id": "SEC-021",
+    "level": "MUST",
+    "chapter": "security",
+    "tags": [
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "应用代码不使用 unsafe 绕过内存安全。",
+    "details": "unsafe 只属于经过专门审查的低层库。\n\n- 业务代码不 import `unsafe` 绕过类型与边界检查\n- 确需零拷贝等场景封装在经审的低层包内并写明不变量\n- 引入 unsafe 的评审按最高级别对待",
+    "quote": {
+      "text": "Package unsafe contains operations that step around the type safety of Go programs.",
+      "source": "https://pkg.go.dev/unsafe"
+    },
+    "rationale": "Go 的内存安全由编译器与 GC 保证，unsafe 绕过这套保护后，越界与别名问题从「编译失败或 panic」变成「未定义行为」，且逃过所有静态检查；收益只有极低层场景才配得上这个代价。",
+    "examples": {
+      "good": "func toBytes(s string) []byte { return []byte(s) }",
+      "bad": "func toBytes(s string) []byte {\n  return unsafe.Slice(unsafe.StringData(s), len(s))\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/unsafe",
+      "https://docs.bearer.com/reference/rules/go_gosec_unsafe_unsafe/"
+    ],
+    "detect": {
+      "tool": "grep",
+      "pattern": "\\bunsafe\\."
+    }
   }
 ]

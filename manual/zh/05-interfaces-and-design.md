@@ -179,6 +179,129 @@ func Save(w *io.Writer) error
 
 **检测**：人工核对（核对函数签名与结构体字段是否出现 *接口类型）
 
+### 【SHOULD】IFACE-005 惯用方法签名匹配标准接口，不自造变体。
+
+- 归属：接口与设计规约/接口定义与落位
+- 起始版本：Go 1.0
+- 主题：api-design
+
+意图对应标准接口时签名必须完全一致。
+
+- `String` 匹配 `fmt.Stringer`，`Read` 匹配 `io.Reader`，`Error` 匹配 error
+- 不发明 `ToString`、`ReadData` 一类变体名
+- 变体方法接入不了依赖该接口的标准生态
+
+**为什么**
+
+> Stringer is implemented by any value that has a String method, which defines the “native” format for that value.
+>
+> —— https://pkg.go.dev/fmt#Stringer
+
+fmt、io、sort 等标准生态按接口方法名发现能力：String 匹配 fmt.Stringer 才能被 %v 打印，Read 匹配 io.Reader 才能进 io.Copy 管道；ToString 这类变体与生态完全脱钩，同名能力写两遍。
+
+**正例**
+
+```go
+func (u User) String() string { return u.Name }
+```
+
+**反例**
+
+```go
+func (u User) ToString() string { return u.Name }
+```
+
+**依据**
+
+- https://pkg.go.dev/fmt#Stringer
+
+**检测**：人工核对（核对与标准接口同名意图的方法签名）
+
+### 【SHOULD】IFACE-006 删除导出符号前先标注 Deprecated 并保留一个发布周期。
+
+- 归属：接口与设计规约/接口定义与落位
+- 起始版本：Go 1.0
+- 主题：api-design
+
+导出符号的删除是 API 破坏性变更。
+
+- 先在文档注释加 `Deprecated: ` 前缀并写明替代品
+- 保留至少一个发布周期，给下游迁移窗口
+- 内部模块（`internal/`）的符号不受本条约束
+
+**为什么**
+
+> If a symbol is deprecated, the comment should begin with the text "Deprecated:" followed by information about the deprecation.
+>
+> —— https://go.dev/doc/comment
+
+直接删除让下游模块在下一次 build 时无预警破损，跨仓库依赖场景连发布窗口都没有；Deprecated 标注进入 godoc 与 IDE 提示，工具链天然传播迁移信息。
+
+**正例**
+
+```go
+// Deprecated: Use NewClient instead.
+func NewConn(addr string) (*Conn, error) { ... }
+```
+
+**反例**
+
+```go
+func NewConn(addr string) (*Conn, error) { ... }
+```
+
+**依据**
+
+- https://go.dev/doc/comment
+
+**检测**：人工核对（核对导出符号删除前的 git 历史与注释）
+
+### 【MAY】IFACE-004 接口保持少量方法，大契约由小接口组合。
+
+- 归属：接口与设计规约/接口定义与落位
+- 起始版本：Go 1.0
+- 主题：api-design
+
+接口越小，实现者与 mock 成本越低。
+
+- 1–3 个方法的接口优先，超过时评估能否拆分组合
+- 阈值是建议值，不是硬性禁令
+- 依赖方按需定义窄接口，实现方保持具体类型
+
+**为什么**
+
+> The bigger the interface, the weaker the abstraction.
+>
+> —— https://go-proverbs.github.io/
+
+接口方法越多，实现与测试替身要满足的契约越多，抽象对实现方的约束反而越弱；小接口按能力组合，调用方只声明自己用到的那一小块，替换实现与单元测试都更轻。
+
+**正例**
+
+```go
+type Store interface {
+  Get(ctx context.Context, id string) (*Item, error)
+}
+```
+
+**反例**
+
+```go
+type Store interface {
+  Get(ctx context.Context, id string) (*Item, error)
+  Put(ctx context.Context, it *Item) error
+  Delete(ctx context.Context, id string) error
+  List(ctx context.Context, q Query) ([]*Item, error)
+  Count(ctx context.Context, q Query) (int, error)
+}
+```
+
+**依据**
+
+- https://go-proverbs.github.io/
+
+**检测**：人工核对（核对接口定义的方法数）
+
 ## （二）组合与复用
 
 ### 【SHOULD】COMPOSE-001 复用能力通过组合表达，不搭继承式层次。
@@ -386,6 +509,48 @@ return svc.Load(nil, path)
 
 **检测**：golangci-lint staticcheck(SA1012)（SA1012 检出向函数传 nil context 的调用）
 
+### 【MUST】CTX-005 WithCancel 与 WithTimeout 等返回的 cancel 必须调用。
+
+- 归属：接口与设计规约/context 传递
+- 起始版本：Go 1.7
+- 主题：context
+
+创建可取消 context 的所有控制流路径都要走到 cancel。
+
+- scoped 场景立即 `defer cancel()`
+- 所有权转移（如交给后台任务）时把 cancel 一并移交并注释
+- govet lostcancel 可机检未调用路径
+
+**为什么**
+
+> Calling the CancelFunc cancels the child and its children, removes the parent's reference to the child, and stops any associated timers.
+>
+> —— https://pkg.go.dev/context#WithCancel
+
+不调 cancel 时，子 context 及其 timer 被父 context 引用到父结束才释放，长期运行进程里每次未释放的 WithTimeout 都在累积泄漏；cancel 是廉价的显式清理，漏掉只表现为慢性内存增长。
+
+**正例**
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+defer cancel()
+resp, err := client.Do(req.WithContext(ctx))
+```
+
+**反例**
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+_ = cancel
+resp, err := client.Do(req.WithContext(ctx))
+```
+
+**依据**
+
+- https://pkg.go.dev/context#WithCancel
+
+**检测**：golangci-lint govet(lostcancel)
+
 ### 【SHOULD】CTX-001 不把 context.Context 存进结构体，作为函数第一个参数传递。
 
 - 归属：接口与设计规约/context 传递
@@ -514,6 +679,177 @@ func Render(ctx context.Context) error {
 
 **检测**：人工核对（核对 context.Value 里放的是否为请求作用域数据）
 
+### 【SHOULD】CTX-006 context.Background 只在入口创建，链中部不顶替入参 ctx。
+
+- 归属：接口与设计规约/context 传递
+- 起始版本：Go 1.7
+- 主题：context
+
+Background 与 TODO 是根 context 的专位。
+
+- 只用于 main、init、测试入口与请求处理的顶层
+- 请求链中部不得用 `context.Background()` 或 `context.TODO()` 顶替入参 ctx
+- 需要脱离取消的后台任务用 `context.WithoutCancel`（见 CTX-008）
+
+**为什么**
+
+> Background returns a non-nil, empty Context. It is never canceled, has no values, and has no deadline. It is typically used by the main function, initialization, and tests, and as the top-level Context for incoming requests.
+>
+> —— https://pkg.go.dev/context#Background
+
+链中部换用 Background 会把调用方的取消信号、截止时间与 value 全部丢弃：客户端断开后下游照常执行，超时防线从该调用起失效；文档把它的适用面限定在 main、init 与测试入口。
+
+**正例**
+
+```go
+func handle(ctx context.Context, id string) error {
+  return store.Get(ctx, id)
+}
+```
+
+**反例**
+
+```go
+func handle(ctx context.Context, id string) error {
+  return store.Get(context.Background(), id)
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/context#Background
+
+**检测**：人工核对（核对非入口函数中的 context.Background 与 TODO 调用）
+
+### 【SHOULD】CTX-007 有 *Context 变体的 API 一律用变体并传 ctx。
+
+- 归属：接口与设计规约/context 传递
+- 起始版本：Go 1.7
+- 主题：context
+
+标准库与主流库的 ctx 变体优先于裸调用。
+
+- `http.NewRequest` 而非 `http.NewRequestWithContext` 时请求脱离取消体系
+- `db.Query` 而非 `db.QueryContext` 时查询无法级联取消
+- noctx 检查器发现存在变体却被裸调用的位置
+
+**为什么**
+
+> Incoming requests to a server should create a Context, and outgoing calls to servers should accept a Context.
+>
+> —— https://pkg.go.dev/context
+
+裸调用把这次操作挂到无取消的 context 上：客户端断开、上游超时或进程退出的信号都传不进来，下游照常执行完整个操作；ctx 变体让取消与超时沿调用链级联传播。
+
+**正例**
+
+```go
+req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+```
+
+**反例**
+
+```go
+req, err := http.NewRequest(http.MethodGet, url, nil)
+```
+
+**依据**
+
+- https://pkg.go.dev/context
+
+**检测**：golangci-lint noctx
+
+### 【SHOULD】CTX-008 请求后继续的后台任务用 context.WithoutCancel。
+
+- 归属：接口与设计规约/context 传递
+- 起始版本：Go 1.21
+- 主题：context
+
+请求结束后仍要执行、又需要保留 trace 链的任务用 WithoutCancel。
+
+- 用 `context.WithoutCancel(ctx)` 替代 `context.Background()`
+- 保留原 ctx 的 value（trace id、鉴权信息），脱离原 ctx 的取消
+- Go 1.21 引入，旧版本需自行封 value
+
+**为什么**
+
+> WithoutCancel returns a copy of parent that is not canceled when parent is canceled. The returned Context returns no Deadline or Err, and its Done channel is nil.
+>
+> —— https://pkg.go.dev/context#WithoutCancel
+
+Background 顶替入参 ctx 会丢掉 value，trace id 在后台任务里断链；WithoutCancel 既保留取值链又脱离取消，是「请求外继续」场景的正解。
+
+**正例**
+
+```go
+bgCtx := context.WithoutCancel(ctx)
+go audit(bgCtx, req)
+```
+
+**反例**
+
+```go
+go audit(context.Background(), req)
+```
+
+**依据**
+
+- https://pkg.go.dev/context#WithoutCancel
+
+**检测**：人工核对（核对请求处理器内后台任务的 ctx 来源）
+
+### 【SHOULD】CTX-009 重试循环每轮检查 ctx.Err，取消后停止重试。
+
+- 归属：接口与设计规约/context 传递
+- 起始版本：Go 1.7
+- 主题：context, control-flow
+
+重试的循环条件要感知取消。
+
+- 每轮重试前检查 `ctx.Err()`，非 nil 即退出
+- 退避等待用 `select` 等待 `ctx.Done()` 或 timer
+- 上游已放弃时继续重试浪费资源并拖长恢复
+
+**为什么**
+
+> A Context carries a deadline, a cancellation signal, and other values across API boundaries.
+>
+> —— https://pkg.go.dev/context
+
+上游取消后仍按既定次数重试，把资源花在没人要的结果上，还与真正需要的请求抢占下游容量；取消信号就该打断重试循环，而不是只在单次请求内生效。
+
+**正例**
+
+```go
+for i := 0; i < maxRetries; i++ {
+  if err := try(ctx); err == nil {
+    return nil
+  }
+  select {
+  case <-ctx.Done():
+    return ctx.Err()
+  case <-time.After(backoff)
+  }
+}
+```
+
+**反例**
+
+```go
+for i := 0; i < maxRetries; i++ {
+  if err := try(ctx); err == nil {
+    return nil
+  }
+  time.Sleep(backoff)
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/context
+
+**检测**：人工核对（核对重试循环的退出条件）
+
 ## （五）结构体安全形状
 
 ### 【MUST】STRUCT-001 含 sync.Mutex 等同步原语的结构体禁止值拷贝，一律用指针传递或接收。
@@ -563,6 +899,90 @@ func (c Counter) Inc() {
 - https://google.github.io/styleguide/go/decisions
 
 **检测**：golangci-lint govet(copylocks)
+
+### 【SHOULD】STRUCT-003 同一类型的方法接收者类型保持一致。
+
+- 归属：接口与设计规约/结构体安全形状
+- 起始版本：Go 1.0
+- 主题：api-design
+
+一个类型的全部方法统一用指针或统一用值接收者。
+
+- 需要修改接收者、含同步原语或结构体较大时全用指针
+- 只读且拷贝代价小的简单类型可全用值
+- 混用导致「值拷贝后调用指针方法」的语义难以预测
+
+**为什么**
+
+> If some of the methods of the type must have pointer receivers, then so should all of them
+>
+> —— https://go.dev/wiki/CodeReviewComments#receiver-type
+
+值接收者方法操作副本，指针接收者方法操作原值；同一类型混用两种接收者时，调用处到底改没改原对象取决于方法声明而非调用意图，读者必须逐方法核对。
+
+**正例**
+
+```go
+type Counter struct { n int }
+func (c *Counter) Inc() { c.n++ }
+func (c *Counter) Value() int { return c.n }
+```
+
+**反例**
+
+```go
+type Counter struct { n int }
+func (c *Counter) Inc() { c.n++ }
+func (c Counter) Value() int { return c.n }
+```
+
+**依据**
+
+- https://go.dev/wiki/CodeReviewComments#receiver-type
+
+**检测**：人工核对（核对同类型方法的接收者声明）
+
+### 【SHOULD】STRUCT-004 参与序列化的导出字段必须带 field tag。
+
+- 归属：接口与设计规约/结构体安全形状
+- 起始版本：Go 1.0
+- 主题：api-design, data-structures
+
+对外契约字段显式写 tag，不依赖编码器回退。
+
+- `json`/`db`/`yaml` 等格式按用途标注，统一命名风格（如 `snake_case`）
+- 无 tag 时编码器回退 Go 字段名，重命名即改线上格式
+- structtag 检查器可发现 tag 格式错误
+
+**为什么**
+
+> The encoding of each struct field can be customized by the format string stored under the "json" key in the struct field's tag.
+>
+> —— https://pkg.go.dev/encoding/json#Marshal
+
+无 tag 时编码器直接用 Go 字段名，重命名一个字段就悄悄改掉线上 JSON 的 key，下游解析方在下一个版本才炸出来；显式 tag 把对外格式固定在结构体定义处，重命名 Go 标识符不再影响契约。
+
+**正例**
+
+```go
+type User struct {
+  CreatedAt time.Time `json:"created_at"`
+}
+```
+
+**反例**
+
+```go
+type User struct {
+  CreatedAt time.Time
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/encoding/json#Marshal
+
+**检测**：golangci-lint structtag
 
 ### 【MAY】STRUCT-002 不应支持比较的结构体，用不可比较字段让编译期拦截 ==。
 

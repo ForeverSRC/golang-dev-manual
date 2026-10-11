@@ -120,6 +120,137 @@ if err := save(order); err != nil {
 
 **检测**：人工核对（逐个 if err != nil 分支核对：同一分支内既写日志又 return err 即违反）
 
+### 【MUST】ERR-007 error 返回值不得用 _ 丢弃。
+
+- 归属：错误与日志/错误处理规约
+- 起始版本：Go 1.0
+- 主题：error-handling
+
+error 是函数结果的一部分，必须逐处检查。
+
+- 不用 `_` 接收 error 返回值
+- 不在检查 error 之前使用其他返回值（未检查 err 就使用 v）
+- 确实无操作空间时记录或上抛，不留静默路径
+- errcheck 可机检
+
+**为什么**
+
+> The error built-in interface type is the conventional interface for representing an error condition, with the nil value representing no error.
+>
+> —— https://pkg.go.dev/builtin#error
+
+语言约定里 nil 代表无错、非 nil 必须处理，用 `_` 丢弃等于宣布失败不可见；被吞掉的错误在下游表现为空数据、零值对象或超时，排障时无从定位最初的失败点。
+
+**正例**
+
+```go
+if _, err := w.Write(data); err != nil {
+  return fmt.Errorf("write body: %w", err)
+}
+```
+
+**反例**
+
+```go
+_, _ = w.Write(data)
+```
+
+**依据**
+
+- https://pkg.go.dev/builtin#error
+
+**检测**：golangci-lint errcheck
+
+### 【MUST】ERR-009 库代码与请求处理路径不调 os.Exit 与 log.Fatal。
+
+- 归属：错误与日志/错误处理规约
+- 起始版本：Go 1.0
+- 主题：error-handling
+
+退出决策权归 main。
+
+- 业务代码返回 error，由 main 决定退出码
+- `os.Exit` 与 `log.Fatal` 跳过全部 defer，清理逻辑失效
+- main 之外仅允许入口装配的显式失败路径
+
+**为什么**
+
+> Exit causes the current program to exit with the given status code. Deferred functions are not run.
+>
+> —— https://pkg.go.dev/os#Exit
+
+os.Exit 不给 defer 执行机会：锁未释放、缓冲未刷出、连接未关闭直接终止；库代码里调用它还会剥夺调用方处理错误的全部机会，失败原因只留在 stdout 上一行日志。
+
+**正例**
+
+```go
+func run() error {
+  return loadConfig()
+}
+func main() {
+  if err := run(); err != nil {
+    log.Fatal(err)
+  }
+}
+```
+
+**反例**
+
+```go
+func loadConfig() *Config {
+  cfg, err := parse()
+  if err != nil {
+    log.Fatal(err)
+  }
+  return cfg
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/os#Exit
+
+**检测**：人工核对（核对非 main 包的 os.Exit 与 log.Fatal 调用）
+
+### 【MUST】ERR-011 对外错误信息保持泛化，细节只进服务端日志。
+
+- 归属：错误与日志/错误处理规约
+- 起始版本：Go 1.0
+- 主题：error-handling, security
+
+面向客户端的错误响应不携带内部细节。
+
+- 堆栈、SQL 语句、文件路径、上游地址只写服务端日志
+- 对外响应给通用错误码与提示（如 internal error）
+- 错误日志需带请求标识，能与服务端日志对上
+
+**为什么**
+
+> Leakage of sensitive information in exception message.
+>
+> —— https://docs.bearer.com/reference/rules/go_lang_information_leakage/
+
+原始错误文本把表结构、目录布局、依赖版本递给攻击者，是注入类攻击的侦察信息；把细节留在服务端日志、对外只给泛化信息，攻击面不随错误处理策略扩大。
+
+**正例**
+
+```go
+slog.Error("query failed", "err", err, "req_id", reqID)
+http.Error(w, "internal error", http.StatusInternalServerError)
+```
+
+**反例**
+
+```go
+http.Error(w, err.Error(), http.StatusInternalServerError)
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_lang_information_leakage/
+
+**检测**：人工核对（核对对外错误响应的构造）
+
 ### 【SHOULD】ERR-004 可预期的失败返回 error，不用 panic。
 
 - 归属：错误与日志/错误处理规约
@@ -211,6 +342,91 @@ order := Lookup(id) // the caller cannot tell not-found from a zero value
 - https://go.dev/wiki/CodeReviewComments#in-band-errors
 
 **检测**：人工核对（核对是否用 -1、空值或零值表达失败）
+
+### 【SHOULD】ERR-010 可写资源的 Close 与 Flush 错误必须检查。
+
+- 归属：错误与日志/错误处理规约
+- 起始版本：Go 1.0
+- 主题：error-handling
+
+写路径的收尾错误不能忽略。
+
+- `bufio.Writer.Flush`、写文件的 `Close` 失败意味着数据没有落盘
+- 只读清理（读文件 Close）可忽略
+- 检查后再记录或上抛，不静默吞掉
+
+**为什么**
+
+> Flush writes any buffered data to the underlying io.Writer.
+>
+> —— https://pkg.go.dev/bufio#Writer.Flush
+
+缓冲写的数据在 Flush/Close 时才真正落到底层，这一步失败即静默丢数据：进程照常退出，文件却是空的或截断的；只读路径没有这个风险，忽略无害。
+
+**正例**
+
+```go
+if err := bw.Flush(); err != nil {
+  return fmt.Errorf("flush: %w", err)
+}
+if err := f.Close(); err != nil {
+  return fmt.Errorf("close: %w", err)
+}
+```
+
+**反例**
+
+```go
+bw.Flush()
+f.Close()
+```
+
+**依据**
+
+- https://pkg.go.dev/bufio#Writer.Flush
+
+**检测**：人工核对（核对写路径资源关闭处的错误处理）
+
+### 【MAY】ERR-008 相互独立的失败用 errors.Join 合并返回。
+
+- 归属：错误与日志/错误处理规约
+- 起始版本：Go 1.20
+- 主题：error-handling
+
+需要一次报出全部失败时用 errors.Join。
+
+- 逐字段校验、批量关闭资源等场景，各失败都值得报出
+- 合并后的错误仍可被 `errors.Is` 按成员分别命中
+- 存在首错即停的因果依赖时直接返回第一个错误
+
+**为什么**
+
+> Join returns an error that wraps the given errors.
+>
+> —— https://pkg.go.dev/errors#Join
+
+逐个返回会让调用方修完一个错再撞下一个，多轮往返；Join 把独立失败合并成一次报出，且每个成员仍是可判定独立错误的值，errors.Is 的语义不因合并而丢失。
+
+**正例**
+
+```go
+return errors.Join(validateName(u), validateEmail(u))
+```
+
+**反例**
+
+```go
+if err := validateName(u); err != nil {
+  return err
+}
+return validateEmail(u)
+```
+
+**依据**
+
+- https://pkg.go.dev/errors#Join
+
+**检测**：人工核对（核对多失败路径的合并方式）
 
 ## （二）错误码规约
 
@@ -325,6 +541,44 @@ if err := callOrder(ctx); err != nil {
 
 **检测**：人工核对（核对对外返回的错误是否直接来自下游）
 
+### 【MAY】CODE-004 错误字符串全小写、不以标点结尾，sentinel 错误带包名前缀。
+
+- 归属：错误与日志/错误码规约
+- 起始版本：Go 1.0
+- 主题：error-handling, naming
+
+错误消息按「可拼接」风格书写。
+
+- 全小写（缩略词也小写：`invalid id`，不写 `invalid ID`）
+- 不以标点结尾，不写成完整句子
+- sentinel 错误消息带包名前缀标识来源（如 `mypkg: not found`）
+
+**为什么**
+
+> Error strings should not be capitalized (unless beginning with proper nouns or acronyms) or end with punctuation, since they are often combined with other context information.
+>
+> —— https://go.dev/wiki/CodeReviewComments#error-strings
+
+错误在调用链上被层层包装拼接，首字母大写或句尾标点出现在中间时读起来是病句；包名前缀让多包错误混在同一日志里时仍能定位来源。
+
+**正例**
+
+```go
+var ErrNotFound = errors.New("mypkg: entity not found")
+```
+
+**反例**
+
+```go
+var ErrNotFound = errors.New("Mypkg: Entity Not Found.")
+```
+
+**依据**
+
+- https://go.dev/wiki/CodeReviewComments#error-strings
+
+**检测**：人工核对（核对 errors.New 与 Errorf 的消息文本）
+
 ## （三）日志规约
 
 ### 【MUST】LOG-001 业务日志用 log/slog 记录，不用 fmt 与 log 直接打印。
@@ -361,6 +615,44 @@ fmt.Printf("order created: %s\n", order.ID)
 - https://pkg.go.dev/log/slog
 
 **检测**：grep 正则 \b(fmt\.Print|log\.Print)（命中处人工核对是否为业务日志）
+
+### 【MUST】LOG-004 日志不输出口令、令牌、邮箱等 PII 与凭据。
+
+- 归属：错误与日志/日志规约
+- 起始版本：Go 1.0
+- 主题：logging, security
+
+敏感字段不进日志，需要关联时用内部标识符。
+
+- 口令、令牌、密钥、邮箱、手机号不落日志
+- 请求关联用内部 id，不打全量请求体
+- 结构化日志的字段名与值都要过一遍敏感词评审
+
+**为什么**
+
+> Leakage of sensitive information in logger message.
+>
+> —— https://docs.bearer.com/reference/rules/go_lang_logger/
+
+日志的读取面远大于数据库：采集、存储、检索、第三方汇聚都可能是明文，凭据与 PII 一旦落日志就无法回收，泄露面与合规风险同时放大。
+
+**正例**
+
+```go
+slog.Info("user login", "user_id", uid)
+```
+
+**反例**
+
+```go
+slog.Info("user login", "email", email, "password", pwd)
+```
+
+**依据**
+
+- https://docs.bearer.com/reference/rules/go_lang_logger/
+
+**检测**：人工核对（核对日志字段中的敏感信息）
 
 ### 【SHOULD】LOG-002 日志字段写成键值对，不拼进消息文本。
 

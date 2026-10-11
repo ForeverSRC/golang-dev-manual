@@ -46,5 +46,47 @@
     "details": "A string, an interface value, and a small struct are themselves only a machine word in size, so passing by value and passing a pointer cost about the same to copy. Pass by value when the function body only reads through `*p` and never writes. Pass a pointer when the caller's data must be modified, or the struct is clearly large.",
     "rationale": "A string and an interface value are fixed-size headers whose copy cost equals that of passing a pointer, with one less dereference. Passing `*string` or `*io.Reader` to save bytes adds a layer of indirection, and when the pointer escapes the function it can push the data onto the heap, actually increasing allocations.",
     "detect_note": "Check whether a parameter that is only read through a dereference uses a pointer."
+  },
+  "PERF-009": {
+    "summary": "Production code does not compare with reflect.DeepEqual.",
+    "details": "Type-known comparisons use the typed Equal functions.\n\n- `slices.Equal` for slices, `maps.Equal` for maps, `bytes.Equal` for byte strings\n- `reflect.DeepEqual` walks reflection and runs 50–200x slower\n- Test code comparing expected values is exempt (semantics first)",
+    "rationale": "DeepEqual reflects over the value structure at runtime, costing one to two orders of magnitude more than typed comparison on hot paths; the typed Equal functions in the slices and maps packages are compiler-specialized, with the same semantics at near hand-written-loop cost.",
+    "detect_note": "Check DeepEqual calls on production paths"
+  },
+  "PERF-010": {
+    "summary": "regexp and template compile once at package level.",
+    "details": "Compiled artifacts are reused, not rebuilt in function bodies.\n\n- Package-level `var re = regexp.MustCompile(...)`, with functions only referencing it\n- Repeated Compile inside functions costs roughly an order of magnitude more and always allocates\n- template's `Parse` follows the same rule",
+    "rationale": "Compile parses the regex and builds the state machine on every call, an overhead comparable to the matching itself on hot paths; the official documentation writes the package-level initialization case into MustCompile's description — compile once and reuse is its designed use.",
+    "detect_note": "Check for regexp.Compile and template.Parse inside function bodies"
+  },
+  "PERF-011": {
+    "summary": "Unbounded inputs are processed streaming, not loaded whole with io.ReadAll.",
+    "details": "Memory peaks follow the input's upper bound, not its current size.\n\n- Large files and unbounded responses stream with `bufio.Scanner` and `io.Copy`\n- `io.ReadAll` is for bounded, small inputs only (such as a small config)\n- Unbounded means the maximum size cannot be known before the call",
+    "rationale": "ReadAll piles the whole input into memory, and with unbounded inputs (external URLs, user uploads) the memory peak is handed to the peer or an attacker; streaming keeps memory usage constant, decoupled from input scale.",
+    "detect_note": "Check whether io.ReadAll inputs are bounded"
+  },
+  "PERF-012": {
+    "summary": "A reused http.Client sets Timeout explicitly and customizes its Transport.",
+    "details": "Client and Transport are process-level configuration points.\n\n- A zero-value Client has no timeout; requests may hang forever\n- The default Transport's `MaxIdleConnsPerHost` is only 2, so high concurrency queues for connections\n- A package-level singleton Client is configured centrally, never created ad hoc at call sites",
+    "rationale": "The connection pool is the Client's internal state: creating a Client per call rebuilds the pool and discards every reusable keep-alive connection, and a zero-value Client with no timeout turns an unresponsive downstream into a goroutine leak.",
+    "detect_note": "Check the configuration of package-level http.Clients"
+  },
+  "PERF-013": {
+    "summary": "Handle resp.Body by version: Go 1.27+ reclaims on Close; earlier versions must drain it.",
+    "details": "Connection reuse depends on the body's read state.\n\n- Go 1.27+ automatically drains unread content on Body close (within a conservative limit); manual draining is unnecessary\n- To abandon a very large body, or on Go 1.26 and below, `io.Copy(io.Discard, resp.Body)` before `Close`\n- Every response must be `Close`d whether or not its content is read",
+    "rationale": "A keep-alive connection returns to the pool only after its body is drained, and undrained connections are torn down and rebuilt; since Go 1.27, Close drains automatically, fixing the performance trap — but bodies beyond the automatic limit still need explicit handling.",
+    "detect_note": "Check body handling in HTTP client code"
+  },
+  "PERF-014": {
+    "summary": "Range over maps taking the value variable, not a second subscript lookup.",
+    "details": "for k, v := range m hashes once per iteration.\n\n- When the value is needed, use the loop variable v, not `m[k]`\n- When only keys are needed, use `for k := range m`\n- `m[k]` inside the loop body re-hashes every iteration",
+    "rationale": "The second range variable is the element already fetched during iteration, while m[k] re-hashes the key every round; in hot loops it is pure waste, and the form carries no compensating benefit.",
+    "detect_note": "Check map range loop bodies"
+  },
+  "PERF-016": {
+    "summary": "sql.DB connection pool limits and lifetimes are configured explicitly.",
+    "details": "Pool parameters default to no protection.\n\n- Set `MaxOpenConns`, `MaxIdleConns`, `ConnMaxLifetime`, and `ConnMaxIdleTime` explicitly\n- Defaults are unlimited connections that never expire, so a failure piles connections up and crushes the database\n- Values follow the database connection limit and instance replica count, with notes",
+    "rationale": "An unlimited default means every goroutine can hold a connection, so amplified failures crush the database before the application; explicit limits keep failure behavior bounded, and ConnMaxLifetime rotates connections to avoid database-side aging.",
+    "detect_note": "Check pool configuration after sql.Open"
   }
 }

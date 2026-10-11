@@ -2,6 +2,46 @@
 
 ## （一）命令行
 
+### 【MUST】TOOL-012 cobra 程序输出写 cmd.OutOrStdout 与 ErrOrStderr。
+
+- 归属：工具规约/命令行
+- 起始版本：Go 1.0
+- 主题：tooling
+
+输出流按用途分流。
+
+- 结果数据走 stdout（`cmd.OutOrStdout()`），诊断、日志、进度走 stderr（`cmd.ErrOrStderr()`）
+- stdout 保持纯数据，管道与重定向才可用
+- 不直接用 `os.Stdout`/`os.Stderr`
+
+**为什么**
+
+> OutOrStdout returns out, stdOut, or stdout.
+>
+> —— https://pkg.go.dev/github.com/spf13/cobra#Command.OutOrStdout
+
+cobra 的输出访问器继承自父命令并可在测试中替换；直接写 `os.Stdout` 的输出无法被测试捕获，日志混进 stdout 也会让 `| jq` 这类管道拿到脏数据。
+
+**正例**
+
+```go
+fmt.Fprintln(cmd.OutOrStdout(), result)
+fmt.Fprintf(cmd.ErrOrStderr(), "loading config from %s\n", path)
+```
+
+**反例**
+
+```go
+fmt.Println(result)
+log.Printf("loading config from %s", path)
+```
+
+**依据**
+
+- https://pkg.go.dev/github.com/spf13/cobra#Command.OutOrStdout
+
+**检测**：人工核对（核对 cobra 命令的输出写法）
+
 ### 【SHOULD】TOOL-004 命令行程序用 cobra 组织子命令。
 
 - 归属：工具规约/命令行
@@ -91,6 +131,92 @@ $ go vet ./...
 
 **检测**：人工核对（核对升级 Go 版本后是否跑过 go fix）
 
+### 【SHOULD】TOOL-014 govulncheck 纳入常规依赖漏洞扫描。
+
+- 归属：工具规约/命令行
+- 起始版本：Go 1.0
+- 主题：security, tooling
+
+依赖树中的已知漏洞要定期扫描。
+
+- CI 周期任务跑 `govulncheck ./...`
+- govulncheck 只报可达漏洞，比逐条比对 CVE 清单信噪比高
+- 高危可达漏洞升级依赖或评估豁免并记录
+
+**为什么**
+
+> Regularly scanning your code and binaries for vulnerabilities helps identify potential security risks early.
+>
+> —— https://go.dev/doc/security/best-practices
+
+依赖漏洞的披露先于影响评估，靠人工盯 CVE 清单必然滞后；govulncheck 由官方漏洞库驱动并分析调用可达性，把「需要处理」的子集从数百条公告里筛出来。
+
+**正例**
+
+```go
+govulncheck ./...
+```
+
+**反例**
+
+```go
+# CI 无任何依赖漏洞扫描步骤
+```
+
+**依据**
+
+- https://go.dev/doc/security/best-practices
+- https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck
+
+**检测**：人工核对（核对 CI 配置）
+
+### 【SHOULD】TOOL-015 进程信号处理用 signal.NotifyContext 进 context 取消链。
+
+- 归属：工具规约/命令行
+- 起始版本：Go 1.16
+- 主题：tooling, context
+
+信号、超时与优雅退出统一走 context。
+
+- main 用 `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)` 创建根 ctx
+- 优雅退出经 ctx 取消传播到各组件
+- 不再手工 channel 转发信号
+
+**为什么**
+
+> NotifyContext returns a copy of the parent context that is marked done (its Done channel is closed) when one of the listed signals arrives.
+>
+> —— https://pkg.go.dev/os/signal#NotifyContext
+
+手工转发信号要自建 channel、广播与超时逻辑，每个组件各写一遍且容易漏；NotifyContext 把信号转成 ctx 取消，既有 context 传播链上的超时与退出逻辑全部复用。
+
+**正例**
+
+```go
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+if err := run(ctx); err != nil {
+  log.Fatal(err)
+}
+```
+
+**反例**
+
+```go
+sigCh := make(chan os.Signal, 1)
+signal.Notify(sigCh, os.Interrupt)
+go func() {
+  <-sigCh
+  os.Exit(0)
+}()
+```
+
+**依据**
+
+- https://pkg.go.dev/os/signal#NotifyContext
+
+**检测**：人工核对（核对 main 的信号处理方式）
+
 ## （二）测试工具
 
 ### 【MUST】TOOL-005 测试断言统一使用 testify。
@@ -128,6 +254,45 @@ if got != want {
 - https://github.com/stretchr/testify#assert-package
 
 **检测**：grep 正则 \bt\.(Errorf|Fatalf)\(（命中处应改用 testify 断言）
+
+### 【SHOULD】TOOL-013 测试与 CI 以 go test -race 运行。
+
+- 归属：工具规约/测试工具
+- 起始版本：Go 1.0
+- 主题：testing, concurrency, tooling
+
+race detector 覆盖全部测试，不只并发代码。
+
+- 本地与 CI 的 `go test` 默认带 `-race`
+- race 只报运行期实际触发的竞争，覆盖不足处补测试
+- 需要性能的场景单独跑非 race 基准
+
+**为什么**
+
+> To use the race detector, add the -race flag when running your tests or building your application, for example, go test -race.
+>
+> —— https://go.dev/doc/security/best-practices
+
+数据竞争无法靠人眼可靠排除，race detector 在运行期实检每次内存访问；官方安全最佳实践把 -race 列为标准配置，且只报执行到的路径，全量测试才提供足够覆盖。
+
+**正例**
+
+```go
+go test -race ./...
+```
+
+**反例**
+
+```go
+go test ./...
+```
+
+**依据**
+
+- https://go.dev/doc/security/best-practices
+- https://go.dev/blog/race-detector
+
+**检测**：人工核对（核对 CI 配置）
 
 ## （三）代码生成
 
