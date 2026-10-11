@@ -547,7 +547,7 @@
     ],
     "since_go": "1.0",
     "summary": "测试等待用同步原语，不用 time.Sleep。",
-    "details": "等待事件就绪，不等固定时长。\n\n- 等待并发完成用 channel、`WaitGroup` 或 synctest\n- `time.Sleep` 等待「应该发生了的事」是 flaky 来源\n- 框架局限（如 consumer 组重平衡）无法事件化时，例外需在测试内注释说明",
+    "details": "等待事件就绪，不等固定时长。\n\n- 等待并发完成用 channel、`WaitGroup` 或 synctest\n- `time.Sleep` 等待「应该发生了的事」是 flaky 来源\n- 能事件化的就事件化：sarama 的 `ConsumerGroupHandler` 在每次 session 开始与结束调用 `Setup`、`Cleanup`，等 `Setup` 返回即重平衡完成\n- 客户端没有暴露这类事件时，等待对象退到「首条消息到达」并带超时，同时在测试内注释说明这一局限",
     "quote": {
       "text": "Sleep pauses the current goroutine for at least the duration d.",
       "source": "https://pkg.go.dev/time#Sleep"
@@ -763,6 +763,35 @@
     "detect": {
       "tool": "golangci-lint",
       "rule": "testifylint"
+    }
+  },
+  {
+    "id": "TEST-030",
+    "level": "MAY",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing",
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "含 goroutine 的包用 goleak 检查泄漏。",
+    "details": "落地方式是包一层项目内 helper，把本仓库已知的泄漏函数一并传进去。\n\n- helper 内部调用 `goleak.VerifyTestMain(m)`，由它接管 `m.Run()` 与 `os.Exit`\n- 豁免手段：`goleak.IgnoreTopFunction`（匹配栈顶函数）、`goleak.IgnoreAnyFunction`（匹配栈内任意位置的函数）、`goleak.IgnoreCurrent`（先记录当前 goroutine）\n- 常见豁免对象：依赖库起的后台 goroutine、goleak 版本未覆盖的运行时 goroutine\n- `VerifyTestMain` 只报出包；定位到用例改用 `goleak.VerifyNone(t)`（与 `t.Parallel()` 不兼容）\n- goleak 官方只声明支持最近两个 Go 小版本，升级 Go 后需重新核对豁免",
+    "quote": {
+      "text": "VerifyTestMain can be used in a TestMain function for package tests to verify that there were no goroutine leaks.",
+      "source": "https://pkg.go.dev/go.uber.org/goleak#VerifyTestMain"
+    },
+    "rationale": "`-race` 检测数据竞争，goleak 检测 goroutine 泄漏，两者盲区不同：泄漏的 goroutine 不碰共享内存时 `-race` 什么都不报，内存却在持续增长。`VerifyTestMain` 在测试进程退出前扫一遍存活 goroutine，把这类问题从生产环境提前到测试阶段；它必须经 `TestMain` 才能拿到「全部测试跑完」这个时机，直接写 `os.Exit` 就绕过了检查。",
+    "examples": {
+      "good": "func TestMain(m *testing.M) {\n  testutils.GoleakVerifyTestMain(m)\n}",
+      "bad": "func TestMain(m *testing.M) {\n  os.Exit(m.Run())\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/go.uber.org/goleak"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 TestMain 是否接上泄漏检查并带豁免名单"
     }
   }
 ]

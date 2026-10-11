@@ -649,6 +649,51 @@ func toBytes(s string) []byte {
 
 **检测**：grep 正则 \bunsafe\.
 
+### 【MUST】SEC-022 鉴权取服务端验证的身份，不用客户端请求头。
+
+- 归属：安全规约
+- 起始版本：Go 1.0
+- 主题：security
+
+可信身份只能来自服务端自己验证过的来源。
+
+- 身份与租户取自会话、令牌校验结果或 mTLS 证书这类服务端验证过的凭据
+- `X-Forwarded-For`、`X-Real-IP`、`X-Forwarded-Host` 一类请求头可被客户端任意伪造，不能作为鉴权或限流身份的依据
+- 需要真实客户端 IP 时，只在受信代理已覆写该请求头的前提下取用
+- 审计日志与风控同样按此口径取身份
+
+**为什么**
+
+> The "Forwarded" HTTP header field cannot be relied upon to be correct, as it may be modified, whether mistakenly or for malicious reasons, by every node on the way to the server, including the client making the request.
+>
+> —— https://www.rfc-editor.org/rfc/rfc7239.html#section-8.1
+
+请求头由客户端完整控制，代理默认只做追加而不覆写，`net/http` 的 `Request.Header` 拿到的就是客户端发来的原样内容；以 `X-Forwarded-*` 或自造头判断身份，一行构造请求即可冒充他人。RFC 7239 在安全考虑里写明 Forwarded 头不可信，理由是链路上每一跳（包括发起请求的客户端）都能修改它，身份只能取自服务端验证过的凭据。
+
+**正例**
+
+```go
+uid, ok := session.UserID(r)
+if !ok {
+  return ErrUnauthorized
+}
+```
+
+**反例**
+
+```go
+uid := r.Header.Get("X-User-Id")
+if uid == "" {
+  return ErrUnauthorized
+}
+```
+
+**依据**
+
+- https://www.rfc-editor.org/rfc/rfc7239.html#section-8.1
+
+**检测**：人工核对（核对鉴权中间件的身份来源是否为服务端验证结果）
+
 ### 【SHOULD】SEC-005 不设 InsecureSkipVerify 跳过 TLS 证书校验。
 
 - 归属：安全规约

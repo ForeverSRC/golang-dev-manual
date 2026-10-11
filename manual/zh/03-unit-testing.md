@@ -204,7 +204,8 @@ func TestDelete(t *testing.T) {
 
 - 等待并发完成用 channel、`WaitGroup` 或 synctest
 - `time.Sleep` 等待「应该发生了的事」是 flaky 来源
-- 框架局限（如 consumer 组重平衡）无法事件化时，例外需在测试内注释说明
+- 能事件化的就事件化：sarama 的 `ConsumerGroupHandler` 在每次 session 开始与结束调用 `Setup`、`Cleanup`，等 `Setup` 返回即重平衡完成
+- 客户端没有暴露这类事件时，等待对象退到「首条消息到达」并带超时，同时在测试内注释说明这一局限
 
 **为什么**
 
@@ -524,6 +525,50 @@ parse.go / parse_test.go（内含 BenchmarkParse）
 - https://pkg.go.dev/testing
 
 **检测**：人工核对（核对基准文件的归属）
+
+### 【MAY】TEST-030 含 goroutine 的包用 goleak 检查泄漏。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+- 主题：testing, concurrency
+
+落地方式是包一层项目内 helper，把本仓库已知的泄漏函数一并传进去。
+
+- helper 内部调用 `goleak.VerifyTestMain(m)`，由它接管 `m.Run()` 与 `os.Exit`
+- 豁免手段：`goleak.IgnoreTopFunction`（匹配栈顶函数）、`goleak.IgnoreAnyFunction`（匹配栈内任意位置的函数）、`goleak.IgnoreCurrent`（先记录当前 goroutine）
+- 常见豁免对象：依赖库起的后台 goroutine、goleak 版本未覆盖的运行时 goroutine
+- `VerifyTestMain` 只报出包；定位到用例改用 `goleak.VerifyNone(t)`（与 `t.Parallel()` 不兼容）
+- goleak 官方只声明支持最近两个 Go 小版本，升级 Go 后需重新核对豁免
+
+**为什么**
+
+> VerifyTestMain can be used in a TestMain function for package tests to verify that there were no goroutine leaks.
+>
+> —— https://pkg.go.dev/go.uber.org/goleak#VerifyTestMain
+
+`-race` 检测数据竞争，goleak 检测 goroutine 泄漏，两者盲区不同：泄漏的 goroutine 不碰共享内存时 `-race` 什么都不报，内存却在持续增长。`VerifyTestMain` 在测试进程退出前扫一遍存活 goroutine，把这类问题从生产环境提前到测试阶段；它必须经 `TestMain` 才能拿到「全部测试跑完」这个时机，直接写 `os.Exit` 就绕过了检查。
+
+**正例**
+
+```go
+func TestMain(m *testing.M) {
+  testutils.GoleakVerifyTestMain(m)
+}
+```
+
+**反例**
+
+```go
+func TestMain(m *testing.M) {
+  os.Exit(m.Run())
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/go.uber.org/goleak
+
+**检测**：人工核对（核对 TestMain 是否接上泄漏检查并带豁免名单）
 
 ## （二）表驱动与用例设计
 

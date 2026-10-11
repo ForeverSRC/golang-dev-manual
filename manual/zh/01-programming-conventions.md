@@ -2195,6 +2195,52 @@ defer pool.Put(buf)
 
 **检测**：人工核对（核对 Pool.Put 前是否 Reset）
 
+### 【SHOULD】CONC-017 常驻 goroutine 入口捕获 panic 并记日志。
+
+- 归属：编程规约/并发规约
+- 起始版本：Go 1.0
+- 主题：concurrency
+
+进程级长期存活的 goroutine 在入口处兜住 panic。
+
+- 适用对象是后台 worker、消费循环、定时任务这类常驻 goroutine
+- 捕获后记录 panic 值与堆栈（`debug.Stack()`），只吞不记等于把故障藏起来
+- 有意 fail-fast（任其崩溃、交由编排系统重启）时可不捕获，需在代码或评审里写明理由
+- 一次性 goroutine 与 `errgroup` 管理的 goroutine 不在本条范围
+
+**为什么**
+
+> If ServeHTTP panics, the server (the caller of ServeHTTP) assumes that the effect of the panic was isolated to the active request. It recovers the panic, logs a stack trace to the server error log, and either closes the network connection or sends an HTTP/2 RST_STREAM, depending on the HTTP protocol.
+>
+> —— https://pkg.go.dev/net/http#Server
+
+panic 只能被同一 goroutine 内的 recover 捕获。`net/http` 对 handler 的 panic 自己兜底，把影响限制在当次请求；自建常驻 goroutine 没有框架兜底，一个 nil 解引用或切片越界就让整个进程退出，在途任务一起丢失。入口处 recover 并记录堆栈，把进程级故障降级为单任务失败，堆栈又保留了定位线索。
+
+**正例**
+
+```go
+go func() {
+  defer func() {
+    if r := recover(); r != nil {
+      slog.Error("worker panic", "panic", r, "stack", string(debug.Stack()))
+    }
+  }()
+  handle(req)
+}()
+```
+
+**反例**
+
+```go
+go handle(req)
+```
+
+**依据**
+
+- https://pkg.go.dev/net/http#Server
+
+**检测**：人工核对（核对常驻 goroutine 的入口是否 recover 并记录堆栈）
+
 ## （九）控制语句规约
 
 ### 【MUST】CTRL-003 循环体内不得 defer 资源释放。

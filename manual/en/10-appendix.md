@@ -29,6 +29,7 @@
 | CONC-014 | SHOULD | Programming Conventions/Concurrency | Do not use sync.Map in write-heavy scenarios. |
 | CONC-015 | SHOULD | Programming Conventions/Concurrency | Batch concurrent tasks set a concurrency limit. |
 | CONC-016 | SHOULD | Programming Conventions/Concurrency | sync.Pool objects are Reset before being put back. |
+| CONC-017 | SHOULD | Programming Conventions/Concurrency | Long-lived goroutine entry points recover and log panics. |
 | CONST-001 | MUST | Programming Conventions/Constants and Enums | Constant names use MixedCaps, not all uppercase or a k prefix. |
 | CONST-002 | SHOULD | Programming Conventions/Constants and Enums | Constants are named by their role, not by their value. |
 | CONST-003 | MAY | Programming Conventions/Constants and Enums | Enumeration values that increase from one source are generated with iota. |
@@ -149,6 +150,7 @@
 | SEC-019 | MUST | Security | Session cookies set HttpOnly, Secure, and SameSite. |
 | SEC-020 | MUST | Security | JWT verification pins an algorithm whitelist; the token's alg field is not trusted. |
 | SEC-021 | MUST | Security | Application code does not use unsafe to bypass memory safety. |
+| SEC-022 | MUST | Security | Authorization uses the server-verified identity, never client request headers. |
 | STD-001 | MUST | Programming Conventions/Standard Library Usage | time.Duration is never multiplied by time.Duration. |
 | STD-002 | SHOULD | Programming Conventions/Standard Library Usage | Compare time.Time values with Equal, not ==. |
 | STD-003 | SHOULD | Programming Conventions/Standard Library Usage | Strip prefixes and suffixes with strings.TrimPrefix and TrimSuffix. |
@@ -185,6 +187,7 @@
 | TEST-027 | SHOULD | Unit Testing/Test Naming and Structure | Benchmark comparisons use benchstat with enough samples for significance. |
 | TEST-028 | MAY | Unit Testing/Test Naming and Structure | Benchmark functions live in a separate _bench_test.go file. |
 | TEST-029 | SHOULD | Unit Testing/Assertions and Test Data | require guards preconditions; assert collects result checks. |
+| TEST-030 | MAY | Unit Testing/Test Naming and Structure | Packages with goroutines use goleak to check for leaks. |
 | TOOL-001 | MUST | Static Analysis/Configuration and Running | Use golangci-lint uniformly for static code analysis. |
 | TOOL-002 | SHOULD | Static Analysis/Recommended Rules | Enable modernize in golangci-lint to keep up with modern Go idioms. |
 | TOOL-003 | SHOULD | Static Analysis/Recommended Rules | Enable testifylint alongside testify when testify is used. |
@@ -228,6 +231,7 @@
 - CONC-014: https://pkg.go.dev/sync#Map
 - CONC-015: https://pkg.go.dev/golang.org/x/sync/errgroup#Group.SetLimit
 - CONC-016: https://pkg.go.dev/sync#Pool
+- CONC-017: https://pkg.go.dev/net/http#Server
 - CONST-001: https://go.dev/wiki/CodeReviewComments#mixed-caps https://google.github.io/styleguide/go/decisions#constant-names
 - CONST-002: https://google.github.io/styleguide/go/decisions#constant-names
 - CONST-003: https://go.dev/doc/effective_go#constants https://go.dev/ref/spec#Constant_declarations
@@ -348,6 +352,7 @@
 - SEC-019: https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/ https://docs.bearer.com/reference/rules/go_lang_insecure_cookie/
 - SEC-020: https://datatracker.ietf.org/doc/html/rfc8725#section-3.1
 - SEC-021: https://pkg.go.dev/unsafe https://docs.bearer.com/reference/rules/go_gosec_unsafe_unsafe/
+- SEC-022: https://www.rfc-editor.org/rfc/rfc7239.html#section-8.1
 - STD-001: https://pkg.go.dev/time#Duration
 - STD-002: https://pkg.go.dev/time#Time.Equal
 - STD-003: https://pkg.go.dev/strings#Trim
@@ -384,6 +389,7 @@
 - TEST-027: https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
 - TEST-028: https://pkg.go.dev/testing
 - TEST-029: https://pkg.go.dev/github.com/stretchr/testify/require
+- TEST-030: https://pkg.go.dev/go.uber.org/goleak
 - TOOL-001: https://golangci-lint.run/
 - TOOL-002: https://golangci-lint.run/docs/linters/configuration/#modernize
 - TOOL-003: https://github.com/Antonboom/testifylint
@@ -429,6 +435,7 @@
 | CONC-014 | manual review (Check the read/write ratio and key-set pattern of sync.Map usage) |
 | CONC-015 | manual review (Check that batch task fan-out sets a limit) |
 | CONC-016 | manual review (Check that Pool.Put sites Reset first) |
+| CONC-017 | manual review (Check that long-lived goroutine entry points recover and log the stack) |
 | CONST-001 | golangci-lint stylecheck(ST1003) |
 | CONST-002 | manual review (Check whether the constant name merely restates the value) |
 | CONST-003 | manual review (Check whether enumerations that increase from one source use hand-written numbers) |
@@ -549,6 +556,7 @@
 | SEC-019 | manual review (Check cookie attribute settings) |
 | SEC-020 | manual review (Check JWT parser configurations) |
 | SEC-021 | grep regex \bunsafe\. (Grep for unsafe package usage) |
+| SEC-022 | manual review (Check where the auth middleware takes identity from) |
 | STD-001 | golangci-lint durationcheck (Check every multiplication involving time.Duration) |
 | STD-002 | manual review (Check the expressions used to compare time.Time values) |
 | STD-003 | manual review (Check that the trimming intent matches the API used) |
@@ -585,6 +593,7 @@
 | TEST-027 | manual review (Check the sampling and judgment behind performance conclusions) |
 | TEST-028 | manual review (Check which file benchmarks belong to) |
 | TEST-029 | golangci-lint testifylint (Check the require/assert split in test bodies) |
+| TEST-030 | manual review (Check that TestMain wires in the leak check together with its exemption list) |
 | TOOL-001 | manual review (Check that the repository root has .golangci.yml and that the lint entry point invokes golangci-lint) |
 | TOOL-002 | manual review (Check that linters.enable in .golangci.yml includes modernize) |
 | TOOL-003 | manual review (Check that linters.enable in .golangci.yml includes testifylint) |
