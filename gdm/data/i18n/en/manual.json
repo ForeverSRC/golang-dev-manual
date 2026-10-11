@@ -8,7 +8,9 @@
         "formatting": "Formatting and Style",
         "functions": "Functions and Methods",
         "data-structures": "Data Structures",
-        "concurrency": "Concurrency",
+      "standard-library": "Standard Library Usage",
+      "database-access": "Database Access",
+      "concurrency": "Concurrency",
         "control-flow": "Control Flow",
         "comments": "Comments"
       }

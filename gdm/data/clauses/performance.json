@@ -199,5 +199,198 @@
       "tool": "manual",
       "note": "核对只做解引用读取的参数是否用了指针"
     }
+  },
+  {
+    "id": "PERF-009",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance"
+    ],
+    "since_go": "1.21",
+    "summary": "生产代码不用 reflect.DeepEqual 做比较。",
+    "details": "类型明确的比较用类型化 Equal 函数。\n\n- 切片用 `slices.Equal`，map 用 `maps.Equal`，字节串用 `bytes.Equal`\n- `reflect.DeepEqual` 走反射，慢 50–200 倍\n- 测试代码比较预期值不在此列（保持语义优先）",
+    "quote": {
+      "text": "Equal reports whether two slices are equal: the same length and all elements equal. If the lengths are different, Equal returns false.",
+      "source": "https://pkg.go.dev/slices#Equal"
+    },
+    "rationale": "DeepEqual 在运行期对值结构做反射遍历，生产热路径上代价是类型化比较的一到两个数量级；slices/maps 包的类型化 Equal 由编译器特化，语义相同代价趋近于手写循环。",
+    "examples": {
+      "good": "if slices.Equal(want, got) {\n  return true\n}",
+      "bad": "if reflect.DeepEqual(want, got) {\n  return true\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/slices#Equal"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对生产路径的 DeepEqual 调用"
+    }
+  },
+  {
+    "id": "PERF-010",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance"
+    ],
+    "since_go": "1.0",
+    "summary": "regexp 与 template 在包级编译一次。",
+    "details": "编译产物复用，不进函数体。\n\n- 包级 `var re = regexp.MustCompile(...)`，函数内只引用\n- 函数内重复 Compile 每次约多耗一个数量级且必分配\n- template 的 `Parse` 同口径",
+    "quote": {
+      "text": "MustCompile is like Compile but panics if the expression cannot be parsed. It simplifies safe initialization of global variables holding compiled regular expressions.",
+      "source": "https://pkg.go.dev/regexp#MustCompile"
+    },
+    "rationale": "Compile 每次执行都要解析正则并构建状态机，热路径上每请求编译一次的开销与匹配本身相当；官方文档把包级初始化场景写在 MustCompile 的说明里，编译一次复用是它的设计用途。",
+    "examples": {
+      "good": "var idRe = regexp.MustCompile(`^[a-z0-9-]+$`)\n\nfunc valid(id string) bool { return idRe.MatchString(id) }",
+      "bad": "func valid(id string) bool {\n  return regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(id)\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/regexp#MustCompile"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对函数体内的 regexp.Compile 与 template.Parse"
+    }
+  },
+  {
+    "id": "PERF-011",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance"
+    ],
+    "since_go": "1.0",
+    "summary": "无上界输入流式处理，不用 io.ReadAll 全量载入。",
+    "details": "内存峰值随输入上界而不是输入现值走。\n\n- 大文件、无上界网络响应用 `bufio.Scanner`、`io.Copy` 流式处理\n- `io.ReadAll` 只用于输入有界且小的场景（如读完一个小配置）\n- 「无上界」的口径：无法在调用前确定最大尺寸的输入",
+    "quote": {
+      "text": "Copy copies from src to dst until either EOF is reached on src or an error occurs.",
+      "source": "https://pkg.go.dev/io#Copy"
+    },
+    "rationale": "ReadAll 把整个输入堆进内存，无上界输入（外部 URL、用户上传）直接把内存峰值交给攻击者或对端；流式处理让内存占用恒定，与输入规模解耦。",
+    "examples": {
+      "good": "if _, err := io.Copy(out, resp.Body); err != nil {\n  return err\n}",
+      "bad": "data, err := io.ReadAll(resp.Body)"
+    },
+    "sources": [
+      "https://pkg.go.dev/io#Copy"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 io.ReadAll 的输入是否有界"
+    }
+  },
+  {
+    "id": "PERF-012",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance",
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "复用的 http.Client 显式设置 Timeout 并自定义 Transport。",
+    "details": "Client 与 Transport 是进程级配置点。\n\n- 零值 Client 无超时，请求可能永久挂起\n- 默认 Transport 的 `MaxIdleConnsPerHost` 仅 2，高并发下排队等连接\n- 包级单例 Client 集中配置，不在调用点临时创建",
+    "quote": {
+      "text": "The Client's Transport typically has internal state (cached TCP connections), so Clients should be reused instead of created as needed.",
+      "source": "https://pkg.go.dev/net/http#Client"
+    },
+    "rationale": "连接池是 Client 内部状态：临时创建 Client 等于每次重建连接池，复用已有的 keep-alive 连接全部作废；零值 Client 无超时则把「下游永不响应」直接转成 goroutine 泄漏。",
+    "examples": {
+      "good": "var client = &http.Client{\n  Timeout: 5 * time.Second,\n  Transport: &http.Transport{\n    MaxIdleConnsPerHost: 32,\n  },\n}",
+      "bad": "resp, err := (&http.Client{}).Get(url)"
+    },
+    "sources": [
+      "https://pkg.go.dev/net/http#Client"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对包级 http.Client 的配置"
+    }
+  },
+  {
+    "id": "PERF-013",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance"
+    ],
+    "since_go": "1.0",
+    "summary": "resp.Body 按版本处理：Go 1.27+ 关闭即回收，更早版本需读尽。",
+    "details": "连接回收依赖 body 的读取状态。\n\n- Go 1.27+ 关闭 Body 时自动读尽未读内容（保守上限内），无需手动读尽\n- 主动放弃超大 body 或 Go 1.26 及以下版本，先 `io.Copy(io.Discard, resp.Body)` 再 `Close`\n- 每个响应必须 `Close`，无论是否读内容",
+    "quote": {
+      "text": "Response.Body now automatically drains any unread content upon being closed, up to a conservative limit, to allow better connection reuse.",
+      "source": "https://go.dev/doc/go1.27"
+    },
+    "rationale": "keep-alive 连接只有 body 读尽后才能回池复用，未读尽的连接被直接关闭重建；Go 1.27 起 Close 自动 drain 修复了这个性能陷阱，超大 body 超出自动上限时仍需显式处理。",
+    "examples": {
+      "good": "defer resp.Body.Close()\n_, err = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))",
+      "bad": "defer resp.Body.Close()\nreturn\n"
+    },
+    "sources": [
+      "https://go.dev/doc/go1.27",
+      "https://pkg.go.dev/net/http#Response.Body"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 HTTP 客户端代码的 body 处理"
+    }
+  },
+  {
+    "id": "PERF-014",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance",
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "range map 直接取值变量，不二次下标查找。",
+    "details": "for k, v := range m 一次循环只做一次哈希查找。\n\n- 需要 value 时用循环变量 v，不写 `m[k]`\n- 只需要 key 时用 `for k := range m`\n- `m[k]` 在循环体内每轮重复哈希",
+    "quote": {
+      "text": "The iteration order over maps is not specified and is not guaranteed to be the same from one iteration to the next.",
+      "source": "https://go.dev/ref/spec#For_range"
+    },
+    "rationale": "range 的第二个变量是遍历时已经取出的元素，m[k] 则每轮重新做一次哈希定位；热点循环里这是纯浪费，且写法没有任何补偿收益。",
+    "examples": {
+      "good": "for k, v := range m {\n  fmt.Println(k, v)\n}",
+      "bad": "for k := range m {\n  fmt.Println(k, m[k])\n}"
+    },
+    "sources": [
+      "https://go.dev/ref/spec#For_range"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 range map 的循环体"
+    }
+  },
+  {
+    "id": "PERF-016",
+    "level": "SHOULD",
+    "chapter": "performance",
+    "tags": [
+      "performance",
+      "data-structures"
+    ],
+    "since_go": "1.0",
+    "summary": "sql.DB 连接池显式配置上限与生命周期。",
+    "details": "连接池参数默认不设防。\n\n- `MaxOpenConns`、`MaxIdleConns`、`ConnMaxLifetime`、`ConnMaxIdleTime` 显式设置\n- 默认无连接上限且连接不过期，故障时连接堆积拖垮数据库\n- 参数依据数据库连接上限与实例副本数确定并注释",
+    "quote": {
+      "text": "DB is a database handle representing a pool of zero or more underlying connections. It's safe for concurrent use by multiple goroutines.",
+      "source": "https://pkg.go.dev/database/sql#DB"
+    },
+    "rationale": "默认无上限意味着每个 goroutine 都可能持有连接，故障放大时数据库先于应用被打垮；显式上限让故障表现可控，ConnMaxLifetime 让连接定期轮换避开数据库侧的连接老化。",
+    "examples": {
+      "good": "db.SetMaxOpenConns(64)\ndb.SetMaxIdleConns(16)\ndb.SetConnMaxLifetime(time.Hour)\ndb.SetConnMaxIdleTime(10 * time.Minute)",
+      "bad": "db, _ := sql.Open(\"pgx\", dsn)\n// 未配置任何池参数"
+    },
+    "sources": [
+      "https://pkg.go.dev/database/sql#DB"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 sql.Open 后的池配置"
+    }
   }
 ]

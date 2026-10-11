@@ -28,5 +28,29 @@
     "details": "When the generator allows specifying the output file name, name the file with a gen prefix or suffix:\n\n- Prefer the suffix, as in wire_gen.go and order_repo_gen.go, so that name sorting keeps it next to files of the same kind.\n- Write the prefix as gen_, as in gen_version.go.\n- Use only underscores as separators, never hyphens.\n- When the file name is fixed by the generator itself (`wire` outputs wire_gen.go) or decided by the platform, follow the generator default and do not rename it.",
     "rationale": "`protoc` adds the .pb.go suffix to generated files and `wire` outputs wire_gen.go, both marking the file name as generated. When the name is chosen by the caller with no convention, generated files and hand-written files mix in the same directory, so a reviewer must open each one to learn which can be edited and must look up the generation command before editing. With a uniform gen prefix or suffix, the directory listing itself answers that; the suffix is recommended because it does not break the existing naming order, leaving retrieval, sorting, and adjacency driven by the business-name prefix. The separator follows its own file name convention: the `_test.go` and `source_windows_amd64.go` forms recognized by the Go toolchain both use underscores, and hyphenated files in the standard library appear only in test data such as testdata.",
     "detect_note": "Check whether generated file names carry a gen prefix or suffix"
+  },
+  "TOOL-012": {
+    "summary": "cobra programs write output through cmd.OutOrStdout and ErrOrStderr.",
+    "details": "Output streams split by purpose.\n\n- Result data goes to stdout (`cmd.OutOrStdout()`); diagnostics, logs, and progress go to stderr (`cmd.ErrOrStderr()`)\n- stdout stays pure data so pipes and redirection work\n- Never use `os.Stdout`/`os.Stderr` directly",
+    "rationale": "cobra's output accessors inherit from the parent command and are replaceable in tests; output written straight to `os.Stdout` cannot be captured by tests, and logs mixed into stdout feed `| jq` style pipelines dirty data.",
+    "detect_note": "Check output writing in cobra commands"
+  },
+  "TOOL-013": {
+    "summary": "Tests and CI run with go test -race.",
+    "details": "The race detector covers all tests, not only concurrent code.\n\n- Local and CI `go test` runs carry `-race` by default\n- race reports only races actually triggered at runtime; insufficient coverage gets more tests\n- Performance-sensitive scenarios run non-race benchmarks separately",
+    "rationale": "Data races cannot be excluded reliably by eye, and the race detector checks every memory access at runtime; the official security best practices list -race as standard configuration, and since it reports only executed paths, full test runs provide the needed coverage.",
+    "detect_note": "Check CI configuration"
+  },
+  "TOOL-014": {
+    "summary": "govulncheck runs as part of routine dependency vulnerability scanning.",
+    "details": "Known vulnerabilities in the dependency tree are scanned periodically.\n\n- A CI scheduled task runs `govulncheck ./...`\n- govulncheck reports reachable vulnerabilities only, with a better signal-to-noise ratio than manual CVE lists\n- High-severity reachable findings get dependency upgrades or documented waivers",
+    "rationale": "Vulnerability disclosures precede impact assessments, and tracking CVE lists by hand always lags; govulncheck is driven by the official vulnerability database and analyzes call reachability, filtering the needs-handling subset out of hundreds of advisories.",
+    "detect_note": "Check CI configuration"
+  },
+  "TOOL-015": {
+    "summary": "Signal handling uses signal.NotifyContext into the context cancellation chain.",
+    "details": "Signals, timeouts, and graceful shutdown share one context.\n\n- main creates the root ctx with `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)`\n- Graceful shutdown propagates through ctx cancellation to every component\n- No more manual channel-based signal forwarding",
+    "rationale": "Manual signal forwarding needs hand-built channels, broadcasting, and timeout logic in every component, easy to miss; NotifyContext turns the signal into ctx cancellation, reusing the timeout and shutdown logic already on the context propagation chain.",
+    "detect_note": "Check signal handling in main"
   }
 }

@@ -222,6 +222,433 @@ apiKey := "sk-live-9f3c1d2e4b5a6c7d"
 
 **Detection**: golangci-lint gosec(G101) (At each hit, confirm whether it is a real credential; for a false positive, annotate the reason with #nosec G101.)
 
+### 【MUST】SEC-012 User-controllable SQL identifiers are validated against a whitelist before splicing.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+Placeholders cover values only, never structural fragments such as column names, table names, or sort directions.
+
+- Dynamically chosen columns, tables, and `ORDER BY` directions map through a whitelist before entering the statement
+- Parameterized placeholders apply to values; identifiers cannot travel through `?`
+- Complementary to SEC-001 (value parameterization); their coverage differs
+
+**Why**
+
+> That snippet could complete the SQL statement in unpredictable ways that are dangerous to your application.
+>
+> — https://go.dev/doc/database/sql-injection
+
+Parameterization separates values from the statement, but ORDER BY and table names must be part of the statement, so splicing user-controlled identifiers there is as injectable as splicing values; a whitelist restricts the selectable structure to code-enumerated sets, so input chooses rather than composes.
+
+**Good**
+
+```go
+var allowed = map[string]string{"name": "name", "created": "created_at"}
+col, ok := allowed[req.Sort]
+if !ok {
+  return fmt.Errorf("invalid sort field")
+}
+q := "SELECT id, name FROM users ORDER BY " + col
+```
+
+**Bad**
+
+```go
+q := "SELECT id, name FROM users ORDER BY " + req.Sort
+```
+
+**References**
+
+- https://go.dev/doc/database/sql-injection
+
+**Detection**: manual review (Check the identifier sources in dynamic SQL)
+
+### 【MUST】SEC-013 Untrusted input is size-limited; request bodies go through http.MaxBytesReader.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+Every read path bounds its input.
+
+- Wrap request bodies with `http.MaxBytesReader` over `w` and `r.Body`
+- Decompression targets (gzip, zip) get size limits against decompression bombs
+- Limit the read before decoding JSON and other formats
+
+**Why**
+
+> MaxBytesReader is similar to io.LimitReader but is intended for limiting the size of incoming request bodies.
+>
+> — https://pkg.go.dev/net/http#MaxBytesReader
+
+Unbounded reads hand the memory peak to the peer: a tiny compressed file can expand into gigabytes of plaintext, and an oversized request body directly exhausts process memory; a limit turns how much the peer wants to send into how much we accept.
+
+**Good**
+
+```go
+r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+  http.Error(w, "payload too large or invalid", http.StatusRequestEntityTooLarge)
+  return
+}
+```
+
+**Bad**
+
+```go
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+  http.Error(w, err.Error(), http.StatusBadRequest)
+  return
+}
+```
+
+**References**
+
+- https://pkg.go.dev/net/http#MaxBytesReader
+
+**Detection**: manual review (Check size limits on decompression and read paths)
+
+### 【MUST】SEC-014 Temporary files are created with os.CreateTemp.
+
+- Category: Security
+- Since: Go 1.16
+- Tags: security
+
+Temporary file names come from the system, not hand-spliced fixed paths.
+
+- `os.CreateTemp(dir, pattern)` generates a random name that never collides under concurrency
+- Fixed paths can be hijacked (symlink attacks) and written by concurrent instances
+- Delete after use, and log cleanup failures
+
+**Why**
+
+> Permissive temporary file creation.
+>
+> — https://docs.bearer.com/reference/rules/go_gosec_filesystem_tempfile/
+
+A predictable temporary file name lets an attacker pre-create a same-name symlink to hijack the write target, or two instances stomp the same file; CreateTemp has the kernel guarantee name uniqueness, removing the hijack surface.
+
+**Good**
+
+```go
+f, err := os.CreateTemp("", "report-*.tmp")
+if err != nil {
+  return err
+}
+defer os.Remove(f.Name())
+```
+
+**Bad**
+
+```go
+f, err := os.Create("/tmp/report.tmp")
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_gosec_filesystem_tempfile/
+- https://pkg.go.dev/os#CreateTemp
+
+**Detection**: golangci-lint gosec(G302, G304) (Check temporary file creation sites)
+
+### 【MUST】SEC-015 tls.Config sets MinVersion explicitly to TLS 1.2 or above.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+The TLS floor never depends on library defaults.
+
+- Hand-built `tls.Config` writes `MinVersion: tls.VersionTLS12` explicitly
+- Library defaults change across versions; explicit declaration pins the security baseline
+- gosec G402 detects missing or outdated versions
+
+**Why**
+
+> Missing TLS MinVersion.
+>
+> — https://docs.bearer.com/reference/rules/go_lang_missing_tls_minversion/
+
+TLS 1.0/1.1 carry published attacks (BEAST, POODLE families), and crypto/tls's default minimum version evolves across Go releases; without an explicit setting the security baseline is actually decided by the Go version chosen at build time, uncontrolled through upgrades and downgrades alike.
+
+**Good**
+
+```go
+cfg := &tls.Config{
+  MinVersion: tls.VersionTLS12,
+}
+```
+
+**Bad**
+
+```go
+cfg := &tls.Config{}
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_lang_missing_tls_minversion/
+- https://pkg.go.dev/crypto/tls#Config
+
+**Detection**: golangci-lint gosec(G402) (Check MinVersion on tls.Config literals)
+
+### 【MUST】SEC-016 SSH connections verify host keys; InsecureIgnoreHostKey is forbidden.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+SSH clients must verify the peer's identity.
+
+- `HostKeyCallback` uses `ssh.FixedHostKey` or known_hosts verification
+- `ssh.InsecureIgnoreHostKey` abandons man-in-the-middle protection and is test-only
+- Connections failing verification must terminate
+
+**Why**
+
+> Missing verification of host keys.
+>
+> — https://docs.bearer.com/reference/rules/go_gosec_crypto_insecure_ignore_host_key/
+
+Skipping host key verification leaves the client unable to tell the real server from a man in the middle: credentials, commands, and transferred data are all exposed to the interceptor; gosec G106 and the Bearer rule both rank it high severity, with only test environments exempt.
+
+**Good**
+
+```go
+config := &ssh.ClientConfig{
+  HostKeyCallback: ssh.FixedHostKey(hostKey),
+}
+```
+
+**Bad**
+
+```go
+config := &ssh.ClientConfig{
+  HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+}
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_gosec_crypto_insecure_ignore_host_key/
+
+**Detection**: golangci-lint gosec(G106) (Check HostKeyCallback configurations)
+
+### 【MUST】SEC-017 Password storage uses slow hashes such as Argon2id and bcrypt.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+Password hashing algorithms must price out brute force.
+
+- Use `golang.org/x/crypto/argon2` or `golang.org/x/crypto/bcrypt` for passwords
+- Single-round MD5/SHA-256 allows billions of guesses per second on GPUs
+- Hash parameters (cost, memory) are re-reviewed as hardware evolves
+
+**Why**
+
+> Usage of weak hashing library on a password (MD5).
+>
+> — https://docs.bearer.com/reference/rules/go_lang_weak_password_encryption_md5/
+
+General hash functions are designed for speed, while password hashing must be designed for cost: the work factor of Argon2id/bcrypt moves offline cracking from seconds to years; when the database leaks, this layer decides whether passwords leak as plaintext.
+
+**Good**
+
+```go
+hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+```
+
+**Bad**
+
+```go
+sum := md5.Sum([]byte(pwd))
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_lang_weak_password_encryption_md5/
+- https://pkg.go.dev/golang.org/x/crypto/bcrypt
+
+**Detection**: manual review (Check the hashing algorithm for password storage)
+
+### 【MUST】SEC-018 Symmetric encryption uses authenticated modes; nonces are random and never reused.
+
+- Category: Security
+- Since: Go 1.2
+- Tags: security
+
+Encryption modes must provide confidentiality and integrity together.
+
+- Use AEAD modes such as AES-GCM; ECB and bare unauthenticated modes are forbidden
+- Generate a fresh random nonce per encryption; never reuse under the same key
+- Go 1.24+ offers `cipher.NewGCMWithRandomNonce` so the library manages the nonce
+
+**Why**
+
+> The nonce must be NonceSize() bytes long and unique for all time, for a given key.
+>
+> — https://pkg.go.dev/crypto/cipher#AEAD
+
+Unauthenticated modes can be tampered with undetected, and ECB leaks plaintext patterns; reusing a nonce under one GCM key leaks the keystream and breaks authentication at once — the official documentation writes nonce uniqueness as a requirement.
+
+**Good**
+
+```go
+gcm, err := cipher.NewGCM(block)
+if err != nil {
+  return err
+}
+nonce := make([]byte, gcm.NonceSize())
+if _, err := rand.Read(nonce); err != nil {
+  return err
+}
+ct := gcm.Seal(nil, nonce, plaintext, nil)
+```
+
+**Bad**
+
+```go
+iv := make([]byte, 16)
+ct := gcm.Seal(nil, iv, plaintext, nil)
+```
+
+**References**
+
+- https://pkg.go.dev/crypto/cipher#AEAD
+
+**Detection**: manual review (Check the encryption mode and nonce generation)
+
+### 【MUST】SEC-019 Session cookies set HttpOnly, Secure, and SameSite.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+All three attributes are required for auth cookies.
+
+- `HttpOnly` blocks script reads, `Secure` forces HTTPS transport, `SameSite` restricts cross-site carrying
+- Applies to all session, token, and auth cookies
+- Non-sensitive functional cookies may be waived with a review note
+
+**Why**
+
+> Missing HTTP Only option in cookie configuration.
+>
+> — https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/
+
+Without HttpOnly an XSS script reads the session token directly; without Secure the token travels over plaintext HTTP; without SameSite cross-site requests carry the cookie automatically, forming CSRF — each attribute closes one attack path.
+
+**Good**
+
+```go
+http.SetCookie(w, &http.Cookie{
+  Name: "session",
+  Value: tok,
+  HttpOnly: true,
+  Secure: true,
+  SameSite: http.SameSiteLaxMode,
+})
+```
+
+**Bad**
+
+```go
+http.SetCookie(w, &http.Cookie{
+  Name: "session",
+  Value: tok,
+})
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/
+- https://docs.bearer.com/reference/rules/go_lang_insecure_cookie/
+
+**Detection**: manual review (Check cookie attribute settings)
+
+### 【MUST】SEC-020 JWT verification pins an algorithm whitelist; the token's alg field is not trusted.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+Acceptable signing algorithms are enumerated in code.
+
+- Parsers explicitly configure an algorithm whitelist (such as `RS256` only)
+- The verification algorithm is never chosen from the token's own `alg` field
+- The `none` algorithm is rejected except in explicitly controlled scenarios
+
+**Why**
+
+> Libraries MUST enable the caller to specify a supported set of algorithms and MUST NOT use any other algorithms when performing cryptographic operations.
+>
+> — https://datatracker.ietf.org/doc/html/rfc8725#section-3.1
+
+Trusting the token's alg field accepts attacker-chosen algorithms: none bypasses verification, and RS256 switched to HS256 forges signatures using the public key as the HMAC secret — both are publicly exploited attacks; a whitelist rejects any token claiming an algorithm outside the set.
+
+**Good**
+
+```go
+tok, err := jwt.Parse(tokenStr, keyFunc, jwt.WithValidMethods([]string{"RS256"}))
+```
+
+**Bad**
+
+```go
+tok, err := jwt.Parse(tokenStr, keyFunc)
+```
+
+**References**
+
+- https://datatracker.ietf.org/doc/html/rfc8725#section-3.1
+
+**Detection**: manual review (Check JWT parser configurations)
+
+### 【MUST】SEC-021 Application code does not use unsafe to bypass memory safety.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+unsafe belongs to specially reviewed low-level libraries.
+
+- Business code does not import `unsafe` to bypass type and bounds checks
+- Zero-copy scenarios are wrapped in reviewed low-level packages with invariants documented
+- Introducing unsafe gets the highest review severity
+
+**Why**
+
+> Package unsafe contains operations that step around the type safety of Go programs.
+>
+> — https://pkg.go.dev/unsafe
+
+Go's memory safety rests on the compiler and GC; bypassing them with unsafe turns out-of-bounds and aliasing problems from compile failures or panics into undefined behavior, invisible to every static check — the payoff only suits the lowest-level scenarios.
+
+**Good**
+
+```go
+func toBytes(s string) []byte { return []byte(s) }
+```
+
+**Bad**
+
+```go
+func toBytes(s string) []byte {
+  return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+```
+
+**References**
+
+- https://pkg.go.dev/unsafe
+- https://docs.bearer.com/reference/rules/go_gosec_unsafe_unsafe/
+
+**Detection**: grep regex \bunsafe\. (Grep for unsafe package usage)
+
 ### 【SHOULD】SEC-005 Do not set InsecureSkipVerify to skip TLS certificate verification.
 
 - Category: Security

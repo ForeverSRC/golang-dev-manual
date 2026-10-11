@@ -179,6 +179,129 @@ func Save(w *io.Writer) error
 
 **Detection**: manual review (Verify whether function signatures and struct fields contain *interface types.)
 
+### 【SHOULD】IFACE-005 Idiomatic method signatures match standard interfaces; do not invent variants.
+
+- Category: Interfaces and Design/Interface Definition and Placement
+- Since: Go 1.0
+- Tags: api-design
+
+When the intent matches a standard interface, the signature must match exactly.
+
+- `String` matches `fmt.Stringer`, `Read` matches `io.Reader`, `Error` matches error
+- Do not invent variants such as `ToString` or `ReadData`
+- Variants cannot plug into the standard ecosystem that depends on the interface
+
+**Why**
+
+> Stringer is implemented by any value that has a String method, which defines the “native” format for that value.
+>
+> — https://pkg.go.dev/fmt#Stringer
+
+fmt, io, and sort discover capabilities by interface method name: String matches fmt.Stringer to be printable with %v, Read matches io.Reader to flow into io.Copy pipelines; a ToString variant is disconnected from the ecosystem and writes the same capability twice.
+
+**Good**
+
+```go
+func (u User) String() string { return u.Name }
+```
+
+**Bad**
+
+```go
+func (u User) ToString() string { return u.Name }
+```
+
+**References**
+
+- https://pkg.go.dev/fmt#Stringer
+
+**Detection**: manual review (Check that method signatures matching standard interfaces are exact)
+
+### 【SHOULD】IFACE-006 Mark exported symbols Deprecated and keep them for one release cycle before deletion.
+
+- Category: Interfaces and Design/Interface Definition and Placement
+- Since: Go 1.0
+- Tags: api-design
+
+Deleting an exported symbol is a breaking API change.
+
+- Prefix the doc comment with `Deprecated: ` and name the replacement
+- Keep it for at least one release cycle as a migration window
+- Symbols in `internal/` modules are not covered by this clause
+
+**Why**
+
+> If a symbol is deprecated, the comment should begin with the text "Deprecated:" followed by information about the deprecation.
+>
+> — https://go.dev/doc/comment
+
+Deleting outright breaks downstream modules at their next build with no warning, and cross-repository consumers may not even have a release window; the Deprecated annotation flows into godoc and IDE hints, so the toolchain spreads the migration path naturally.
+
+**Good**
+
+```go
+// Deprecated: Use NewClient instead.
+func NewConn(addr string) (*Conn, error) { ... }
+```
+
+**Bad**
+
+```go
+func NewConn(addr string) (*Conn, error) { ... }
+```
+
+**References**
+
+- https://go.dev/doc/comment
+
+**Detection**: manual review (Check git history and comments before deleting exported symbols)
+
+### 【MAY】IFACE-004 Keep interfaces small; larger contracts are composed from smaller ones.
+
+- Category: Interfaces and Design/Interface Definition and Placement
+- Since: Go 1.0
+- Tags: api-design
+
+The smaller the interface, the cheaper the implementations and mocks.
+
+- Prefer 1–3 method interfaces; evaluate splitting when exceeded
+- The threshold is a guideline, not a hard rule
+- Consumers define the narrow interface they need, implementers keep concrete types
+
+**Why**
+
+> The bigger the interface, the weaker the abstraction.
+>
+> — https://go-proverbs.github.io/
+
+The more methods an interface has, the more its implementers and test doubles must satisfy, and the weaker its constraint on implementers becomes; small interfaces compose by capability, callers declare only the slice they use, and swapping implementations or unit testing gets lighter.
+
+**Good**
+
+```go
+type Store interface {
+  Get(ctx context.Context, id string) (*Item, error)
+}
+```
+
+**Bad**
+
+```go
+type Store interface {
+  Get(ctx context.Context, id string) (*Item, error)
+  Put(ctx context.Context, it *Item) error
+  Delete(ctx context.Context, id string) error
+  List(ctx context.Context, q Query) ([]*Item, error)
+  Count(ctx context.Context, q Query) (int, error)
+}
+```
+
+**References**
+
+- https://go-proverbs.github.io/
+
+**Detection**: manual review (Check the method count of interface definitions)
+
 ## (2) Composition and Reuse
 
 ### 【SHOULD】COMPOSE-001 Express reusable capability through composition, not inheritance-style hierarchies.
@@ -386,6 +509,48 @@ return svc.Load(nil, path)
 
 **Detection**: golangci-lint staticcheck(SA1012) (SA1012 detects calls that pass a nil context to a function.)
 
+### 【MUST】CTX-005 The cancel returned by WithCancel and WithTimeout must be called.
+
+- Category: Interfaces and Design/Passing context
+- Since: Go 1.7
+- Tags: context
+
+Every control-flow path creating a cancelable context must reach cancel.
+
+- Scoped usage defers `cancel()` immediately
+- When ownership transfers (say to a background task), hand over the cancel too and note it
+- govet lostcancel mechanically finds uncalled paths
+
+**Why**
+
+> Calling the CancelFunc cancels the child and its children, removes the parent's reference to the child, and stops any associated timers.
+>
+> — https://pkg.go.dev/context#WithCancel
+
+Without calling cancel, the child context and its timers stay referenced until the parent finishes, so every unreleased WithTimeout in a long-running process accumulates leakage; cancel is cheap explicit cleanup, and missing it only shows up as slow memory growth.
+
+**Good**
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+defer cancel()
+resp, err := client.Do(req.WithContext(ctx))
+```
+
+**Bad**
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+_ = cancel
+resp, err := client.Do(req.WithContext(ctx))
+```
+
+**References**
+
+- https://pkg.go.dev/context#WithCancel
+
+**Detection**: golangci-lint govet(lostcancel) (Check that every cancel returned by With* is called)
+
 ### 【SHOULD】CTX-001 Do not store context.Context in a struct; pass it as the first parameter of a function.
 
 - Category: Interfaces and Design/Passing context
@@ -514,6 +679,177 @@ func Render(ctx context.Context) error {
 
 **Detection**: manual review (Verify whether what is put in context.Value is request-scoped data.)
 
+### 【SHOULD】CTX-006 context.Background is created at entry points only; mid-chain calls do not substitute it for the ctx parameter.
+
+- Category: Interfaces and Design/Passing context
+- Since: Go 1.7
+- Tags: context
+
+Background and TODO belong to root positions.
+
+- Reserved for main, init, test entries, and the top of request handling
+- Mid-chain code does not substitute `context.Background()` or `context.TODO()` for the ctx parameter
+- Background tasks that must escape cancellation use `context.WithoutCancel` (see CTX-008)
+
+**Why**
+
+> Background returns a non-nil, empty Context. It is never canceled, has no values, and has no deadline. It is typically used by the main function, initialization, and tests, and as the top-level Context for incoming requests.
+>
+> — https://pkg.go.dev/context#Background
+
+Substituting Background mid-chain discards the caller's cancellation signal, deadline, and values: after the client disconnects the downstream keeps running, and the timeout defense fails from that call onward; the documentation limits its use to main, init, tests, and the top of incoming requests.
+
+**Good**
+
+```go
+func handle(ctx context.Context, id string) error {
+  return store.Get(ctx, id)
+}
+```
+
+**Bad**
+
+```go
+func handle(ctx context.Context, id string) error {
+  return store.Get(context.Background(), id)
+}
+```
+
+**References**
+
+- https://pkg.go.dev/context#Background
+
+**Detection**: manual review (Check for context.Background and TODO calls outside entry points)
+
+### 【SHOULD】CTX-007 APIs offering *Context variants are always called through the variant with ctx.
+
+- Category: Interfaces and Design/Passing context
+- Since: Go 1.7
+- Tags: context
+
+Standard library and mainstream library ctx variants take precedence over bare calls.
+
+- `http.NewRequest` without `http.NewRequestWithContext` detaches the request from cancellation
+- `db.Query` without `db.QueryContext` leaves the query uncancellable
+- The noctx checker finds sites where a variant exists but the bare call is used
+
+**Why**
+
+> Incoming requests to a server should create a Context, and outgoing calls to servers should accept a Context.
+>
+> — https://pkg.go.dev/context
+
+A bare call attaches the operation to an uncancellable context: client disconnects, upstream timeouts, and shutdown signals never reach it, and the downstream runs to completion; ctx variants let cancellation and timeouts cascade along the call chain.
+
+**Good**
+
+```go
+req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+```
+
+**Bad**
+
+```go
+req, err := http.NewRequest(http.MethodGet, url, nil)
+```
+
+**References**
+
+- https://pkg.go.dev/context
+
+**Detection**: golangci-lint noctx (Check for bare calls where a *Context variant exists)
+
+### 【SHOULD】CTX-008 Post-request background tasks use context.WithoutCancel.
+
+- Category: Interfaces and Design/Passing context
+- Since: Go 1.21
+- Tags: context
+
+Tasks that continue after the request and need the trace chain use WithoutCancel.
+
+- Replace `context.Background()` with `context.WithoutCancel(ctx)`
+- Keeps the original ctx values (trace id, auth info) while escaping its cancellation
+- Introduced in Go 1.21; older versions wrap values manually
+
+**Why**
+
+> WithoutCancel returns a copy of parent that is not canceled when parent is canceled. The returned Context returns no Deadline or Err, and its Done channel is nil.
+>
+> — https://pkg.go.dev/context#WithoutCancel
+
+Substituting Background drops the values and breaks the trace id chain in the background task; WithoutCancel keeps the value chain while escaping cancellation, and is the correct shape for the run-after-request scenario.
+
+**Good**
+
+```go
+bgCtx := context.WithoutCancel(ctx)
+go audit(bgCtx, req)
+```
+
+**Bad**
+
+```go
+go audit(context.Background(), req)
+```
+
+**References**
+
+- https://pkg.go.dev/context#WithoutCancel
+
+**Detection**: manual review (Check the ctx source of background tasks started in handlers)
+
+### 【SHOULD】CTX-009 Retry loops check ctx.Err each round and stop once canceled.
+
+- Category: Interfaces and Design/Passing context
+- Since: Go 1.7
+- Tags: context, control-flow
+
+Retry loop conditions must sense cancellation.
+
+- Check `ctx.Err()` before each retry and exit when non-nil
+- Backoff waits `select` on `ctx.Done()` or a timer
+- Retrying after the caller gave up wastes resources and prolongs recovery
+
+**Why**
+
+> A Context carries a deadline, a cancellation signal, and other values across API boundaries.
+>
+> — https://pkg.go.dev/context
+
+Retrying a fixed number of times after the upstream canceled spends resources on results nobody wants while competing with real requests for downstream capacity; the cancellation signal should break the retry loop, not just the single request.
+
+**Good**
+
+```go
+for i := 0; i < maxRetries; i++ {
+  if err := try(ctx); err == nil {
+    return nil
+  }
+  select {
+  case <-ctx.Done():
+    return ctx.Err()
+  case <-time.After(backoff)
+  }
+}
+```
+
+**Bad**
+
+```go
+for i := 0; i < maxRetries; i++ {
+  if err := try(ctx); err == nil {
+    return nil
+  }
+  time.Sleep(backoff)
+}
+```
+
+**References**
+
+- https://pkg.go.dev/context
+
+**Detection**: manual review (Check the exit conditions of retry loops)
+
 ## (5) Safe Struct Shape
 
 ### 【MUST】STRUCT-001 Structs containing sync.Mutex or other synchronization primitives must not be copied by value; always pass or receive them by pointer.
@@ -563,6 +899,90 @@ func (c Counter) Inc() {
 - https://google.github.io/styleguide/go/decisions
 
 **Detection**: golangci-lint govet(copylocks)
+
+### 【SHOULD】STRUCT-003 Methods of one type keep a consistent receiver type.
+
+- Category: Interfaces and Design/Safe Struct Shape
+- Since: Go 1.0
+- Tags: api-design
+
+All methods of a type use either pointer or value receivers throughout.
+
+- Types needing mutation, containing sync primitives, or being large use pointer receivers throughout
+- Small read-only cheap-to-copy types may use value receivers throughout
+- Mixing makes the semantics of a value-copied pointer call unpredictable
+
+**Why**
+
+> If some of the methods of the type must have pointer receivers, then so should all of them
+>
+> — https://go.dev/wiki/CodeReviewComments#receiver-type
+
+Value receiver methods operate on a copy and pointer receiver methods on the original; mixing the two within one type means whether the original is mutated depends on the method declaration rather than the call intent, forcing readers to verify method by method.
+
+**Good**
+
+```go
+type Counter struct { n int }
+func (c *Counter) Inc() { c.n++ }
+func (c *Counter) Value() int { return c.n }
+```
+
+**Bad**
+
+```go
+type Counter struct { n int }
+func (c *Counter) Inc() { c.n++ }
+func (c Counter) Value() int { return c.n }
+```
+
+**References**
+
+- https://go.dev/wiki/CodeReviewComments#receiver-type
+
+**Detection**: manual review (Check receiver declarations across methods of the same type)
+
+### 【SHOULD】STRUCT-004 Exported fields participating in serialization carry field tags.
+
+- Category: Interfaces and Design/Safe Struct Shape
+- Since: Go 1.0
+- Tags: api-design, data-structures
+
+External contract fields get explicit tags instead of encoder fallback.
+
+- Tag per format as needed (`json`/`db`/`yaml`) with a consistent naming style such as `snake_case`
+- Without a tag the encoder falls back to the Go field name, so renaming changes the wire format
+- The structtag checker finds tag format errors
+
+**Why**
+
+> The encoding of each struct field can be customized by the format string stored under the "json" key in the struct field's tag.
+>
+> — https://pkg.go.dev/encoding/json#Marshal
+
+Without a tag the encoder uses the Go field name directly, so renaming one field quietly changes the wire format and the downstream parser breaks a release later; an explicit tag pins the external format at the struct definition, and renaming Go identifiers no longer touches the contract.
+
+**Good**
+
+```go
+type User struct {
+  CreatedAt time.Time `json:"created_at"`
+}
+```
+
+**Bad**
+
+```go
+type User struct {
+  CreatedAt time.Time
+}
+```
+
+**References**
+
+- https://pkg.go.dev/encoding/json#Marshal
+
+**Detection**: golangci-lint structtag (Check that serialized exported fields carry tags)
 
 ### 【MAY】STRUCT-002 For structs that should not support comparison, use an incomparable field to block == at compile time.
 

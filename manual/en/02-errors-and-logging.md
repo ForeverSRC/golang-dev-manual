@@ -120,6 +120,137 @@ if err := save(order); err != nil {
 
 **Detection**: manual review (Check each if err != nil branch: writing a log and returning err in the same branch is a violation)
 
+### 【MUST】ERR-007 error return values are never discarded with _.
+
+- Category: Errors and Logging/Error Handling
+- Since: Go 1.0
+- Tags: error-handling
+
+error is part of the function result and must be checked everywhere.
+
+- Do not receive an error return value with `_`
+- Do not use other return values before checking err (using v before inspecting err)
+- When there is nothing to do, log or propagate; never leave a silent path
+- errcheck detects this mechanically
+
+**Why**
+
+> The error built-in interface type is the conventional interface for representing an error condition, with the nil value representing no error.
+>
+> — https://pkg.go.dev/builtin#error
+
+The language convention is nil means no error and non-nil must be handled; discarding with `_` declares the failure invisible. Swallowed errors surface downstream as empty data, zero-valued objects, or timeouts, with no way to locate the original failure point.
+
+**Good**
+
+```go
+if _, err := w.Write(data); err != nil {
+  return fmt.Errorf("write body: %w", err)
+}
+```
+
+**Bad**
+
+```go
+_, _ = w.Write(data)
+```
+
+**References**
+
+- https://pkg.go.dev/builtin#error
+
+**Detection**: golangci-lint errcheck (Check for error values discarded with _)
+
+### 【MUST】ERR-009 Library code and request paths never call os.Exit or log.Fatal.
+
+- Category: Errors and Logging/Error Handling
+- Since: Go 1.0
+- Tags: error-handling
+
+Exit decisions belong to main.
+
+- Business code returns error; main decides the exit code
+- `os.Exit` and `log.Fatal` skip all defers, so cleanup never runs
+- Outside main only an explicit failure path at entry assembly is allowed
+
+**Why**
+
+> Exit causes the current program to exit with the given status code. Deferred functions are not run.
+>
+> — https://pkg.go.dev/os#Exit
+
+os.Exit gives no chance for defers: locks stay held, buffers unflushed, connections unclosed at termination; calling it from library code also strips the caller of any chance to handle the error, leaving one log line on stdout.
+
+**Good**
+
+```go
+func run() error {
+  return loadConfig()
+}
+func main() {
+  if err := run(); err != nil {
+    log.Fatal(err)
+  }
+}
+```
+
+**Bad**
+
+```go
+func loadConfig() *Config {
+  cfg, err := parse()
+  if err != nil {
+    log.Fatal(err)
+  }
+  return cfg
+}
+```
+
+**References**
+
+- https://pkg.go.dev/os#Exit
+
+**Detection**: manual review (Check for os.Exit and log.Fatal calls outside main)
+
+### 【MUST】ERR-011 External error messages stay generic; details go to server-side logs only.
+
+- Category: Errors and Logging/Error Handling
+- Since: Go 1.0
+- Tags: error-handling, security
+
+Client-facing error responses carry no internal details.
+
+- Stack traces, SQL statements, file paths, and upstream addresses go to server logs
+- External responses use generic codes and hints (such as internal error)
+- Error logs carry a request id to correlate with server logs
+
+**Why**
+
+> Leakage of sensitive information in exception message.
+>
+> — https://docs.bearer.com/reference/rules/go_lang_information_leakage/
+
+Raw error text hands attackers the table structure, directory layout, and dependency versions — reconnaissance for injection attacks; keeping details in server logs and returning generic information keeps the attack surface from growing with the error-handling policy.
+
+**Good**
+
+```go
+slog.Error("query failed", "err", err, "req_id", reqID)
+http.Error(w, "internal error", http.StatusInternalServerError)
+```
+
+**Bad**
+
+```go
+http.Error(w, err.Error(), http.StatusInternalServerError)
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_lang_information_leakage/
+
+**Detection**: manual review (Check how external error responses are constructed)
+
 ### 【SHOULD】ERR-004 Return an error for expected failures; do not use panic.
 
 - Category: Errors and Logging/Error Handling
@@ -211,6 +342,91 @@ order := Lookup(id) // the caller cannot tell not-found from a zero value
 - https://go.dev/wiki/CodeReviewComments#in-band-errors
 
 **Detection**: manual review (Check whether -1, an empty value or a zero value is used to express failure)
+
+### 【SHOULD】ERR-010 Close and Flush errors on writable resources must be checked.
+
+- Category: Errors and Logging/Error Handling
+- Since: Go 1.0
+- Tags: error-handling
+
+Write-path teardown errors cannot be ignored.
+
+- `bufio.Writer.Flush` and file `Close` on writes failing means data never reached disk
+- Read-only cleanup (Close after reads) may be ignored
+- Check, then log or propagate; do not swallow silently
+
+**Why**
+
+> Flush writes any buffered data to the underlying io.Writer.
+>
+> — https://pkg.go.dev/bufio#Writer.Flush
+
+Buffered writes reach the underlying writer only at Flush/Close, and failing there silently loses data: the process exits normally while the file is empty or truncated; the read-only path carries no such risk, so ignoring it is harmless.
+
+**Good**
+
+```go
+if err := bw.Flush(); err != nil {
+  return fmt.Errorf("flush: %w", err)
+}
+if err := f.Close(); err != nil {
+  return fmt.Errorf("close: %w", err)
+}
+```
+
+**Bad**
+
+```go
+bw.Flush()
+f.Close()
+```
+
+**References**
+
+- https://pkg.go.dev/bufio#Writer.Flush
+
+**Detection**: manual review (Check error handling at write-path resource closing)
+
+### 【MAY】ERR-008 Independent failures are merged with errors.Join.
+
+- Category: Errors and Logging/Error Handling
+- Since: Go 1.20
+- Tags: error-handling
+
+Use errors.Join when all failures deserve reporting at once.
+
+- Field-by-field validation and batch resource closing report every failure
+- The joined error still matches members individually through `errors.Is`
+- With causal dependencies, return the first error directly
+
+**Why**
+
+> Join returns an error that wraps the given errors.
+>
+> — https://pkg.go.dev/errors#Join
+
+Returning one at a time makes the caller fix an error only to hit the next; Join reports all independent failures at once, and each member remains a value matchable by errors.Is, so the semantics survive the merge.
+
+**Good**
+
+```go
+return errors.Join(validateName(u), validateEmail(u))
+```
+
+**Bad**
+
+```go
+if err := validateName(u); err != nil {
+  return err
+}
+return validateEmail(u)
+```
+
+**References**
+
+- https://pkg.go.dev/errors#Join
+
+**Detection**: manual review (Check how multi-failure paths are merged)
 
 ## (2) Error Codes
 
@@ -325,6 +541,44 @@ if err := callOrder(ctx); err != nil {
 
 **Detection**: manual review (Check whether an error returned to the outside comes directly from a downstream service)
 
+### 【MAY】CODE-004 Error strings are lowercase, unpunctuated; sentinel errors carry a package prefix.
+
+- Category: Errors and Logging/Error Codes
+- Since: Go 1.0
+- Tags: error-handling, naming
+
+Error messages follow a concatenable style.
+
+- All lowercase (initialisms included: `invalid id`, not `invalid ID`)
+- No trailing punctuation, not written as full sentences
+- Sentinel error messages carry a package prefix to mark origin (such as `mypkg: not found`)
+
+**Why**
+
+> Error strings should not be capitalized (unless beginning with proper nouns or acronyms) or end with punctuation, since they are often combined with other context information.
+>
+> — https://go.dev/wiki/CodeReviewComments#error-strings
+
+Errors get wrapped and concatenated along the call chain; a capitalized first letter or trailing punctuation in the middle reads as a broken sentence, and a package prefix keeps the origin locatable when errors from many packages mix in one log.
+
+**Good**
+
+```go
+var ErrNotFound = errors.New("mypkg: entity not found")
+```
+
+**Bad**
+
+```go
+var ErrNotFound = errors.New("Mypkg: Entity Not Found.")
+```
+
+**References**
+
+- https://go.dev/wiki/CodeReviewComments#error-strings
+
+**Detection**: manual review (Check the message text of errors.New and Errorf)
+
 ## (3) Logging
 
 ### 【MUST】LOG-001 Record business logs with log/slog; do not print directly with fmt or log.
@@ -361,6 +615,44 @@ fmt.Printf("order created: %s\n", order.ID)
 - https://pkg.go.dev/log/slog
 
 **Detection**: grep regex \b(fmt\.Print|log\.Print) (Check by hand whether the match is a business log)
+
+### 【MUST】LOG-004 Logs never emit passwords, tokens, emails, or other PII and credentials.
+
+- Category: Errors and Logging/Logging
+- Since: Go 1.0
+- Tags: logging, security
+
+Sensitive fields stay out of logs; correlation uses internal identifiers.
+
+- Passwords, tokens, keys, emails, and phone numbers never land in logs
+- Request correlation uses internal ids, not full request bodies
+- Both field names and values in structured logs pass a sensitive-word review
+
+**Why**
+
+> Leakage of sensitive information in logger message.
+>
+> — https://docs.bearer.com/reference/rules/go_lang_logger/
+
+The readership of logs dwarfs the database: collection, storage, search, and third-party aggregation may all be plaintext, and once credentials or PII land in logs they cannot be recalled, amplifying both the exposure and the compliance risk.
+
+**Good**
+
+```go
+slog.Info("user login", "user_id", uid)
+```
+
+**Bad**
+
+```go
+slog.Info("user login", "email", email, "password", pwd)
+```
+
+**References**
+
+- https://docs.bearer.com/reference/rules/go_lang_logger/
+
+**Detection**: manual review (Check log fields for sensitive information)
 
 ### 【SHOULD】LOG-002 Write log fields as key-value pairs; do not splice them into the message text.
 

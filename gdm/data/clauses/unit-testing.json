@@ -192,7 +192,7 @@
     "tags": ["testing"],
     "since_go": "1.0",
     "summary": "测试用例名优先写成 should 接结果、when 接条件的句式。",
-    "details": "`t.Run` 的子测试名与表格里的 name 字段，写成 should 接期望结果、when 接触发条件，例如 should return error when file is missing。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。",
+    "details": "`t.Run` 的子测试名与表格里的 `name` 字段，写成 should 接期望结果、when 接触发条件，例如 `should return error when file is missing`。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。",
     "quote": {
       "text": "When you use t.Run to create a subtest, the first argument is used as a descriptive name for the test. To ensure that test results are legible to humans reading the logs, choose subtest names that will remain useful and readable after escaping.",
       "source": "https://go.dev/wiki/TestComments#choose-human-readable-subtest-names"
@@ -478,6 +478,291 @@
       "tool": "grep",
       "pattern": "gomock\\.Any\\(\\)",
       "note": "除 context.Context 外，命中处改用 Eq 或 AssignableToTypeOf"
+    }
+  },
+  {
+    "id": "TEST-020",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "table-driven",
+    "tags": [
+      "testing"
+    ],
+    "since_go": "1.7",
+    "summary": "表驱动用例经 t.Run 以具名子测试执行。",
+    "details": "每个用例一个具名子测试，失败可直达。\n\n- 用 `t.Run(name, func(t *testing.T))` 包裹每个用例\n- 用例名写业务语义（如 `invalid email`），不用 `case1`、`case2`\n- 循环变量捕获问题 Go 1.22 起已由语言修复，旧版本需复制",
+    "quote": {
+      "text": "Run runs f as a subtest of t called name.",
+      "source": "https://pkg.go.dev/testing#T.Run"
+    },
+    "rationale": "裸循环跑用例时失败只报行号，定位要回到用例表逐行对；t.Run 的子测试名直接出现在失败输出里，go test -run 还能单独重放单个用例。",
+    "examples": {
+      "good": "for name, tc := range cases {\n  t.Run(name, func(t *testing.T) {\n    got := Parse(tc.in)\n    assert.Equal(t, tc.want, got)\n  })\n}",
+      "bad": "for _, tc := range cases {\n  got := Parse(tc.in)\n  assert.Equal(t, tc.want, got)\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/testing#T.Run"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对表驱动测试是否经 t.Run 执行"
+    }
+  },
+  {
+    "id": "TEST-021",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing"
+    ],
+    "since_go": "1.0",
+    "summary": "测试之间不依赖执行顺序，每个用例独立可运行。",
+    "details": "每个用例自己准备自己需要的数据。\n\n- 每个用例单独运行也能通过，不依赖前面用例留下的数据\n- 需要数据库记录、临时文件时在用例内自己创建、自己清理\n- 单跑某个用例（`go test -run TestX`）与全量跑的结果一致",
+    "quote": {
+      "text": "Shuffle both, the order of tests and the order of benchmarks",
+      "source": "https://pkg.go.dev/cmd/go"
+    },
+    "rationale": "`go test` 提供 `-shuffle` 选项随机化测试的执行顺序，说明执行顺序从来不是被承诺的行为。一个用例若依赖另一个用例留下的数据，单独运行它就失败，全量运行它才能通过——失败原因不在被测代码，而在执行顺序。让每个用例自己准备数据后，任何顺序、任何子集运行结果都一致，失败的唯一解释就是被测代码有问题。",
+    "examples": {
+      "good": "func TestDelete(t *testing.T) {\n  id := createUser(t)\n  err := Delete(t.Context(), id)\n  assert.NoError(t, err)\n}",
+      "bad": "func TestDelete(t *testing.T) {\n  // 依赖 TestCreate 已经插入了 id=1 的记录\n  err := Delete(t.Context(), 1)\n  assert.NoError(t, err)\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/cmd/go"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对用例是否依赖其他用例留下的数据"
+    }
+  },
+  {
+    "id": "TEST-022",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing",
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "测试等待用同步原语，不用 time.Sleep。",
+    "details": "等待事件就绪，不等固定时长。\n\n- 等待并发完成用 channel、`WaitGroup` 或 synctest\n- `time.Sleep` 等待「应该发生了的事」是 flaky 来源\n- 框架局限（如 consumer 组重平衡）无法事件化时，例外需在测试内注释说明",
+    "quote": {
+      "text": "Sleep pauses the current goroutine for at least the duration d.",
+      "source": "https://pkg.go.dev/time#Sleep"
+    },
+    "rationale": "Sleep 表达的是时长而非事件：慢机器上时长不够测试失败，快机器上时长浪费测试变慢，两端都不稳定；等待「事件发生」就该等事件本身（channel、WaitGroup、回调），时长永远替代不了它。",
+    "examples": {
+      "good": "done := make(chan struct{})\ngo func() {\n  defer close(done)\n  worker()\n}()\nselect {\ncase <-done:\ncase <-time.After(5 * time.Second):\n  t.Fatal(\"worker did not finish\")\n}",
+      "bad": "go worker()\ntime.Sleep(100 * time.Millisecond)"
+    },
+    "sources": [
+      "https://pkg.go.dev/time#Sleep"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对测试内 time.Sleep 的用途"
+    }
+  },
+  {
+    "id": "TEST-023",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing",
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "测试文件按被测源文件命名。",
+    "details": "foo.go 的测试叫 foo_test.go。\n\n- 不按被测函数命名（不建 parse_test.go 装多个函数的测试）\n- `go test`、覆盖率与 IDE 跳转都按文件对映\n- 同一被测文件的测试集中一处，检索成本最低",
+    "quote": {
+      "text": "To write a new test suite, create a file whose name ends in _test.go that contains the TestXxx functions as described. Put the file in the same package as the one being tested.",
+      "source": "https://pkg.go.dev/testing"
+    },
+    "rationale": "文件对映是 Go 测试组织的默认索引：找 Parse 的测试先开 parse_test.go，覆盖率报告与失败输出也按这个对映落位；按函数名散建测试文件后，三层索引全部失效。",
+    "examples": {
+      "good": "parse.go / parse_test.go",
+      "bad": "parse.go / util_test.go（内含 Parse 的测试）"
+    },
+    "sources": [
+      "https://pkg.go.dev/testing"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对测试文件与被测源文件的命名对映"
+    }
+  },
+  {
+    "id": "TEST-024",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing"
+    ],
+    "since_go": "1.15",
+    "summary": "测试临时文件写 t.TempDir。",
+    "details": "测试产物落进 per-test 临时目录。\n\n- `t.TempDir()` 自动清理且用例互不干扰\n- 不写 /tmp 或仓库目录等共享路径\n- 并行用例各拿各的目录，无路径冲突",
+    "quote": {
+      "text": "TempDir returns a new directory for the test to use. The directory is automatically removed when the test and all its subtests complete.",
+      "source": "https://pkg.go.dev/testing#T.TempDir"
+    },
+    "rationale": "共享临时目录里固定名字的文件会被并行用例互写，残留文件让下一次运行读到脏数据；t.TempDir 的目录随测试结束自动删除，隔离与清理都是框架保证。",
+    "examples": {
+      "good": "dir := t.TempDir()\nf, err := os.Create(filepath.Join(dir, \"out.txt\"))",
+      "bad": "f, err := os.Create(\"/tmp/out.txt\")"
+    },
+    "sources": [
+      "https://pkg.go.dev/testing#T.TempDir"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对测试内的临时目录创建"
+    }
+  },
+  {
+    "id": "TEST-025",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing",
+      "context"
+    ],
+    "since_go": "1.24",
+    "summary": "测试内取 ctx 用 t.Context。",
+    "details": "测试生命周期自带的 context 优先于 Background。\n\n- `t.Context()` 在测试结束与清理函数执行前自动取消\n- 被测函数接收 ctx 时传入它，测试结束协程随之退出\n- 替代手工 defer cancel 的样板",
+    "quote": {
+      "text": "Context returns a context that is canceled just before Cleanup-registered functions are called.",
+      "source": "https://pkg.go.dev/testing#T.Context"
+    },
+    "rationale": "`context.Background()` 造的 ctx 永不取消，测试结束后泄漏的 goroutine 一直活到进程退出并污染下一个测试；`t.Context` 随测试结束自动取消，协程跟着退出。",
+    "examples": {
+      "good": "func TestQuery(t *testing.T) {\n  got, err := store.Get(t.Context(), \"id\")\n  assert.NoError(t, err)\n  _ = got\n}",
+      "bad": "func TestQuery(t *testing.T) {\n  got, err := store.Get(context.Background(), \"id\")\n  assert.NoError(t, err)\n  _ = got\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/testing#T.Context"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对测试内的 ctx 来源"
+    }
+  },
+  {
+    "id": "TEST-026",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing",
+      "performance"
+    ],
+    "since_go": "1.24",
+    "summary": "基准用 b.Loop，不手写 b.N 循环。",
+    "details": "Go 1.24+ 的新基准循环替代 b.N 手写循环。\n\n- `b.Loop` 内的代码自动进入计时区，setup 留在循环外\n- 手写 `b.N` 循环易把 setup 算进计时，或让编译器消除死代码\n- 旧 Go 版本仍按 `b.N` 写法",
+    "quote": {
+      "text": "Loop executes the given function as a benchmark loop, resetting the timer appropriately.",
+      "source": "https://pkg.go.dev/testing#B.Loop"
+    },
+    "rationale": "`b.N` 循环的计时边界与防优化都靠使用者自觉：setup 写进循环、结果变量没消费被消除，基准数字失真；`b.Loop` 由框架管计时边界与存活，写法上不可能犯这两类错。",
+    "examples": {
+      "good": "func BenchmarkParse(b *testing.B) {\n  in := makeInput()\n  for b.Loop() {\n    _ = Parse(in)\n  }\n}",
+      "bad": "func BenchmarkParse(b *testing.B) {\n  for i := 0; i < b.N; i++ {\n    _ = Parse(makeInput())\n  }\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/testing#B.Loop"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对基准函数的循环写法"
+    }
+  },
+  {
+    "id": "TEST-027",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing",
+      "performance"
+    ],
+    "since_go": "1.0",
+    "summary": "基准对比用 benchstat 判显著，采样足够多次。",
+    "details": "性能结论要有统计依据。\n\n- 对比新旧实现至少各 10 次采样，用 `benchstat` 汇总\n- 禁止单次运行下结论，禁止重跑到显著为止\n- 结论表述带置信区间而非绝对值",
+    "quote": {
+      "text": "Command benchstat computes and compares statistics of benchmarks.",
+      "source": "https://pkg.go.dev/golang.org/x/perf/cmd/benchstat"
+    },
+    "rationale": "单次基准运行的方差与机器噪音同量级，快慢结论只是抽样误差；重跑到显著是选择偏差，天然能「证明」任何结论。benchstat 给出置信区间，快慢超出区间才算数。",
+    "examples": {
+      "good": "go test -bench=. -count=10 ./... > old.txt\n# 应用变更后\ngo test -bench=. -count=10 ./... > new.txt\nbenchstat old.txt new.txt",
+      "bad": "go test -bench=. -run=^$ ./... # 单次运行即下结论"
+    },
+    "sources": [
+      "https://pkg.go.dev/golang.org/x/perf/cmd/benchstat"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对性能结论的采样与判定依据"
+    }
+  },
+  {
+    "id": "TEST-028",
+    "level": "MAY",
+    "chapter": "unit-testing",
+    "section": "test-structure",
+    "tags": [
+      "testing"
+    ],
+    "since_go": "1.0",
+    "summary": "基准函数单独放 _bench_test.go。",
+    "details": "测量型测试与正确性测试分文件。\n\n- 基准放 `<file>_bench_test.go`，按被测源文件命名\n- 基准输出不被普通测试的输出噪音污染\n- 运行 `go test ./...` 时基准文件默认不执行，可保持仓库默认行为",
+    "quote": {
+      "text": "To write a new test suite, create a file whose name ends in _test.go that contains the TestXxx functions as described. Put the file in the same package as the one being tested.",
+      "source": "https://pkg.go.dev/testing"
+    },
+    "rationale": "基准与单元测试混在同一文件时，基准数据被测试日志淹没，跑 go test 时基准还拖慢整体；分文件后「跑测试」与「跑基准」各自干净。",
+    "examples": {
+      "good": "parse.go / parse_test.go / parse_bench_test.go",
+      "bad": "parse.go / parse_test.go（内含 BenchmarkParse）"
+    },
+    "sources": [
+      "https://pkg.go.dev/testing"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对基准文件的归属"
+    }
+  },
+  {
+    "id": "TEST-029",
+    "level": "SHOULD",
+    "chapter": "unit-testing",
+    "section": "assertions",
+    "tags": [
+      "assertion"
+    ],
+    "since_go": "1.0",
+    "summary": "require 用于前置条件，assert 用于结果校验。",
+    "details": "两类断言按失败后的行为分工。\n\n- require 失败即终止：前置条件不满足时后续断言无意义\n- assert 失败继续：结果校验收集全部失败一次看完\n- 同一测试内不混用同一检查点的两种风格",
+    "quote": {
+      "text": "The require package provides the same functions as assert package but stops test execution when a check fails.",
+      "source": "https://pkg.go.dev/github.com/stretchr/testify/require"
+    },
+    "rationale": "前置条件失败后继续跑 assert，每个断言都报错但根因只有一个，输出淹没信号；反过来，结果校验用 require 会停在第一个失败，修一处再撞下一处。",
+    "examples": {
+      "good": "u, err := CreateUser(t.Context(), req)\nrequire.NoError(t, err)\nassert.Equal(t, \"alice\", u.Name)\nassert.False(t, u.IsAdmin)",
+      "bad": "u, err := CreateUser(t.Context(), req)\nassert.NoError(t, err)\nassert.Equal(t, \"alice\", u.Name)"
+    },
+    "sources": [
+      "https://pkg.go.dev/github.com/stretchr/testify/require"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "testifylint"
     }
   }
 ]

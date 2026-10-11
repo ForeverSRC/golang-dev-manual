@@ -292,5 +292,204 @@
       "tool": "manual",
       "note": "核对请求路径上的日志是否传入 ctx"
     }
+  },
+  {
+    "id": "ERR-007",
+    "level": "MUST",
+    "chapter": "errors-and-logging",
+    "section": "error-handling",
+    "tags": [
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "error 返回值不得用 _ 丢弃。",
+    "details": "error 是函数结果的一部分，必须逐处检查。\n\n- 不用 `_` 接收 error 返回值\n- 不在检查 error 之前使用其他返回值（未检查 err 就使用 v）\n- 确实无操作空间时记录或上抛，不留静默路径\n- errcheck 可机检",
+    "quote": {
+      "text": "The error built-in interface type is the conventional interface for representing an error condition, with the nil value representing no error.",
+      "source": "https://pkg.go.dev/builtin#error"
+    },
+    "rationale": "语言约定里 nil 代表无错、非 nil 必须处理，用 `_` 丢弃等于宣布失败不可见；被吞掉的错误在下游表现为空数据、零值对象或超时，排障时无从定位最初的失败点。",
+    "examples": {
+      "good": "if _, err := w.Write(data); err != nil {\n  return fmt.Errorf(\"write body: %w\", err)\n}",
+      "bad": "_, _ = w.Write(data)"
+    },
+    "sources": [
+      "https://pkg.go.dev/builtin#error"
+    ],
+    "detect": {
+      "tool": "golangci-lint",
+      "rule": "errcheck"
+    }
+  },
+  {
+    "id": "ERR-008",
+    "level": "MAY",
+    "chapter": "errors-and-logging",
+    "section": "error-handling",
+    "tags": [
+      "error-handling"
+    ],
+    "since_go": "1.20",
+    "summary": "相互独立的失败用 errors.Join 合并返回。",
+    "details": "需要一次报出全部失败时用 errors.Join。\n\n- 逐字段校验、批量关闭资源等场景，各失败都值得报出\n- 合并后的错误仍可被 `errors.Is` 按成员分别命中\n- 存在首错即停的因果依赖时直接返回第一个错误",
+    "quote": {
+      "text": "Join returns an error that wraps the given errors.",
+      "source": "https://pkg.go.dev/errors#Join"
+    },
+    "rationale": "逐个返回会让调用方修完一个错再撞下一个，多轮往返；Join 把独立失败合并成一次报出，且每个成员仍是可判定独立错误的值，errors.Is 的语义不因合并而丢失。",
+    "examples": {
+      "good": "return errors.Join(validateName(u), validateEmail(u))",
+      "bad": "if err := validateName(u); err != nil {\n  return err\n}\nreturn validateEmail(u)"
+    },
+    "sources": [
+      "https://pkg.go.dev/errors#Join"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对多失败路径的合并方式"
+    }
+  },
+  {
+    "id": "ERR-009",
+    "level": "MUST",
+    "chapter": "errors-and-logging",
+    "section": "error-handling",
+    "tags": [
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "库代码与请求处理路径不调 os.Exit 与 log.Fatal。",
+    "details": "退出决策权归 main。\n\n- 业务代码返回 error，由 main 决定退出码\n- `os.Exit` 与 `log.Fatal` 跳过全部 defer，清理逻辑失效\n- main 之外仅允许入口装配的显式失败路径",
+    "quote": {
+      "text": "Exit causes the current program to exit with the given status code. Deferred functions are not run.",
+      "source": "https://pkg.go.dev/os#Exit"
+    },
+    "rationale": "os.Exit 不给 defer 执行机会：锁未释放、缓冲未刷出、连接未关闭直接终止；库代码里调用它还会剥夺调用方处理错误的全部机会，失败原因只留在 stdout 上一行日志。",
+    "examples": {
+      "good": "func run() error {\n  return loadConfig()\n}\nfunc main() {\n  if err := run(); err != nil {\n    log.Fatal(err)\n  }\n}",
+      "bad": "func loadConfig() *Config {\n  cfg, err := parse()\n  if err != nil {\n    log.Fatal(err)\n  }\n  return cfg\n}"
+    },
+    "sources": [
+      "https://pkg.go.dev/os#Exit"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对非 main 包的 os.Exit 与 log.Fatal 调用"
+    }
+  },
+  {
+    "id": "ERR-010",
+    "level": "SHOULD",
+    "chapter": "errors-and-logging",
+    "section": "error-handling",
+    "tags": [
+      "error-handling"
+    ],
+    "since_go": "1.0",
+    "summary": "可写资源的 Close 与 Flush 错误必须检查。",
+    "details": "写路径的收尾错误不能忽略。\n\n- `bufio.Writer.Flush`、写文件的 `Close` 失败意味着数据没有落盘\n- 只读清理（读文件 Close）可忽略\n- 检查后再记录或上抛，不静默吞掉",
+    "quote": {
+      "text": "Flush writes any buffered data to the underlying io.Writer.",
+      "source": "https://pkg.go.dev/bufio#Writer.Flush"
+    },
+    "rationale": "缓冲写的数据在 Flush/Close 时才真正落到底层，这一步失败即静默丢数据：进程照常退出，文件却是空的或截断的；只读路径没有这个风险，忽略无害。",
+    "examples": {
+      "good": "if err := bw.Flush(); err != nil {\n  return fmt.Errorf(\"flush: %w\", err)\n}\nif err := f.Close(); err != nil {\n  return fmt.Errorf(\"close: %w\", err)\n}",
+      "bad": "bw.Flush()\nf.Close()"
+    },
+    "sources": [
+      "https://pkg.go.dev/bufio#Writer.Flush"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对写路径资源关闭处的错误处理"
+    }
+  },
+  {
+    "id": "ERR-011",
+    "level": "MUST",
+    "chapter": "errors-and-logging",
+    "section": "error-handling",
+    "tags": [
+      "error-handling",
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "对外错误信息保持泛化，细节只进服务端日志。",
+    "details": "面向客户端的错误响应不携带内部细节。\n\n- 堆栈、SQL 语句、文件路径、上游地址只写服务端日志\n- 对外响应给通用错误码与提示（如 internal error）\n- 错误日志需带请求标识，能与服务端日志对上",
+    "quote": {
+      "text": "Leakage of sensitive information in exception message.",
+      "source": "https://docs.bearer.com/reference/rules/go_lang_information_leakage/"
+    },
+    "rationale": "原始错误文本把表结构、目录布局、依赖版本递给攻击者，是注入类攻击的侦察信息；把细节留在服务端日志、对外只给泛化信息，攻击面不随错误处理策略扩大。",
+    "examples": {
+      "good": "slog.Error(\"query failed\", \"err\", err, \"req_id\", reqID)\nhttp.Error(w, \"internal error\", http.StatusInternalServerError)",
+      "bad": "http.Error(w, err.Error(), http.StatusInternalServerError)"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_lang_information_leakage/"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对对外错误响应的构造"
+    }
+  },
+  {
+    "id": "CODE-004",
+    "level": "MAY",
+    "chapter": "errors-and-logging",
+    "section": "error-codes",
+    "tags": [
+      "error-handling",
+      "naming"
+    ],
+    "since_go": "1.0",
+    "summary": "错误字符串全小写、不以标点结尾，sentinel 错误带包名前缀。",
+    "details": "错误消息按「可拼接」风格书写。\n\n- 全小写（缩略词也小写：`invalid id`，不写 `invalid ID`）\n- 不以标点结尾，不写成完整句子\n- sentinel 错误消息带包名前缀标识来源（如 `mypkg: not found`）",
+    "quote": {
+      "text": "Error strings should not be capitalized (unless beginning with proper nouns or acronyms) or end with punctuation, since they are often combined with other context information.",
+      "source": "https://go.dev/wiki/CodeReviewComments#error-strings"
+    },
+    "rationale": "错误在调用链上被层层包装拼接，首字母大写或句尾标点出现在中间时读起来是病句；包名前缀让多包错误混在同一日志里时仍能定位来源。",
+    "examples": {
+      "good": "var ErrNotFound = errors.New(\"mypkg: entity not found\")",
+      "bad": "var ErrNotFound = errors.New(\"Mypkg: Entity Not Found.\")"
+    },
+    "sources": [
+      "https://go.dev/wiki/CodeReviewComments#error-strings"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 errors.New 与 Errorf 的消息文本"
+    }
+  },
+  {
+    "id": "LOG-004",
+    "level": "MUST",
+    "chapter": "errors-and-logging",
+    "section": "logging",
+    "tags": [
+      "logging",
+      "security"
+    ],
+    "since_go": "1.0",
+    "summary": "日志不输出口令、令牌、邮箱等 PII 与凭据。",
+    "details": "敏感字段不进日志，需要关联时用内部标识符。\n\n- 口令、令牌、密钥、邮箱、手机号不落日志\n- 请求关联用内部 id，不打全量请求体\n- 结构化日志的字段名与值都要过一遍敏感词评审",
+    "quote": {
+      "text": "Leakage of sensitive information in logger message.",
+      "source": "https://docs.bearer.com/reference/rules/go_lang_logger/"
+    },
+    "rationale": "日志的读取面远大于数据库：采集、存储、检索、第三方汇聚都可能是明文，凭据与 PII 一旦落日志就无法回收，泄露面与合规风险同时放大。",
+    "examples": {
+      "good": "slog.Info(\"user login\", \"user_id\", uid)",
+      "bad": "slog.Info(\"user login\", \"email\", email, \"password\", pwd)"
+    },
+    "sources": [
+      "https://docs.bearer.com/reference/rules/go_lang_logger/"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对日志字段中的敏感信息"
+    }
   }
 ]

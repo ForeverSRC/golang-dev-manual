@@ -148,13 +148,318 @@ func TestLoad(t *testing.T) {
 
 **检测**：人工核对（核对读取真实文件、网络或数据库的测试是否以 _it_test.go 结尾）
 
+### 【SHOULD】TEST-021 测试之间不依赖执行顺序，每个用例独立可运行。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+- 主题：testing
+
+每个用例自己准备自己需要的数据。
+
+- 每个用例单独运行也能通过，不依赖前面用例留下的数据
+- 需要数据库记录、临时文件时在用例内自己创建、自己清理
+- 单跑某个用例（`go test -run TestX`）与全量跑的结果一致
+
+**为什么**
+
+> Shuffle both, the order of tests and the order of benchmarks
+>
+> —— https://pkg.go.dev/cmd/go
+
+`go test` 提供 `-shuffle` 选项随机化测试的执行顺序，说明执行顺序从来不是被承诺的行为。一个用例若依赖另一个用例留下的数据，单独运行它就失败，全量运行它才能通过——失败原因不在被测代码，而在执行顺序。让每个用例自己准备数据后，任何顺序、任何子集运行结果都一致，失败的唯一解释就是被测代码有问题。
+
+**正例**
+
+```go
+func TestDelete(t *testing.T) {
+  id := createUser(t)
+  err := Delete(t.Context(), id)
+  assert.NoError(t, err)
+}
+```
+
+**反例**
+
+```go
+func TestDelete(t *testing.T) {
+  // 依赖 TestCreate 已经插入了 id=1 的记录
+  err := Delete(t.Context(), 1)
+  assert.NoError(t, err)
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/cmd/go
+
+**检测**：人工核对（核对用例是否依赖其他用例留下的数据）
+
+### 【SHOULD】TEST-022 测试等待用同步原语，不用 time.Sleep。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+- 主题：testing, concurrency
+
+等待事件就绪，不等固定时长。
+
+- 等待并发完成用 channel、`WaitGroup` 或 synctest
+- `time.Sleep` 等待「应该发生了的事」是 flaky 来源
+- 框架局限（如 consumer 组重平衡）无法事件化时，例外需在测试内注释说明
+
+**为什么**
+
+> Sleep pauses the current goroutine for at least the duration d.
+>
+> —— https://pkg.go.dev/time#Sleep
+
+Sleep 表达的是时长而非事件：慢机器上时长不够测试失败，快机器上时长浪费测试变慢，两端都不稳定；等待「事件发生」就该等事件本身（channel、WaitGroup、回调），时长永远替代不了它。
+
+**正例**
+
+```go
+done := make(chan struct{})
+go func() {
+  defer close(done)
+  worker()
+}()
+select {
+case <-done:
+case <-time.After(5 * time.Second):
+  t.Fatal("worker did not finish")
+}
+```
+
+**反例**
+
+```go
+go worker()
+time.Sleep(100 * time.Millisecond)
+```
+
+**依据**
+
+- https://pkg.go.dev/time#Sleep
+
+**检测**：人工核对（核对测试内 time.Sleep 的用途）
+
+### 【SHOULD】TEST-023 测试文件按被测源文件命名。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+- 主题：testing, naming
+
+foo.go 的测试叫 foo_test.go。
+
+- 不按被测函数命名（不建 parse_test.go 装多个函数的测试）
+- `go test`、覆盖率与 IDE 跳转都按文件对映
+- 同一被测文件的测试集中一处，检索成本最低
+
+**为什么**
+
+> To write a new test suite, create a file whose name ends in _test.go that contains the TestXxx functions as described. Put the file in the same package as the one being tested.
+>
+> —— https://pkg.go.dev/testing
+
+文件对映是 Go 测试组织的默认索引：找 Parse 的测试先开 parse_test.go，覆盖率报告与失败输出也按这个对映落位；按函数名散建测试文件后，三层索引全部失效。
+
+**正例**
+
+```go
+parse.go / parse_test.go
+```
+
+**反例**
+
+```go
+parse.go / util_test.go（内含 Parse 的测试）
+```
+
+**依据**
+
+- https://pkg.go.dev/testing
+
+**检测**：人工核对（核对测试文件与被测源文件的命名对映）
+
+### 【SHOULD】TEST-024 测试临时文件写 t.TempDir。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.15
+- 主题：testing
+
+测试产物落进 per-test 临时目录。
+
+- `t.TempDir()` 自动清理且用例互不干扰
+- 不写 /tmp 或仓库目录等共享路径
+- 并行用例各拿各的目录，无路径冲突
+
+**为什么**
+
+> TempDir returns a new directory for the test to use. The directory is automatically removed when the test and all its subtests complete.
+>
+> —— https://pkg.go.dev/testing#T.TempDir
+
+共享临时目录里固定名字的文件会被并行用例互写，残留文件让下一次运行读到脏数据；t.TempDir 的目录随测试结束自动删除，隔离与清理都是框架保证。
+
+**正例**
+
+```go
+dir := t.TempDir()
+f, err := os.Create(filepath.Join(dir, "out.txt"))
+```
+
+**反例**
+
+```go
+f, err := os.Create("/tmp/out.txt")
+```
+
+**依据**
+
+- https://pkg.go.dev/testing#T.TempDir
+
+**检测**：人工核对（核对测试内的临时目录创建）
+
+### 【SHOULD】TEST-025 测试内取 ctx 用 t.Context。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.24
+- 主题：testing, context
+
+测试生命周期自带的 context 优先于 Background。
+
+- `t.Context()` 在测试结束与清理函数执行前自动取消
+- 被测函数接收 ctx 时传入它，测试结束协程随之退出
+- 替代手工 defer cancel 的样板
+
+**为什么**
+
+> Context returns a context that is canceled just before Cleanup-registered functions are called.
+>
+> —— https://pkg.go.dev/testing#T.Context
+
+`context.Background()` 造的 ctx 永不取消，测试结束后泄漏的 goroutine 一直活到进程退出并污染下一个测试；`t.Context` 随测试结束自动取消，协程跟着退出。
+
+**正例**
+
+```go
+func TestQuery(t *testing.T) {
+  got, err := store.Get(t.Context(), "id")
+  assert.NoError(t, err)
+  _ = got
+}
+```
+
+**反例**
+
+```go
+func TestQuery(t *testing.T) {
+  got, err := store.Get(context.Background(), "id")
+  assert.NoError(t, err)
+  _ = got
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/testing#T.Context
+
+**检测**：人工核对（核对测试内的 ctx 来源）
+
+### 【SHOULD】TEST-026 基准用 b.Loop，不手写 b.N 循环。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.24
+- 主题：testing, performance
+
+Go 1.24+ 的新基准循环替代 b.N 手写循环。
+
+- `b.Loop` 内的代码自动进入计时区，setup 留在循环外
+- 手写 `b.N` 循环易把 setup 算进计时，或让编译器消除死代码
+- 旧 Go 版本仍按 `b.N` 写法
+
+**为什么**
+
+> Loop executes the given function as a benchmark loop, resetting the timer appropriately.
+>
+> —— https://pkg.go.dev/testing#B.Loop
+
+`b.N` 循环的计时边界与防优化都靠使用者自觉：setup 写进循环、结果变量没消费被消除，基准数字失真；`b.Loop` 由框架管计时边界与存活，写法上不可能犯这两类错。
+
+**正例**
+
+```go
+func BenchmarkParse(b *testing.B) {
+  in := makeInput()
+  for b.Loop() {
+    _ = Parse(in)
+  }
+}
+```
+
+**反例**
+
+```go
+func BenchmarkParse(b *testing.B) {
+  for i := 0; i < b.N; i++ {
+    _ = Parse(makeInput())
+  }
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/testing#B.Loop
+
+**检测**：人工核对（核对基准函数的循环写法）
+
+### 【SHOULD】TEST-027 基准对比用 benchstat 判显著，采样足够多次。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+- 主题：testing, performance
+
+性能结论要有统计依据。
+
+- 对比新旧实现至少各 10 次采样，用 `benchstat` 汇总
+- 禁止单次运行下结论，禁止重跑到显著为止
+- 结论表述带置信区间而非绝对值
+
+**为什么**
+
+> Command benchstat computes and compares statistics of benchmarks.
+>
+> —— https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
+
+单次基准运行的方差与机器噪音同量级，快慢结论只是抽样误差；重跑到显著是选择偏差，天然能「证明」任何结论。benchstat 给出置信区间，快慢超出区间才算数。
+
+**正例**
+
+```go
+go test -bench=. -count=10 ./... > old.txt
+# 应用变更后
+go test -bench=. -count=10 ./... > new.txt
+benchstat old.txt new.txt
+```
+
+**反例**
+
+```go
+go test -bench=. -run=^$ ./... # 单次运行即下结论
+```
+
+**依据**
+
+- https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
+
+**检测**：人工核对（核对性能结论的采样与判定依据）
+
 ### 【MAY】TEST-008 测试用例名优先写成 should 接结果、when 接条件的句式。
 
 - 归属：单元测试规约/测试命名与结构
 - 起始版本：Go 1.0
 - 主题：testing
 
-`t.Run` 的子测试名与表格里的 name 字段，写成 should 接期望结果、when 接触发条件，例如 should return error when file is missing。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。
+`t.Run` 的子测试名与表格里的 `name` 字段，写成 should 接期望结果、when 接触发条件，例如 `should return error when file is missing`。场景一眼能看懂时，简短的中文或英文描述同样可用，不为了套句式把名字写长。
 
 **为什么**
 
@@ -181,6 +486,44 @@ func TestLoad(t *testing.T) {
 - https://go.dev/wiki/TestComments#choose-human-readable-subtest-names
 
 **检测**：人工核对（核对 t.Run 与表格 name 是否写清期望结果与触发条件）
+
+### 【MAY】TEST-028 基准函数单独放 _bench_test.go。
+
+- 归属：单元测试规约/测试命名与结构
+- 起始版本：Go 1.0
+- 主题：testing
+
+测量型测试与正确性测试分文件。
+
+- 基准放 `<file>_bench_test.go`，按被测源文件命名
+- 基准输出不被普通测试的输出噪音污染
+- 运行 `go test ./...` 时基准文件默认不执行，可保持仓库默认行为
+
+**为什么**
+
+> To write a new test suite, create a file whose name ends in _test.go that contains the TestXxx functions as described. Put the file in the same package as the one being tested.
+>
+> —— https://pkg.go.dev/testing
+
+基准与单元测试混在同一文件时，基准数据被测试日志淹没，跑 go test 时基准还拖慢整体；分文件后「跑测试」与「跑基准」各自干净。
+
+**正例**
+
+```go
+parse.go / parse_test.go / parse_bench_test.go
+```
+
+**反例**
+
+```go
+parse.go / parse_test.go（内含 BenchmarkParse）
+```
+
+**依据**
+
+- https://pkg.go.dev/testing
+
+**检测**：人工核对（核对基准文件的归属）
 
 ## （二）表驱动与用例设计
 
@@ -421,6 +764,52 @@ func TestFilterByID(t *testing.T) {
 
 **检测**：人工核对（核对修缺陷的提交是否带上触发条件对应的用例）
 
+### 【SHOULD】TEST-020 表驱动用例经 t.Run 以具名子测试执行。
+
+- 归属：单元测试规约/表驱动与用例设计
+- 起始版本：Go 1.7
+- 主题：testing
+
+每个用例一个具名子测试，失败可直达。
+
+- 用 `t.Run(name, func(t *testing.T))` 包裹每个用例
+- 用例名写业务语义（如 `invalid email`），不用 `case1`、`case2`
+- 循环变量捕获问题 Go 1.22 起已由语言修复，旧版本需复制
+
+**为什么**
+
+> Run runs f as a subtest of t called name.
+>
+> —— https://pkg.go.dev/testing#T.Run
+
+裸循环跑用例时失败只报行号，定位要回到用例表逐行对；t.Run 的子测试名直接出现在失败输出里，go test -run 还能单独重放单个用例。
+
+**正例**
+
+```go
+for name, tc := range cases {
+  t.Run(name, func(t *testing.T) {
+    got := Parse(tc.in)
+    assert.Equal(t, tc.want, got)
+  })
+}
+```
+
+**反例**
+
+```go
+for _, tc := range cases {
+  got := Parse(tc.in)
+  assert.Equal(t, tc.want, got)
+}
+```
+
+**依据**
+
+- https://pkg.go.dev/testing#T.Run
+
+**检测**：人工核对（核对表驱动测试是否经 t.Run 执行）
+
 ## （三）断言与测试数据
 
 ### 【SHOULD】TEST-003 一次比对完整结果，不逐字段拆散或裁剪成子集。
@@ -540,6 +929,49 @@ require.ErrorContains(t, err, "load")
 - https://go.dev/blog/go1.13-errors
 
 **检测**：人工核对（核对用例是否用错误消息文本判断错误种类；哨兵与错误类型是否用 errors.Is / errors.As）
+
+### 【SHOULD】TEST-029 require 用于前置条件，assert 用于结果校验。
+
+- 归属：单元测试规约/断言与测试数据
+- 起始版本：Go 1.0
+- 主题：assertion
+
+两类断言按失败后的行为分工。
+
+- require 失败即终止：前置条件不满足时后续断言无意义
+- assert 失败继续：结果校验收集全部失败一次看完
+- 同一测试内不混用同一检查点的两种风格
+
+**为什么**
+
+> The require package provides the same functions as assert package but stops test execution when a check fails.
+>
+> —— https://pkg.go.dev/github.com/stretchr/testify/require
+
+前置条件失败后继续跑 assert，每个断言都报错但根因只有一个，输出淹没信号；反过来，结果校验用 require 会停在第一个失败，修一处再撞下一处。
+
+**正例**
+
+```go
+u, err := CreateUser(t.Context(), req)
+require.NoError(t, err)
+assert.Equal(t, "alice", u.Name)
+assert.False(t, u.IsAdmin)
+```
+
+**反例**
+
+```go
+u, err := CreateUser(t.Context(), req)
+assert.NoError(t, err)
+assert.Equal(t, "alice", u.Name)
+```
+
+**依据**
+
+- https://pkg.go.dev/github.com/stretchr/testify/require
+
+**检测**：golangci-lint testifylint
 
 ## （四）Mock 与测试替身
 

@@ -137,5 +137,209 @@
     "summary": "Do not explicitly copy the loop variable any longer.",
     "details": "Since Go 1.22 the iteration variable of a for loop is independent on each iteration, and a closure or goroutine captures the value of that iteration, so writing `v := v` or passing the variable as an argument into the goroutine is no longer needed. This clause applies to modules whose go.mod declares Go 1.22 or above.",
     "rationale": "The explicit copy was the way to avoid a shared variable before Go 1.22, and keeping it after the language was fixed only makes readers think protection is still needed here; letting copyloopvar detect it cleans it up uniformly."
+  },
+  "NAMING-007": {
+    "summary": "Boolean predicate methods are named with an Is, Has, or Can prefix.",
+    "details": "Methods returning bool pick a prefix by semantics so the name reads as a yes/no question.\n\n- State checks use Is: IsHealthy, IsEmpty\n- Possession checks use Has: HasExpired, HasPrefix\n- Capability checks use Can: CanRetry, CanClose\n- Existing stdlib predicates without a prefix (such as `strings.Contains`) keep their convention",
+    "rationale": "The standard library's position on naming methods is to let the name carry the meaning directly, and predicates are no exception: IsConnected reads as a yes/no question at the call site, while the bare adjective Connected cannot be told apart from a connection object, so readers must jump to the definition to confirm it is a bool.",
+    "detect_note": "Check that methods returning bool carry a predicate prefix"
+  },
+  "NAMING-008": {
+    "summary": "Boolean variables and struct fields are named with an Is, Has, or Can prefix.",
+    "details": "Variables and fields of type bool use a linking-verb prefix to express a judgment.\n\n- IsConnected, HasCache, CanRetry\n- No bare adjectives or nouns: Connected, Cache, Retry\n- Temporary boolean variables follow the same rule: isValid, hasMore",
+    "rationale": "Bare adjectives collide with object names: cfg.Cache could mean a cache configuration or a boolean that enables caching; adding Is/Has/Can makes the type semantics self-evident in the name, so reading an if condition no longer requires a jump to the definition.",
+    "detect_note": "Check that bool fields and variables carry a prefix"
+  },
+  "NAMING-009": {
+    "summary": "Single-method interfaces are named after the method plus an er suffix.",
+    "details": "A single-method interface forms an agent noun from its method name plus er.\n\n- Reader, Writer, Closer, Stringer, CloseNotifier\n- Multi-method interfaces use concrete domain nouns: Conn, Pool, Store\n- When er does not fit the method name, a close variant is allowed, such as Recognizer for Recognize",
+    "rationale": "The er suffix ties the interface name directly to its single method, so the contract is visible from the name; the standard library follows this convention throughout, and deviating from it produces two naming styles within one family of interfaces.",
+    "detect_note": "Check that single-method interface type names correspond to their method"
+  },
+  "NAMING-010": {
+    "summary": "Function variants use fixed markers such as Must, f, and WithContext.",
+    "details": "Variants of one function distinguish behavior through fixed prefixes and suffixes.\n\n- Must prefix: panics on failure, as in `regexp.MustCompile`\n- f suffix: takes a format string and variadic args, as in `errors.Errorf`\n- WithContext suffix: carries a context, as in `http.NewRequestWithContext`\n- Markers stay consistent with the standard library; do not invent new ones",
+    "rationale": "Callers in code review and IDE hints often see only the function name, not the signature: the Must prefix says this panics, the f suffix says the argument is a format string, WithContext says cancellation propagates through ctx; if variant behavior is not in the name, misuse surfaces only when the implementation is read.",
+    "detect_note": "Check that variant functions keep naming markers consistent with the standard library"
+  },
+  "NAMING-011": {
+    "summary": "Identifiers do not shadow predeclared names such as len, cap, error, and min.",
+    "details": "Local variables, parameters, and fields do not reuse predeclared identifiers.\n\n- Predeclared names include len, cap, new, make, min, max, clear, error, any\n- Misusing a shadowed name produces no compile error; the semantics change silently\n- When a same-name declaration is truly needed (for example generated code), state the reason in review",
+    "rationale": "Predeclared identifiers are the fallback names of every scope; shadowing them locally turns min(x, y) into a user function call and error into a local variable, with no compiler hint — only unusual behavior. The predeclared checker turns this into a mechanical check.",
+    "detect_note": "Check that local identifiers do not shadow predeclared names"
+  },
+  "CONST-004": {
+    "summary": "Leave the zero value of an iota enum as an Unknown sentinel, or start at iota+1.",
+    "details": "The zero value of an enum type carries no business meaning.\n\n- Define StatusUnknown first, or start the first business member at iota+1\n- Zero serves as the uninitialized/invalid sentinel so validation can separate it from real states\n- Exception: types whose zero value has clear business meaning (such as GenderMale at 0) may keep it, confirmed in review",
+    "rationale": "The zero value of var s Status silently equals the first const member, so an uninitialized field passes validation as the first business state, and debugging cannot tell a default from a real state; reserving zero for Unknown makes uninitialized states surface explicitly at validation.",
+    "detect_note": "Check whether the first iota member occupies the zero value"
+  },
+  "DATA-003": {
+    "summary": "Type assertions use the comma-ok form, not the single-value form.",
+    "details": "When the assertion may not hold, take the ok value and branch.\n\n- Use `v, ok := x.(T)` and branch on ok\n- The single-value form `v := x.(T)` is limited to cases where a failed assertion is a program error, with a comment\n- Type switches are not covered by this clause",
+    "rationale": "The single-value form panics on a type mismatch, turning the predictable branch of a wrong type into a process crash; comma-ok leaves the decision to the code, letting the caller take a downgrade or error path.",
+    "detect_note": "Check the form of every type assertion"
+  },
+  "DATA-004": {
+    "summary": "Initialize a nil map before writing to it.",
+    "details": "Confirm the map has been initialized with make or a literal before writing.\n\n- Reading a nil map is legal and returns zero values\n- Writing to a nil map panics\n- Maps inside structs can be lazily initialized in the constructor or a method so the zero value stays usable",
+    "rationale": "The zero value of `var m map[string]int` can be read but not written; any write path that reaches it panics with no compile-time hint at all. Initialize up front, or make the type's zero value usable — pick one and be explicit.",
+    "detect_note": "Check that map write paths operate on initialized maps"
+  },
+  "DATA-005": {
+    "summary": "Do not rely on map iteration order; sort keys when order matters.",
+    "details": "The output order of a range over a map is not a contract.\n\n- Serialization, comparison, and display that need stable output sort the keys first\n- Order-dependent logic fails intermittently in CI and production alike\n- The runtime randomizes map iteration; this is a language guarantee, not an implementation detail",
+    "rationale": "The language specification explicitly makes no promise about iteration order, so order-dependent code can differ between two runs of the same process, and a passing test only means randomness favored it; explicit sorting is the only way to establish a contract.",
+    "detect_note": "Check that logic after ranging a map does not depend on order"
+  },
+  "DATA-006": {
+    "summary": "Check the value range before a narrowing integer conversion.",
+    "details": "Narrowing conversions such as int64 to int32 or uint to int need explicit validation.\n\n- Verify the value fits the target type before converting\n- Conversions driven by external input must be checked (the `gosec G115` case)\n- Bit-level scenarios with clearly meaningless high bits may be waived with a comment",
+    "rationale": "Narrowing conversions truncate and wrap silently: three billion in int64 becomes a negative int32 with no error anywhere; when external input drives the conversion, the truncated result becomes a business bug or a security hole.",
+    "detect_note": "Check the range before narrowing conversions"
+  },
+  "DATA-007": {
+    "summary": "Struct fields that participate in JSON serialization must be exported.",
+    "details": "Fields that must appear in JSON use exported identifiers; unexported fields are silently ignored.\n\n- Unexported fields cannot be encoded or decoded by `encoding/json`\n- Pair with a field tag for the key mapping (see STRUCT-004)\n- Numbers parsed into `interface{}` are always `float64`; large integers go through `json.Number` or typed structs",
+    "rationale": "encoding/json cannot access unexported fields, so production JSON silently loses fields — and local tests that never verify the contract will not catch it; exporting with a tag pins the contract at the struct definition.",
+    "detect_note": "Compare struct fields with the serialization contract and check unexported fields"
+  },
+  "STD-001": {
+    "summary": "time.Duration is never multiplied by time.Duration.",
+    "details": "Duration arithmetic multiplies only by scalars.\n\n- Use `d * n` (n an integer) for multiples\n- `d * d` and `d * (x * time.Second)` are unit errors\n- Build durations from variables with scalar multiplication such as `time.Duration(n) * time.Second`",
+    "rationale": "A Duration is a nanosecond count, so multiplying two durations yields square nanoseconds, off by many orders of magnitude from intuition: `5 * time.Second * time.Second` is not 25 seconds but 2.5 trillion nanoseconds; the durationcheck checker turns this into a mechanical check.",
+    "detect_note": "Check every multiplication involving time.Duration"
+  },
+  "STD-002": {
+    "summary": "Compare time.Time values with Equal, not ==.",
+    "details": "Use Equal or Compare to test for the same instant.\n\n- `==` also compares wall clock, location, and the monotonic clock reading\n- Times parsed from strings or received over the network carry no monotonic reading, but mixed sources make `==` unreliable\n- Zero checks use `IsZero`; ordering uses `Before`/`After`",
+    "rationale": "time.Time carries a monotonic clock reading internally, and == folds that reading into the comparison, so the same wall-clock instant can compare unequal; Equal compares only the time instant, matching business expectations.",
+    "detect_note": "Check the expressions used to compare time.Time values"
+  },
+  "STD-003": {
+    "summary": "Strip prefixes and suffixes with strings.TrimPrefix and TrimSuffix.",
+    "details": "Do not use the strings.Trim family for substring trimming.\n\n- `strings.TrimPrefix`/`strings.TrimSuffix` remove one exact substring: `strings.TrimPrefix(s, \"api/\")`\n- `strings.Trim`/`strings.TrimLeft`/`strings.TrimRight` take a set of characters and repeatedly strip all matching ones\n- Mixing the two is a common source of over-trimming",
+    "rationale": "Trim's second argument is a set of characters, not a substring: strings.Trim(s, \"ab\") removes every leading and trailing a and b, which differs entirely from the intent of removing the prefix ab; the set semantics hide behind the function name, and misuse shows up as occasional over-trimming.",
+    "detect_note": "Check that the trimming intent matches the API used"
+  },
+  "FUNC-004": {
+    "summary": "Nil branches of interface-returning functions return nil explicitly.",
+    "details": "When the return type is an interface (error included), do not return a typed nil pointer variable.\n\n- Return nil directly when there is no error\n- When a concrete error type is needed, construct it and decide the return value by emptiness\n- Applies to every interface return value; error is the most common case",
+    "rationale": "An interface value carries a (type, value) pair; a typed nil pointer wrapped in it makes the interface non-nil, so the caller's err != nil check holds and enters the error branch, panicking later when nil fields are dereferenced. Returning nil explicitly removes the trap at the source.",
+    "detect_note": "Check the nil branches of interface-returning functions"
+  },
+  "CTRL-003": {
+    "summary": "Do not defer resource release inside a loop body.",
+    "details": "defer binds to the function, not the loop iteration.\n\n- Close resources opened in a loop within the same iteration, or extract the loop body into a function\n- deferring in a long loop releases everything only when the function returns, exhausting file descriptors and connections\n- For cleanup-at-the-end semantics, collect explicitly and close in one place",
+    "rationale": "deferred calls run when the surrounding function returns, so a thousand iterations defer a thousand releases, and handles only accumulate for the lifetime of the function; on servers this shows up as fd exhaustion and dead pool connections in long loops.",
+    "detect_note": "Grep for defer statements inside loop bodies"
+  },
+  "CTRL-004": {
+    "summary": "HTTP handlers return immediately after writing an error response.",
+    "details": "Business logic must not continue after `http.Error` or `w.Write`.\n\n- The error branch returns right after writing the response\n- Continuing may call `WriteHeader` again, triggering the superfluous WriteHeader warning\n- The same applies to middleware that rewrites responses",
+    "rationale": "Code that runs after the response was written either calls WriteHeader a second time (the header is already sent, changes are ignored, and a warning is logged) or writes sensitive error details into the body; an immediate return closes the error branch.",
+    "detect_note": "Check that handlers return after http.Error/w.Write"
+  },
+  "CTRL-005": {
+    "summary": "Inner scopes do not shadow the outer err with :=.",
+    "details": "Keep one identifier for an error variable across scopes.\n\n- The err in `if v, err := f(); err != nil` is unrelated to the outer err, and assignments do not escape\n- To carry an inner result out, declare first, then assign\n- The shadow checker must be enabled explicitly; waive noisy hits with nolint",
+    "rationale": ":= declares a new variable in the new scope, so the err inside an if statement is a fresh one — checking it leaves the outer err still nil, silently bypassing error handling; such defects surface neither at compile time nor at runtime, only in review or via the shadow checker.",
+    "detect_note": "Check for := declarations that shadow an outer err"
+  },
+  "CONC-005": {
+    "summary": "Channel parameters in function signatures are typed as directional.",
+    "details": "Pick chan<- or <-chan by the parameter's actual use.\n\n- Send-only parameters use `chan<- T`, receive-only use `<-chan T`\n- Directional types stop erroneous sends and closes at compile time\n- Return values and struct fields follow the same rule",
+    "rationale": "A bidirectional chan T places no compile-time constraint on erroneous sends or closes, and closing a producer's channel makes consumers panic; directional types put the usage boundary in the signature, so misuse fails compilation instead.",
+    "detect_note": "Check the direction of channel parameters in exported functions"
+  },
+  "CONC-006": {
+    "summary": "Buffered channels with capacity above 1 carry a comment on sizing and overflow behavior.",
+    "details": "Buffer capacity is a concurrency design decision, not an arbitrary number.\n\n- Unbuffered by default; buffers above 1 must note the sizing rationale and what happens when full (block, drop, or degrade)\n- Large buffers mask backpressure, and queued work grows unbounded\n- Producer/consumer rate alignment notes go next to the make statement",
+    "rationale": "An unbuffered channel provides natural backpressure, while a buffered one delays the signal of overproduction until after the backlog builds; an unannotated capacity cannot be told apart from a casual number, so review cannot judge whether the full-buffer behavior is safe.",
+    "detect_note": "Grep for make(chan, n) with n greater than 1 and no adjacent comment"
+  },
+  "CONC-007": {
+    "summary": "Selectable cancelable paths include a ctx.Done() branch.",
+    "details": "Long-lived goroutines need a cancellation exit in their select loop.\n\n- Put `ctx.Done()` in the select case set and exit on cancellation\n- Only one-shot selects with certain termination may omit it\n- Goroutines without a cancellation branch cannot exit when the service shuts down",
+    "rationale": "A select blocks on multiple channels; if the cancellation signal is not in the case set, the goroutine keeps blocking after the caller cancels, and every such goroutine leaks during graceful shutdown.",
+    "detect_note": "Check the case set of long-lived goroutine selects"
+  },
+  "CONC-008": {
+    "summary": "A select inside a for loop does not busy-wait via a default branch.",
+    "details": "The default branch of an in-loop select spins the loop.\n\n- Drop `default` when waiting for data, letting select block\n- For non-blocking polling, sleep or back off inside the `default` branch\n- A receiver sets a closed channel to nil to exit the multiplexing",
+    "rationale": "`for { select { default: } }` retries immediately whenever no case is ready, so the spinning loop keeps one CPU core busy doing nothing; a closed channel is always ready and consumes a core the same way once mixed into a select, and setting it to nil is the standard way to exit.",
+    "detect_note": "Check the default branch of selects inside loops"
+  },
+  "CONC-009": {
+    "summary": "Periodic ticks in loops use time.NewTicker with Stop.",
+    "details": "Periodic tasks that can stop avoid time.After and time.Tick.\n\n- Each `time.After` in a loop allocates a fresh timer; old ones are unreclaimable until fired\n- The ticker behind `time.Tick` cannot be stopped and leaks forever\n- Use `ticker := time.NewTicker(d)` with `defer ticker.Stop()`",
+    "rationale": "time.After allocates a new timer per loop iteration that the GC cannot reclaim until it fires, showing up as memory and timer buildup in long loops; the official documentation marks time.Tick as leaking outright, and NewTicker plus Stop is the only path with stop semantics.",
+    "detect_note": "Check for time.After and time.Tick inside loop bodies"
+  },
+  "CONC-010": {
+    "summary": "Wait with wg.Go, or place manual wg.Add before the go statement.",
+    "details": "On Go 1.25+, prefer wg.Go(f) over the manual Add/go/Done pairing.\n\n- `wg.Go(f)` encapsulates Add, goroutine start, and Done in one step, eliminating pairing errors\n- With manual use, `wg.Add(1)` must precede the go statement; inside the goroutine it races with Wait\n- Use `errgroup` when collecting per-task errors; Go below 1.25 still pairs manually",
+    "rationale": "When Add runs inside the goroutine, the main goroutine's Wait may pass the zero-count check before Add executes, and the wait becomes a no-op; wg.Go has the standard library guarantee the pairing order, removing this class of intermittent race at the root.",
+    "detect_note": "Check the relative position of wg.Add and the go statement"
+  },
+  "CONC-011": {
+    "summary": "Critical sections exclude I/O, network calls, and channel operations.",
+    "details": "Lock hold time covers memory operations only.\n\n- Blocking calls over network, disk, and databases stay outside the lock\n- When lock-held data is needed for I/O, copy the result out, then unlock\n- Channel sends and receives can block indefinitely and move out as well",
+    "rationale": "Making a network call while holding a lock stretches the hold time to the network round trip, and milliseconds of I/O serialize every goroutine waiting on that lock; moving I/O outside brings the hold time back to nanoseconds, so concurrency does not decay with external latency.",
+    "detect_note": "Check for blocking calls between Lock and Unlock"
+  },
+  "CONC-012": {
+    "summary": "Do not request Lock while holding RLock on the same RWMutex.",
+    "details": "An RWMutex cannot upgrade; read and write lock requests must be one-directional.\n\n- For writes while holding a read lock, `RUnlock` first, then `Lock`\n- For read-modify-write atomicity, use `Lock` directly\n- Recursive read locking is equally forbidden",
+    "rationale": "A pending write lock blocks subsequent read locks, so requesting the write lock while holding the read lock deadlocks on yourself: you are waiting for your own read lock to release; the documentation explicitly forbids recursive read locking too, so upgrade semantics must split into two steps or use a write lock throughout.",
+    "detect_note": "Check for nested RLock and Lock holds"
+  },
+  "CONC-013": {
+    "summary": "Simple counters and flags use typed atomic types.",
+    "details": "atomic.Int64, atomic.Bool, and siblings replace the function-style atomic calls.\n\n- Single-value state such as counters, switches, and version numbers uses `atomic.Int64`/`atomic.Int32`/`atomic.Bool`/`atomic.Pointer`\n- Do not use the function form `atomic.AddInt64(&counter, 1)`\n- Compound state still uses a mutex",
+    "rationale": "Typed atomics put this field is atomically accessed into the type itself, so passing a plain int64 fails at compile time; with function-style calls the target field is type-identical to any other field, and new access points can easily miss the atomic operation.",
+    "detect_note": "Check the form of atomic operations"
+  },
+  "CONC-014": {
+    "summary": "Do not use sync.Map in write-heavy scenarios.",
+    "details": "sync.Map serves two access patterns only.\n\n- Keys written once and read many times (grow-only caches)\n- Multiple goroutines operating on disjoint key sets\n- Everything else uses `map` with `RWMutex`; `sync.Map` is slower on write-heavy paths and type-unsafe",
+    "rationale": "sync.Map trades a read-optimized internal structure for lock-free reads, and its maintenance cost exceeds map+RWMutex under heavy writes; the official documentation names exactly two optimized modes, so using it beyond them has no performance basis and loses compile-time type checking.",
+    "detect_note": "Check the read/write ratio and key-set pattern of sync.Map usage"
+  },
+  "CONC-015": {
+    "summary": "Batch concurrent tasks set a concurrency limit.",
+    "details": "Unbounded goroutine startup at input scale exhausts resources.\n\n- Limit with `errgroup.Group`'s `SetLimit` or a buffered-channel semaphore\n- The limit follows downstream capacity (connection pool, downstream QPS) and is annotated\n- One-off small tasks (bounded fan-out input) may be waived with a note",
+    "rationale": "Every goroutine occupies stack memory and scheduling cost, so starting one goroutine per item at a scale of ten thousand exhausts memory and downstream connections quickly; a fixed limit keeps concurrency bounded, and errgroup also collects errors in one place.",
+    "detect_note": "Check that batch task fan-out sets a limit"
+  },
+  "CONC-016": {
+    "summary": "sync.Pool objects are Reset before being put back.",
+    "details": "Objects returned to the pool must clear their internal state.\n\n- `Reset` slices, maps, and pointer fields so stale data does not leak into the next `Get`\n- Do not assume `Get` returns a zero-valued object\n- Document the `Reset` obligation on pooled types",
+    "rationale": "The pool caches memory without resetting state, and a dirty object carries the previous user's data into the next Get, leaking user data across requests or corrupting logic; Get means usable memory, not a zero value, so the reset obligation sits with the caller.",
+    "detect_note": "Check that Pool.Put sites Reset first"
+  },
+  "DB-001": {
+    "summary": "Check rows.Err and Close rows after iterating sql.Rows.",
+    "details": "The rows lifecycle spans the whole iteration.\n\n- Check `rows.Err()` after the `for rows.Scan` loop ends\n- Close rows when done, or `defer rows.Close()` right after the query\n- Statements that return no rows (INSERT/UPDATE/DELETE) use `Exec`, not `Query`",
+    "rationale": "Without Close, a connection stays occupied and is never returned to the pool; without Err, an I/O interruption mid-iteration is swallowed (on a network blip the loop quietly reads fewer rows); Err's error never escapes through Scan, so it must be checked explicitly.",
+    "detect_note": "Check that rows.Err and rows.Close appear after iteration"
+  },
+  "DB-002": {
+    "summary": "Wrap multi-statement writes in a transaction and defer Rollback right after Begin.",
+    "details": "Transactions need a single cleanup path.\n\n- Follow `tx := db.BeginTx(ctx, nil)` immediately with `defer tx.Rollback()`\n- Rollback after a successful Commit returns `ErrTxDone`, which is harmless\n- Panic or early-return paths leave no transaction hanging",
+    "rationale": "Without defer Rollback, a transaction hangs until connection reclamation on panic or early return, holding row locks the whole time; calling Rollback after Commit only returns ErrTxDone, so as a safety net it is always safe.",
+    "detect_note": "Check that transactions defer Rollback right after Begin"
+  },
+  "DB-003": {
+    "summary": "Receive nullable columns into pointers or sql.Null.",
+    "details": "NULL and the Go zero value are different semantics.\n\n- When a column is nullable, Scan into `*T` or `sql.Null[T]` (Go 1.22+ generics)\n- Scanning NULL into a bare basic type fails outright\n- When the schema changes (new nullable columns), re-check the Scan targets",
+    "rationale": "Scanning NULL into a bare type fails with a conversion error, and the failure lands at the runtime data boundary, triggered by downstream DDL changes; pointers and sql.Null[T] encode nullable in the type, matching the database's semantics.",
+    "detect_note": "Compare DDL nullable columns with the Scan target types"
+  },
+  "DB-004": {
+    "summary": "Match sql.ErrNoRows with errors.Is.",
+    "details": "Not found is a domain result, not an ordinary error.\n\n- Match with `errors.Is(err, sql.ErrNoRows)` and translate into domain semantics (such as a not-found marker)\n- Direct `==` comparison breaks once the error is wrapped\n- `QueryRow`'s single-row queries are the main source of ErrNoRows",
+    "rationale": "Treating ErrNoRows as an ordinary error leaves upstream unable to tell no such row from a database outage, which often shows up as a 5xx for a request that simply did not exist; matching with errors.Is and translating into a not-found result completes the error-chain semantics.",
+    "detect_note": "Check how ErrNoRows is matched"
   }
 }

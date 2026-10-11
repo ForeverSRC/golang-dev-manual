@@ -311,3 +311,295 @@ func printName(name *string) {
 
 **Detection**: manual review (Check whether a parameter that is only read through a dereference uses a pointer.)
 
+### 【SHOULD】PERF-009 Production code does not compare with reflect.DeepEqual.
+
+- Category: Performance
+- Since: Go 1.21
+- Tags: performance
+
+Type-known comparisons use the typed Equal functions.
+
+- `slices.Equal` for slices, `maps.Equal` for maps, `bytes.Equal` for byte strings
+- `reflect.DeepEqual` walks reflection and runs 50–200x slower
+- Test code comparing expected values is exempt (semantics first)
+
+**Why**
+
+> Equal reports whether two slices are equal: the same length and all elements equal. If the lengths are different, Equal returns false.
+>
+> — https://pkg.go.dev/slices#Equal
+
+DeepEqual reflects over the value structure at runtime, costing one to two orders of magnitude more than typed comparison on hot paths; the typed Equal functions in the slices and maps packages are compiler-specialized, with the same semantics at near hand-written-loop cost.
+
+**Good**
+
+```go
+if slices.Equal(want, got) {
+  return true
+}
+```
+
+**Bad**
+
+```go
+if reflect.DeepEqual(want, got) {
+  return true
+}
+```
+
+**References**
+
+- https://pkg.go.dev/slices#Equal
+
+**Detection**: manual review (Check DeepEqual calls on production paths)
+
+### 【SHOULD】PERF-010 regexp and template compile once at package level.
+
+- Category: Performance
+- Since: Go 1.0
+- Tags: performance
+
+Compiled artifacts are reused, not rebuilt in function bodies.
+
+- Package-level `var re = regexp.MustCompile(...)`, with functions only referencing it
+- Repeated Compile inside functions costs roughly an order of magnitude more and always allocates
+- template's `Parse` follows the same rule
+
+**Why**
+
+> MustCompile is like Compile but panics if the expression cannot be parsed. It simplifies safe initialization of global variables holding compiled regular expressions.
+>
+> — https://pkg.go.dev/regexp#MustCompile
+
+Compile parses the regex and builds the state machine on every call, an overhead comparable to the matching itself on hot paths; the official documentation writes the package-level initialization case into MustCompile's description — compile once and reuse is its designed use.
+
+**Good**
+
+```go
+var idRe = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+func valid(id string) bool { return idRe.MatchString(id) }
+```
+
+**Bad**
+
+```go
+func valid(id string) bool {
+  return regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(id)
+}
+```
+
+**References**
+
+- https://pkg.go.dev/regexp#MustCompile
+
+**Detection**: manual review (Check for regexp.Compile and template.Parse inside function bodies)
+
+### 【SHOULD】PERF-011 Unbounded inputs are processed streaming, not loaded whole with io.ReadAll.
+
+- Category: Performance
+- Since: Go 1.0
+- Tags: performance
+
+Memory peaks follow the input's upper bound, not its current size.
+
+- Large files and unbounded responses stream with `bufio.Scanner` and `io.Copy`
+- `io.ReadAll` is for bounded, small inputs only (such as a small config)
+- Unbounded means the maximum size cannot be known before the call
+
+**Why**
+
+> Copy copies from src to dst until either EOF is reached on src or an error occurs.
+>
+> — https://pkg.go.dev/io#Copy
+
+ReadAll piles the whole input into memory, and with unbounded inputs (external URLs, user uploads) the memory peak is handed to the peer or an attacker; streaming keeps memory usage constant, decoupled from input scale.
+
+**Good**
+
+```go
+if _, err := io.Copy(out, resp.Body); err != nil {
+  return err
+}
+```
+
+**Bad**
+
+```go
+data, err := io.ReadAll(resp.Body)
+```
+
+**References**
+
+- https://pkg.go.dev/io#Copy
+
+**Detection**: manual review (Check whether io.ReadAll inputs are bounded)
+
+### 【SHOULD】PERF-012 A reused http.Client sets Timeout explicitly and customizes its Transport.
+
+- Category: Performance
+- Since: Go 1.0
+- Tags: performance, security
+
+Client and Transport are process-level configuration points.
+
+- A zero-value Client has no timeout; requests may hang forever
+- The default Transport's `MaxIdleConnsPerHost` is only 2, so high concurrency queues for connections
+- A package-level singleton Client is configured centrally, never created ad hoc at call sites
+
+**Why**
+
+> The Client's Transport typically has internal state (cached TCP connections), so Clients should be reused instead of created as needed.
+>
+> — https://pkg.go.dev/net/http#Client
+
+The connection pool is the Client's internal state: creating a Client per call rebuilds the pool and discards every reusable keep-alive connection, and a zero-value Client with no timeout turns an unresponsive downstream into a goroutine leak.
+
+**Good**
+
+```go
+var client = &http.Client{
+  Timeout: 5 * time.Second,
+  Transport: &http.Transport{
+    MaxIdleConnsPerHost: 32,
+  },
+}
+```
+
+**Bad**
+
+```go
+resp, err := (&http.Client{}).Get(url)
+```
+
+**References**
+
+- https://pkg.go.dev/net/http#Client
+
+**Detection**: manual review (Check the configuration of package-level http.Clients)
+
+### 【SHOULD】PERF-013 Handle resp.Body by version: Go 1.27+ reclaims on Close; earlier versions must drain it.
+
+- Category: Performance
+- Since: Go 1.0
+- Tags: performance
+
+Connection reuse depends on the body's read state.
+
+- Go 1.27+ automatically drains unread content on Body close (within a conservative limit); manual draining is unnecessary
+- To abandon a very large body, or on Go 1.26 and below, `io.Copy(io.Discard, resp.Body)` before `Close`
+- Every response must be `Close`d whether or not its content is read
+
+**Why**
+
+> Response.Body now automatically drains any unread content upon being closed, up to a conservative limit, to allow better connection reuse.
+>
+> — https://go.dev/doc/go1.27
+
+A keep-alive connection returns to the pool only after its body is drained, and undrained connections are torn down and rebuilt; since Go 1.27, Close drains automatically, fixing the performance trap — but bodies beyond the automatic limit still need explicit handling.
+
+**Good**
+
+```go
+defer resp.Body.Close()
+_, err = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+```
+
+**Bad**
+
+```go
+defer resp.Body.Close()
+return
+```
+
+**References**
+
+- https://go.dev/doc/go1.27
+- https://pkg.go.dev/net/http#Response.Body
+
+**Detection**: manual review (Check body handling in HTTP client code)
+
+### 【SHOULD】PERF-014 Range over maps taking the value variable, not a second subscript lookup.
+
+- Category: Performance
+- Since: Go 1.0
+- Tags: performance, data-structures
+
+for k, v := range m hashes once per iteration.
+
+- When the value is needed, use the loop variable v, not `m[k]`
+- When only keys are needed, use `for k := range m`
+- `m[k]` inside the loop body re-hashes every iteration
+
+**Why**
+
+> The iteration order over maps is not specified and is not guaranteed to be the same from one iteration to the next.
+>
+> — https://go.dev/ref/spec#For_range
+
+The second range variable is the element already fetched during iteration, while m[k] re-hashes the key every round; in hot loops it is pure waste, and the form carries no compensating benefit.
+
+**Good**
+
+```go
+for k, v := range m {
+  fmt.Println(k, v)
+}
+```
+
+**Bad**
+
+```go
+for k := range m {
+  fmt.Println(k, m[k])
+}
+```
+
+**References**
+
+- https://go.dev/ref/spec#For_range
+
+**Detection**: manual review (Check map range loop bodies)
+
+### 【SHOULD】PERF-016 sql.DB connection pool limits and lifetimes are configured explicitly.
+
+- Category: Performance
+- Since: Go 1.0
+- Tags: performance, data-structures
+
+Pool parameters default to no protection.
+
+- Set `MaxOpenConns`, `MaxIdleConns`, `ConnMaxLifetime`, and `ConnMaxIdleTime` explicitly
+- Defaults are unlimited connections that never expire, so a failure piles connections up and crushes the database
+- Values follow the database connection limit and instance replica count, with notes
+
+**Why**
+
+> DB is a database handle representing a pool of zero or more underlying connections. It's safe for concurrent use by multiple goroutines.
+>
+> — https://pkg.go.dev/database/sql#DB
+
+An unlimited default means every goroutine can hold a connection, so amplified failures crush the database before the application; explicit limits keep failure behavior bounded, and ConnMaxLifetime rotates connections to avoid database-side aging.
+
+**Good**
+
+```go
+db.SetMaxOpenConns(64)
+db.SetMaxIdleConns(16)
+db.SetConnMaxLifetime(time.Hour)
+db.SetConnMaxIdleTime(10 * time.Minute)
+```
+
+**Bad**
+
+```go
+db, _ := sql.Open("pgx", dsn)
+// 未配置任何池参数
+```
+
+**References**
+
+- https://pkg.go.dev/database/sql#DB
+
+**Detection**: manual review (Check pool configuration after sql.Open)
+

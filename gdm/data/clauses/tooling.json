@@ -133,5 +133,123 @@
       "tool": "manual",
       "note": "核对生成物文件名是否带 gen 前缀或后缀"
     }
+  },
+  {
+    "id": "TOOL-012",
+    "level": "MUST",
+    "chapter": "tooling",
+    "section": "command-line",
+    "tags": [
+      "tooling"
+    ],
+    "since_go": "1.0",
+    "summary": "cobra 程序输出写 cmd.OutOrStdout 与 ErrOrStderr。",
+    "details": "输出流按用途分流。\n\n- 结果数据走 stdout（`cmd.OutOrStdout()`），诊断、日志、进度走 stderr（`cmd.ErrOrStderr()`）\n- stdout 保持纯数据，管道与重定向才可用\n- 不直接用 `os.Stdout`/`os.Stderr`",
+    "quote": {
+      "text": "OutOrStdout returns out, stdOut, or stdout.",
+      "source": "https://pkg.go.dev/github.com/spf13/cobra#Command.OutOrStdout"
+    },
+    "rationale": "cobra 的输出访问器继承自父命令并可在测试中替换；直接写 `os.Stdout` 的输出无法被测试捕获，日志混进 stdout 也会让 `| jq` 这类管道拿到脏数据。",
+    "examples": {
+      "good": "fmt.Fprintln(cmd.OutOrStdout(), result)\nfmt.Fprintf(cmd.ErrOrStderr(), \"loading config from %s\\n\", path)",
+      "bad": "fmt.Println(result)\nlog.Printf(\"loading config from %s\", path)"
+    },
+    "sources": [
+      "https://pkg.go.dev/github.com/spf13/cobra#Command.OutOrStdout"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 cobra 命令的输出写法"
+    }
+  },
+  {
+    "id": "TOOL-013",
+    "level": "SHOULD",
+    "chapter": "tooling",
+    "section": "testing-tools",
+    "tags": [
+      "testing",
+      "concurrency",
+      "tooling"
+    ],
+    "since_go": "1.0",
+    "summary": "测试与 CI 以 go test -race 运行。",
+    "details": "race detector 覆盖全部测试，不只并发代码。\n\n- 本地与 CI 的 `go test` 默认带 `-race`\n- race 只报运行期实际触发的竞争，覆盖不足处补测试\n- 需要性能的场景单独跑非 race 基准",
+    "quote": {
+      "text": "To use the race detector, add the -race flag when running your tests or building your application, for example, go test -race.",
+      "source": "https://go.dev/doc/security/best-practices"
+    },
+    "rationale": "数据竞争无法靠人眼可靠排除，race detector 在运行期实检每次内存访问；官方安全最佳实践把 -race 列为标准配置，且只报执行到的路径，全量测试才提供足够覆盖。",
+    "examples": {
+      "good": "go test -race ./...",
+      "bad": "go test ./..."
+    },
+    "sources": [
+      "https://go.dev/doc/security/best-practices",
+      "https://go.dev/blog/race-detector"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 CI 配置"
+    }
+  },
+  {
+    "id": "TOOL-014",
+    "level": "SHOULD",
+    "chapter": "tooling",
+    "section": "command-line",
+    "tags": [
+      "security",
+      "tooling"
+    ],
+    "since_go": "1.0",
+    "summary": "govulncheck 纳入常规依赖漏洞扫描。",
+    "details": "依赖树中的已知漏洞要定期扫描。\n\n- CI 周期任务跑 `govulncheck ./...`\n- govulncheck 只报可达漏洞，比逐条比对 CVE 清单信噪比高\n- 高危可达漏洞升级依赖或评估豁免并记录",
+    "quote": {
+      "text": "Regularly scanning your code and binaries for vulnerabilities helps identify potential security risks early.",
+      "source": "https://go.dev/doc/security/best-practices"
+    },
+    "rationale": "依赖漏洞的披露先于影响评估，靠人工盯 CVE 清单必然滞后；govulncheck 由官方漏洞库驱动并分析调用可达性，把「需要处理」的子集从数百条公告里筛出来。",
+    "examples": {
+      "good": "govulncheck ./...",
+      "bad": "# CI 无任何依赖漏洞扫描步骤"
+    },
+    "sources": [
+      "https://go.dev/doc/security/best-practices",
+      "https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 CI 配置"
+    }
+  },
+  {
+    "id": "TOOL-015",
+    "level": "SHOULD",
+    "chapter": "tooling",
+    "section": "command-line",
+    "tags": [
+      "tooling",
+      "context"
+    ],
+    "since_go": "1.16",
+    "summary": "进程信号处理用 signal.NotifyContext 进 context 取消链。",
+    "details": "信号、超时与优雅退出统一走 context。\n\n- main 用 `signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)` 创建根 ctx\n- 优雅退出经 ctx 取消传播到各组件\n- 不再手工 channel 转发信号",
+    "quote": {
+      "text": "NotifyContext returns a copy of the parent context that is marked done (its Done channel is closed) when one of the listed signals arrives.",
+      "source": "https://pkg.go.dev/os/signal#NotifyContext"
+    },
+    "rationale": "手工转发信号要自建 channel、广播与超时逻辑，每个组件各写一遍且容易漏；NotifyContext 把信号转成 ctx 取消，既有 context 传播链上的超时与退出逻辑全部复用。",
+    "examples": {
+      "good": "ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)\ndefer stop()\nif err := run(ctx); err != nil {\n  log.Fatal(err)\n}",
+      "bad": "sigCh := make(chan os.Signal, 1)\nsignal.Notify(sigCh, os.Interrupt)\ngo func() {\n  <-sigCh\n  os.Exit(0)\n}()"
+    },
+    "sources": [
+      "https://pkg.go.dev/os/signal#NotifyContext"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对 main 的信号处理方式"
+    }
   }
 ]

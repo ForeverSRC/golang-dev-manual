@@ -63,5 +63,65 @@
     "details": "When verifying secret values such as MACs, tokens, and signatures, use `hmac.Equal`, or `ConstantTimeCompare` from `crypto/subtle`. `bytes.Equal`, `==`, and `strings.Compare` return early at the first difference and are not used for secret comparison.",
     "rationale": "An ordinary comparison returns at the first differing byte, letting an attacker probe byte by byte: a correct prefix takes longer, so filtering by elapsed time can recover the secret within a limited number of attempts. `ConstantTimeCompare` takes time related only to length, cutting off this timing side channel.",
     "detect_note": "Check whether secret comparison sites use a constant-time function."
+  },
+  "SEC-012": {
+    "summary": "User-controllable SQL identifiers are validated against a whitelist before splicing.",
+    "details": "Placeholders cover values only, never structural fragments such as column names, table names, or sort directions.\n\n- Dynamically chosen columns, tables, and `ORDER BY` directions map through a whitelist before entering the statement\n- Parameterized placeholders apply to values; identifiers cannot travel through `?`\n- Complementary to SEC-001 (value parameterization); their coverage differs",
+    "rationale": "Parameterization separates values from the statement, but ORDER BY and table names must be part of the statement, so splicing user-controlled identifiers there is as injectable as splicing values; a whitelist restricts the selectable structure to code-enumerated sets, so input chooses rather than composes.",
+    "detect_note": "Check the identifier sources in dynamic SQL"
+  },
+  "SEC-013": {
+    "summary": "Untrusted input is size-limited; request bodies go through http.MaxBytesReader.",
+    "details": "Every read path bounds its input.\n\n- Wrap request bodies with `http.MaxBytesReader` over `w` and `r.Body`\n- Decompression targets (gzip, zip) get size limits against decompression bombs\n- Limit the read before decoding JSON and other formats",
+    "rationale": "Unbounded reads hand the memory peak to the peer: a tiny compressed file can expand into gigabytes of plaintext, and an oversized request body directly exhausts process memory; a limit turns how much the peer wants to send into how much we accept.",
+    "detect_note": "Check size limits on decompression and read paths"
+  },
+  "SEC-014": {
+    "summary": "Temporary files are created with os.CreateTemp.",
+    "details": "Temporary file names come from the system, not hand-spliced fixed paths.\n\n- `os.CreateTemp(dir, pattern)` generates a random name that never collides under concurrency\n- Fixed paths can be hijacked (symlink attacks) and written by concurrent instances\n- Delete after use, and log cleanup failures",
+    "rationale": "A predictable temporary file name lets an attacker pre-create a same-name symlink to hijack the write target, or two instances stomp the same file; CreateTemp has the kernel guarantee name uniqueness, removing the hijack surface.",
+    "detect_note": "Check temporary file creation sites"
+  },
+  "SEC-015": {
+    "summary": "tls.Config sets MinVersion explicitly to TLS 1.2 or above.",
+    "details": "The TLS floor never depends on library defaults.\n\n- Hand-built `tls.Config` writes `MinVersion: tls.VersionTLS12` explicitly\n- Library defaults change across versions; explicit declaration pins the security baseline\n- gosec G402 detects missing or outdated versions",
+    "rationale": "TLS 1.0/1.1 carry published attacks (BEAST, POODLE families), and crypto/tls's default minimum version evolves across Go releases; without an explicit setting the security baseline is actually decided by the Go version chosen at build time, uncontrolled through upgrades and downgrades alike.",
+    "detect_note": "Check MinVersion on tls.Config literals"
+  },
+  "SEC-016": {
+    "summary": "SSH connections verify host keys; InsecureIgnoreHostKey is forbidden.",
+    "details": "SSH clients must verify the peer's identity.\n\n- `HostKeyCallback` uses `ssh.FixedHostKey` or known_hosts verification\n- `ssh.InsecureIgnoreHostKey` abandons man-in-the-middle protection and is test-only\n- Connections failing verification must terminate",
+    "rationale": "Skipping host key verification leaves the client unable to tell the real server from a man in the middle: credentials, commands, and transferred data are all exposed to the interceptor; gosec G106 and the Bearer rule both rank it high severity, with only test environments exempt.",
+    "detect_note": "Check HostKeyCallback configurations"
+  },
+  "SEC-017": {
+    "summary": "Password storage uses slow hashes such as Argon2id and bcrypt.",
+    "details": "Password hashing algorithms must price out brute force.\n\n- Use `golang.org/x/crypto/argon2` or `golang.org/x/crypto/bcrypt` for passwords\n- Single-round MD5/SHA-256 allows billions of guesses per second on GPUs\n- Hash parameters (cost, memory) are re-reviewed as hardware evolves",
+    "rationale": "General hash functions are designed for speed, while password hashing must be designed for cost: the work factor of Argon2id/bcrypt moves offline cracking from seconds to years; when the database leaks, this layer decides whether passwords leak as plaintext.",
+    "detect_note": "Check the hashing algorithm for password storage"
+  },
+  "SEC-018": {
+    "summary": "Symmetric encryption uses authenticated modes; nonces are random and never reused.",
+    "details": "Encryption modes must provide confidentiality and integrity together.\n\n- Use AEAD modes such as AES-GCM; ECB and bare unauthenticated modes are forbidden\n- Generate a fresh random nonce per encryption; never reuse under the same key\n- Go 1.24+ offers `cipher.NewGCMWithRandomNonce` so the library manages the nonce",
+    "rationale": "Unauthenticated modes can be tampered with undetected, and ECB leaks plaintext patterns; reusing a nonce under one GCM key leaks the keystream and breaks authentication at once — the official documentation writes nonce uniqueness as a requirement.",
+    "detect_note": "Check the encryption mode and nonce generation"
+  },
+  "SEC-019": {
+    "summary": "Session cookies set HttpOnly, Secure, and SameSite.",
+    "details": "All three attributes are required for auth cookies.\n\n- `HttpOnly` blocks script reads, `Secure` forces HTTPS transport, `SameSite` restricts cross-site carrying\n- Applies to all session, token, and auth cookies\n- Non-sensitive functional cookies may be waived with a review note",
+    "rationale": "Without HttpOnly an XSS script reads the session token directly; without Secure the token travels over plaintext HTTP; without SameSite cross-site requests carry the cookie automatically, forming CSRF — each attribute closes one attack path.",
+    "detect_note": "Check cookie attribute settings"
+  },
+  "SEC-020": {
+    "summary": "JWT verification pins an algorithm whitelist; the token's alg field is not trusted.",
+    "details": "Acceptable signing algorithms are enumerated in code.\n\n- Parsers explicitly configure an algorithm whitelist (such as `RS256` only)\n- The verification algorithm is never chosen from the token's own `alg` field\n- The `none` algorithm is rejected except in explicitly controlled scenarios",
+    "rationale": "Trusting the token's alg field accepts attacker-chosen algorithms: none bypasses verification, and RS256 switched to HS256 forges signatures using the public key as the HMAC secret — both are publicly exploited attacks; a whitelist rejects any token claiming an algorithm outside the set.",
+    "detect_note": "Check JWT parser configurations"
+  },
+  "SEC-021": {
+    "summary": "Application code does not use unsafe to bypass memory safety.",
+    "details": "unsafe belongs to specially reviewed low-level libraries.\n\n- Business code does not import `unsafe` to bypass type and bounds checks\n- Zero-copy scenarios are wrapped in reviewed low-level packages with invariants documented\n- Introducing unsafe gets the highest review severity",
+    "rationale": "Go's memory safety rests on the compiler and GC; bypassing them with unsafe turns out-of-bounds and aliasing problems from compile failures or panics into undefined behavior, invisible to every static check — the payoff only suits the lowest-level scenarios.",
+    "detect_note": "Grep for unsafe package usage"
   }
 }

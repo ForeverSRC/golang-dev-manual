@@ -18,8 +18,11 @@
 - [Google Go Style Best Practices](https://google.github.io/styleguide/go/best-practices)
 - [Structured Logging with slog（官方博客）](https://go.dev/blog/slog)
 - [log/slog](https://pkg.go.dev/log/slog)
+- [JWT Best Current Practices（RFC 8725）](https://datatracker.ietf.org/doc/html/rfc8725)
 - [Using go fix to modernize Go code（官方博客）](https://go.dev/blog/gofix)
 - [Go 1.26 Release Notes](https://go.dev/doc/go1.26)
+- [Go 1.27 Release Notes](https://go.dev/doc/go1.27)
+- [The Go Memory Model](https://go.dev/ref/mem)
 - [cmd/fix](https://pkg.go.dev/cmd/fix)
 - [Google API 设计指南：错误](https://cloud.google.com/apis/design/errors)
 
@@ -47,6 +50,21 @@
 - [gosec 规则清单（RULES.md）](https://github.com/securego/gosec/blob/master/RULES.md)
 - [revive 规则清单（RULES_DESCRIPTIONS.md）](https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md)
 - [go-critic 检查项总览](https://go-critic.com/overview.html)
+- [Bearer Go 规则清单](https://docs.bearer.com/reference/rules/?lang-go=go_)
+- [Snyk Go 规则清单](https://docs.snyk.io/scan-with-snyk/snyk-code/snyk-code-security-rules/go-rules)
+- [errcheck](https://github.com/kisielk/errcheck)
+- [forcetypeassert](https://github.com/gostaticanalysis/forcetypeassert)
+- [durationcheck](https://github.com/charithe/durationcheck)
+- [noctx](https://github.com/sonatard/noctx)
+- [govet shadow（x/tools analysis）](https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/shadow)
+- [rowserrcheck](https://github.com/jingyugao/rowserrcheck)
+- [sqlclosecheck](https://github.com/ryanrolds/sqlclosecheck)
+- [predeclared](https://github.com/nishanths/predeclared)
+- [testifylint](https://github.com/Antonboom/testifylint)
+- [goleak](https://pkg.go.dev/go.uber.org/goleak)
+- [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
+- [errgroup](https://pkg.go.dev/golang.org/x/sync/errgroup)
+- [Data Race Detector（官方博客）](https://go.dev/blog/race-detector)
 
 ## 工具链
 
@@ -78,6 +96,8 @@
 - [腾讯云：Go 语言开发规范指南](https://cloud.tencent.cn/developer/article/2512042)
 - [字节 Go 开发规范（第三方转载笔记）](https://www.haveyb.com/article/3102)
 - [Practical Go：写可维护 Go 程序的建议（Dave Cheney）](https://dave.cheney.net/practical-go/presentations/qcon-china.html)
+- [100 Go Mistakes and How to Avoid Them（100go.co）](https://100go.co/)
+- [Go 代码约定（unknwon/go-code-convention）](https://github.com/unknwon/go-code-convention/blob/main/zh-CN.md)
 
 ## 企业级与项目级分级规范
 

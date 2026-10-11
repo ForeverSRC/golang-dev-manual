@@ -81,5 +81,65 @@
     "details": "For structs that contain internal state, caches, or pointer fields and whose == cannot compare business identity, embed a helper type named `[0]func()`; from then on, both == and using it as a map key no longer compile. This affects only comparison syntax and takes no extra memory.",
     "rationale": "When all fields are comparable, == is legal at compile time and compares field-by-field content; such comparison is incidental rather than intentional and holds only under certain data combinations. After embedding an incomparable field, misuse fails to compile outright, at the cost of a zero-length array that does not change the struct's size or the meaning of its fields.",
     "detect_note": "Verify whether exported structs that intentionally prohibit comparison have embedded an incomparable field."
+  },
+  "IFACE-004": {
+    "summary": "Keep interfaces small; larger contracts are composed from smaller ones.",
+    "details": "The smaller the interface, the cheaper the implementations and mocks.\n\n- Prefer 1–3 method interfaces; evaluate splitting when exceeded\n- The threshold is a guideline, not a hard rule\n- Consumers define the narrow interface they need, implementers keep concrete types",
+    "rationale": "The more methods an interface has, the more its implementers and test doubles must satisfy, and the weaker its constraint on implementers becomes; small interfaces compose by capability, callers declare only the slice they use, and swapping implementations or unit testing gets lighter.",
+    "detect_note": "Check the method count of interface definitions"
+  },
+  "IFACE-005": {
+    "summary": "Idiomatic method signatures match standard interfaces; do not invent variants.",
+    "details": "When the intent matches a standard interface, the signature must match exactly.\n\n- `String` matches `fmt.Stringer`, `Read` matches `io.Reader`, `Error` matches error\n- Do not invent variants such as `ToString` or `ReadData`\n- Variants cannot plug into the standard ecosystem that depends on the interface",
+    "rationale": "fmt, io, and sort discover capabilities by interface method name: String matches fmt.Stringer to be printable with %v, Read matches io.Reader to flow into io.Copy pipelines; a ToString variant is disconnected from the ecosystem and writes the same capability twice.",
+    "detect_note": "Check that method signatures matching standard interfaces are exact"
+  },
+  "IFACE-006": {
+    "summary": "Mark exported symbols Deprecated and keep them for one release cycle before deletion.",
+    "details": "Deleting an exported symbol is a breaking API change.\n\n- Prefix the doc comment with `Deprecated: ` and name the replacement\n- Keep it for at least one release cycle as a migration window\n- Symbols in `internal/` modules are not covered by this clause",
+    "rationale": "Deleting outright breaks downstream modules at their next build with no warning, and cross-repository consumers may not even have a release window; the Deprecated annotation flows into godoc and IDE hints, so the toolchain spreads the migration path naturally.",
+    "detect_note": "Check git history and comments before deleting exported symbols"
+  },
+  "STRUCT-003": {
+    "summary": "Methods of one type keep a consistent receiver type.",
+    "details": "All methods of a type use either pointer or value receivers throughout.\n\n- Types needing mutation, containing sync primitives, or being large use pointer receivers throughout\n- Small read-only cheap-to-copy types may use value receivers throughout\n- Mixing makes the semantics of a value-copied pointer call unpredictable",
+    "rationale": "Value receiver methods operate on a copy and pointer receiver methods on the original; mixing the two within one type means whether the original is mutated depends on the method declaration rather than the call intent, forcing readers to verify method by method.",
+    "detect_note": "Check receiver declarations across methods of the same type"
+  },
+  "STRUCT-004": {
+    "summary": "Exported fields participating in serialization carry field tags.",
+    "details": "External contract fields get explicit tags instead of encoder fallback.\n\n- Tag per format as needed (`json`/`db`/`yaml`) with a consistent naming style such as `snake_case`\n- Without a tag the encoder falls back to the Go field name, so renaming changes the wire format\n- The structtag checker finds tag format errors",
+    "rationale": "Without a tag the encoder uses the Go field name directly, so renaming one field quietly changes the wire format and the downstream parser breaks a release later; an explicit tag pins the external format at the struct definition, and renaming Go identifiers no longer touches the contract.",
+    "detect_note": "Check that serialized exported fields carry tags"
+  },
+  "CTX-005": {
+    "summary": "The cancel returned by WithCancel and WithTimeout must be called.",
+    "details": "Every control-flow path creating a cancelable context must reach cancel.\n\n- Scoped usage defers `cancel()` immediately\n- When ownership transfers (say to a background task), hand over the cancel too and note it\n- govet lostcancel mechanically finds uncalled paths",
+    "rationale": "Without calling cancel, the child context and its timers stay referenced until the parent finishes, so every unreleased WithTimeout in a long-running process accumulates leakage; cancel is cheap explicit cleanup, and missing it only shows up as slow memory growth.",
+    "detect_note": "Check that every cancel returned by With* is called"
+  },
+  "CTX-006": {
+    "summary": "context.Background is created at entry points only; mid-chain calls do not substitute it for the ctx parameter.",
+    "details": "Background and TODO belong to root positions.\n\n- Reserved for main, init, test entries, and the top of request handling\n- Mid-chain code does not substitute `context.Background()` or `context.TODO()` for the ctx parameter\n- Background tasks that must escape cancellation use `context.WithoutCancel` (see CTX-008)",
+    "rationale": "Substituting Background mid-chain discards the caller's cancellation signal, deadline, and values: after the client disconnects the downstream keeps running, and the timeout defense fails from that call onward; the documentation limits its use to main, init, tests, and the top of incoming requests.",
+    "detect_note": "Check for context.Background and TODO calls outside entry points"
+  },
+  "CTX-007": {
+    "summary": "APIs offering *Context variants are always called through the variant with ctx.",
+    "details": "Standard library and mainstream library ctx variants take precedence over bare calls.\n\n- `http.NewRequest` without `http.NewRequestWithContext` detaches the request from cancellation\n- `db.Query` without `db.QueryContext` leaves the query uncancellable\n- The noctx checker finds sites where a variant exists but the bare call is used",
+    "rationale": "A bare call attaches the operation to an uncancellable context: client disconnects, upstream timeouts, and shutdown signals never reach it, and the downstream runs to completion; ctx variants let cancellation and timeouts cascade along the call chain.",
+    "detect_note": "Check for bare calls where a *Context variant exists"
+  },
+  "CTX-008": {
+    "summary": "Post-request background tasks use context.WithoutCancel.",
+    "details": "Tasks that continue after the request and need the trace chain use WithoutCancel.\n\n- Replace `context.Background()` with `context.WithoutCancel(ctx)`\n- Keeps the original ctx values (trace id, auth info) while escaping its cancellation\n- Introduced in Go 1.21; older versions wrap values manually",
+    "rationale": "Substituting Background drops the values and breaks the trace id chain in the background task; WithoutCancel keeps the value chain while escaping cancellation, and is the correct shape for the run-after-request scenario.",
+    "detect_note": "Check the ctx source of background tasks started in handlers"
+  },
+  "CTX-009": {
+    "summary": "Retry loops check ctx.Err each round and stop once canceled.",
+    "details": "Retry loop conditions must sense cancellation.\n\n- Check `ctx.Err()` before each retry and exit when non-nil\n- Backoff waits `select` on `ctx.Done()` or a timer\n- Retrying after the caller gave up wastes resources and prolongs recovery",
+    "rationale": "Retrying a fixed number of times after the upstream canceled spends resources on results nobody wants while competing with real requests for downstream capacity; the cancellation signal should break the retry loop, not just the single request.",
+    "detect_note": "Check the exit conditions of retry loops"
   }
 }
