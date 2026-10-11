@@ -649,6 +649,51 @@ func toBytes(s string) []byte {
 
 **Detection**: grep regex \bunsafe\. (Grep for unsafe package usage)
 
+### 【MUST】SEC-022 Authorization uses the server-verified identity, never client request headers.
+
+- Category: Security
+- Since: Go 1.0
+- Tags: security
+
+A trusted identity can only come from a source the server verified itself.
+
+- Take identity and tenant from sessions, verified tokens, or mTLS certificates
+- `X-Forwarded-For`, `X-Real-IP`, and `X-Forwarded-Host` can be forged by any client and must not decide authorization or rate-limit identity
+- When the real client IP is needed, use it only where a trusted proxy overwrites that header
+- Audit logs and risk control take identity the same way
+
+**Why**
+
+> The "Forwarded" HTTP header field cannot be relied upon to be correct, as it may be modified, whether mistakenly or for malicious reasons, by every node on the way to the server, including the client making the request.
+>
+> — https://www.rfc-editor.org/rfc/rfc7239.html#section-8.1
+
+Request headers are fully controlled by the client, and a proxy appends rather than overwrites by default, so `net/http`'s `Request.Header` hands you exactly what the client sent; deciding identity from `X-Forwarded-*` or a made-up header lets a single crafted request impersonate someone else. RFC 7239 writes in its security considerations that the Forwarded header cannot be relied upon, because every hop on the way to the server — including the client — can modify it, so identity must come from credentials the server verified.
+
+**Good**
+
+```go
+uid, ok := session.UserID(r)
+if !ok {
+  return ErrUnauthorized
+}
+```
+
+**Bad**
+
+```go
+uid := r.Header.Get("X-User-Id")
+if uid == "" {
+  return ErrUnauthorized
+}
+```
+
+**References**
+
+- https://www.rfc-editor.org/rfc/rfc7239.html#section-8.1
+
+**Detection**: manual review (Check where the auth middleware takes identity from)
+
 ### 【SHOULD】SEC-005 Do not set InsecureSkipVerify to skip TLS certificate verification.
 
 - Category: Security

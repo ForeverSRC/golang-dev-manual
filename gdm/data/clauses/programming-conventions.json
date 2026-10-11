@@ -1607,5 +1607,33 @@
       "tool": "manual",
       "note": "核对 ErrNoRows 的判定方式"
     }
+  },
+  {
+    "id": "CONC-017",
+    "level": "SHOULD",
+    "chapter": "programming-conventions",
+    "section": "concurrency",
+    "tags": [
+      "concurrency"
+    ],
+    "since_go": "1.0",
+    "summary": "常驻 goroutine 入口捕获 panic 并记日志。",
+    "details": "进程级长期存活的 goroutine 在入口处兜住 panic。\n\n- 适用对象是后台 worker、消费循环、定时任务这类常驻 goroutine\n- 捕获后记录 panic 值与堆栈（`debug.Stack()`），只吞不记等于把故障藏起来\n- 有意 fail-fast（任其崩溃、交由编排系统重启）时可不捕获，需在代码或评审里写明理由\n- 一次性 goroutine 与 `errgroup` 管理的 goroutine 不在本条范围",
+    "quote": {
+      "text": "If ServeHTTP panics, the server (the caller of ServeHTTP) assumes that the effect of the panic was isolated to the active request. It recovers the panic, logs a stack trace to the server error log, and either closes the network connection or sends an HTTP/2 RST_STREAM, depending on the HTTP protocol.",
+      "source": "https://pkg.go.dev/net/http#Server"
+    },
+    "rationale": "panic 只能被同一 goroutine 内的 recover 捕获。`net/http` 对 handler 的 panic 自己兜底，把影响限制在当次请求；自建常驻 goroutine 没有框架兜底，一个 nil 解引用或切片越界就让整个进程退出，在途任务一起丢失。入口处 recover 并记录堆栈，把进程级故障降级为单任务失败，堆栈又保留了定位线索。",
+    "examples": {
+      "good": "go func() {\n  defer func() {\n    if r := recover(); r != nil {\n      slog.Error(\"worker panic\", \"panic\", r, \"stack\", string(debug.Stack()))\n    }\n  }()\n  handle(req)\n}()",
+      "bad": "go handle(req)"
+    },
+    "sources": [
+      "https://pkg.go.dev/net/http#Server"
+    ],
+    "detect": {
+      "tool": "manual",
+      "note": "核对常驻 goroutine 的入口是否 recover 并记录堆栈"
+    }
   }
 ]

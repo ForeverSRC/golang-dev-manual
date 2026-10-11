@@ -29,6 +29,7 @@
 | CONC-014 | SHOULD | 编程规约/并发规约 | 写入密集场景不用 sync.Map。 |
 | CONC-015 | SHOULD | 编程规约/并发规约 | 批量并发任务设置并发上限。 |
 | CONC-016 | SHOULD | 编程规约/并发规约 | sync.Pool 对象放回前 Reset。 |
+| CONC-017 | SHOULD | 编程规约/并发规约 | 常驻 goroutine 入口捕获 panic 并记日志。 |
 | CONST-001 | MUST | 编程规约/常量与枚举规约 | 常量名用 MixedCaps，不用全大写或 k 前缀。 |
 | CONST-002 | SHOULD | 编程规约/常量与枚举规约 | 常量按用途命名，不复刻它的取值。 |
 | CONST-003 | MAY | 编程规约/常量与枚举规约 | 同源递增的枚举值用 iota 生成。 |
@@ -149,6 +150,7 @@
 | SEC-019 | MUST | 安全规约 | 会话 cookie 设置 HttpOnly、Secure 与 SameSite。 |
 | SEC-020 | MUST | 安全规约 | JWT 校验固定签名算法白名单，不信任令牌 alg 字段。 |
 | SEC-021 | MUST | 安全规约 | 应用代码不使用 unsafe 绕过内存安全。 |
+| SEC-022 | MUST | 安全规约 | 鉴权取服务端验证的身份，不用客户端请求头。 |
 | STD-001 | MUST | 编程规约/标准库使用规约 | time.Duration 不得与 time.Duration 相乘。 |
 | STD-002 | SHOULD | 编程规约/标准库使用规约 | time.Time 比较用 Equal，不用 ==。 |
 | STD-003 | SHOULD | 编程规约/标准库使用规约 | 去前后缀用 strings.TrimPrefix 与 TrimSuffix。 |
@@ -185,6 +187,7 @@
 | TEST-027 | SHOULD | 单元测试规约/测试命名与结构 | 基准对比用 benchstat 判显著，采样足够多次。 |
 | TEST-028 | MAY | 单元测试规约/测试命名与结构 | 基准函数单独放 _bench_test.go。 |
 | TEST-029 | SHOULD | 单元测试规约/断言与测试数据 | require 用于前置条件，assert 用于结果校验。 |
+| TEST-030 | MAY | 单元测试规约/测试命名与结构 | 含 goroutine 的包用 goleak 检查泄漏。 |
 | TOOL-001 | MUST | 静态检查规约/配置与运行 | 统一用 golangci-lint 做静态代码检查。 |
 | TOOL-002 | SHOULD | 静态检查规约/推荐规则 | golangci-lint 中开启 modernize，跟进新版 Go 惯用法。 |
 | TOOL-003 | SHOULD | 静态检查规约/推荐规则 | 使用 testify 时，同步开启 testifylint。 |
@@ -228,6 +231,7 @@
 - CONC-014：https://pkg.go.dev/sync#Map
 - CONC-015：https://pkg.go.dev/golang.org/x/sync/errgroup#Group.SetLimit
 - CONC-016：https://pkg.go.dev/sync#Pool
+- CONC-017：https://pkg.go.dev/net/http#Server
 - CONST-001：https://go.dev/wiki/CodeReviewComments#mixed-caps https://google.github.io/styleguide/go/decisions#constant-names
 - CONST-002：https://google.github.io/styleguide/go/decisions#constant-names
 - CONST-003：https://go.dev/doc/effective_go#constants https://go.dev/ref/spec#Constant_declarations
@@ -348,6 +352,7 @@
 - SEC-019：https://docs.bearer.com/reference/rules/go_lang_cookie_missing_http_only/ https://docs.bearer.com/reference/rules/go_lang_insecure_cookie/
 - SEC-020：https://datatracker.ietf.org/doc/html/rfc8725#section-3.1
 - SEC-021：https://pkg.go.dev/unsafe https://docs.bearer.com/reference/rules/go_gosec_unsafe_unsafe/
+- SEC-022：https://www.rfc-editor.org/rfc/rfc7239.html#section-8.1
 - STD-001：https://pkg.go.dev/time#Duration
 - STD-002：https://pkg.go.dev/time#Time.Equal
 - STD-003：https://pkg.go.dev/strings#Trim
@@ -384,6 +389,7 @@
 - TEST-027：https://pkg.go.dev/golang.org/x/perf/cmd/benchstat
 - TEST-028：https://pkg.go.dev/testing
 - TEST-029：https://pkg.go.dev/github.com/stretchr/testify/require
+- TEST-030：https://pkg.go.dev/go.uber.org/goleak
 - TOOL-001：https://golangci-lint.run/
 - TOOL-002：https://golangci-lint.run/docs/linters/configuration/#modernize
 - TOOL-003：https://github.com/Antonboom/testifylint
@@ -429,6 +435,7 @@
 | CONC-014 | 人工核对（核对 sync.Map 的读写比与键集模式） |
 | CONC-015 | 人工核对（核对批量任务的并发创建是否设上限） |
 | CONC-016 | 人工核对（核对 Pool.Put 前是否 Reset） |
+| CONC-017 | 人工核对（核对常驻 goroutine 的入口是否 recover 并记录堆栈） |
 | CONST-001 | golangci-lint stylecheck(ST1003) |
 | CONST-002 | 人工核对（核对常量名是否只是在复述取值） |
 | CONST-003 | 人工核对（核对同源递增的枚举是否手写了数字） |
@@ -549,6 +556,7 @@
 | SEC-019 | 人工核对（核对 cookie 属性设置） |
 | SEC-020 | 人工核对（核对 JWT 解析配置） |
 | SEC-021 | grep 正则 \bunsafe\. |
+| SEC-022 | 人工核对（核对鉴权中间件的身份来源是否为服务端验证结果） |
 | STD-001 | golangci-lint durationcheck |
 | STD-002 | 人工核对（核对 time.Time 的比较表达式） |
 | STD-003 | 人工核对（核对字符串裁剪意图与所用 API 是否匹配） |
@@ -585,6 +593,7 @@
 | TEST-027 | 人工核对（核对性能结论的采样与判定依据） |
 | TEST-028 | 人工核对（核对基准文件的归属） |
 | TEST-029 | golangci-lint testifylint |
+| TEST-030 | 人工核对（核对 TestMain 是否接上泄漏检查并带豁免名单） |
 | TOOL-001 | 人工核对（核对仓库根有 .golangci.yml 且 lint 入口调用 golangci-lint） |
 | TOOL-002 | 人工核对（核对 .golangci.yml 的 linters.enable 含 modernize） |
 | TOOL-003 | 人工核对（核对 .golangci.yml 的 linters.enable 含 testifylint） |

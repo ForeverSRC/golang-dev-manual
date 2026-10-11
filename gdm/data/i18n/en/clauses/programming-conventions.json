@@ -341,5 +341,11 @@
     "details": "Not found is a domain result, not an ordinary error.\n\n- Match with `errors.Is(err, sql.ErrNoRows)` and translate into domain semantics (such as a not-found marker)\n- Direct `==` comparison breaks once the error is wrapped\n- `QueryRow`'s single-row queries are the main source of ErrNoRows",
     "rationale": "Treating ErrNoRows as an ordinary error leaves upstream unable to tell no such row from a database outage, which often shows up as a 5xx for a request that simply did not exist; matching with errors.Is and translating into a not-found result completes the error-chain semantics.",
     "detect_note": "Check how ErrNoRows is matched"
+  },
+  "CONC-017": {
+    "summary": "Long-lived goroutine entry points recover and log panics.",
+    "details": "Goroutines that live for the process lifetime catch panics at their entry point.\n\n- Applies to background workers, consume loops, and scheduled jobs\n- Log both the panic value and the stack (`debug.Stack()`); recovering without logging hides the failure\n- A deliberate fail-fast setup (let it crash, let the orchestrator restart) may skip this, with the reason stated in code or review\n- One-off goroutines and goroutines managed by `errgroup` are out of scope",
+    "rationale": "A panic can only be caught by a recover in the same goroutine. `net/http` catches handler panics for you and limits the damage to the active request; a self-started long-lived goroutine has no such safety net, so one nil dereference or slice bounds error takes the whole process down along with in-flight work. Recovering at the entry point and logging the stack downgrades a process-level failure to a single failed task while keeping the clue needed to locate it.",
+    "detect_note": "Check that long-lived goroutine entry points recover and log the stack"
   }
 }

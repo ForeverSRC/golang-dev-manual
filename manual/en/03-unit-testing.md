@@ -204,7 +204,8 @@ Wait for events, not fixed durations.
 
 - Await concurrent completion with channels, `WaitGroup`, or synctest
 - `time.Sleep` waiting for what should have happened is a flakiness source
-- Where framework limits (such as consumer-group rebalancing) prevent eventing, note the exception in the test
+- Event it where the client allows: sarama's `ConsumerGroupHandler` calls `Setup` and `Cleanup` at the start and end of each session, so waiting for `Setup` to return means the rebalance is done
+- When the client exposes no such event, fall back to waiting for the first message with a timeout, and note the limitation in the test
 
 **Why**
 
@@ -524,6 +525,50 @@ parse.go / parse_test.go（内含 BenchmarkParse）
 - https://pkg.go.dev/testing
 
 **Detection**: manual review (Check which file benchmarks belong to)
+
+### 【MAY】TEST-030 Packages with goroutines use goleak to check for leaks.
+
+- Category: Unit Testing/Test Naming and Structure
+- Since: Go 1.0
+- Tags: testing, concurrency
+
+The landing form wraps a project-local helper that carries the known leaky functions for this repository.
+
+- The helper calls `goleak.VerifyTestMain(m)`, which takes over `m.Run()` and `os.Exit`
+- Exemptions: `goleak.IgnoreTopFunction` (matches the top of the stack), `goleak.IgnoreAnyFunction` (matches anywhere in the stack), `goleak.IgnoreCurrent` (records the current goroutine first)
+- Common things to exempt: background goroutines started by dependencies, and runtime goroutines a given goleak version does not know about
+- `VerifyTestMain` only names the package; to pin down a case use `goleak.VerifyNone(t)` (incompatible with `t.Parallel()`)
+- goleak officially supports only the two most recent Go minor versions, so re-check exemptions after a Go upgrade
+
+**Why**
+
+> VerifyTestMain can be used in a TestMain function for package tests to verify that there were no goroutine leaks.
+>
+> — https://pkg.go.dev/go.uber.org/goleak#VerifyTestMain
+
+`-race` detects data races while goleak detects goroutine leaks, and their blind spots differ: a leaked goroutine that touches no shared memory makes `-race` silent while memory keeps growing. `VerifyTestMain` sweeps the live goroutines before the test process exits, moving that class of problem from production into the test phase; it needs `TestMain` to obtain the after-all-tests moment, and a plain `os.Exit` bypasses the check entirely.
+
+**Good**
+
+```go
+func TestMain(m *testing.M) {
+  testutils.GoleakVerifyTestMain(m)
+}
+```
+
+**Bad**
+
+```go
+func TestMain(m *testing.M) {
+  os.Exit(m.Run())
+}
+```
+
+**References**
+
+- https://pkg.go.dev/go.uber.org/goleak
+
+**Detection**: manual review (Check that TestMain wires in the leak check together with its exemption list)
 
 ## (2) Table-Driven and Case Design
 

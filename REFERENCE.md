@@ -23,6 +23,7 @@
 - [Go 1.26 Release Notes](https://go.dev/doc/go1.26)
 - [Go 1.27 Release Notes](https://go.dev/doc/go1.27)
 - [The Go Memory Model](https://go.dev/ref/mem)
+- [net/http（Server：panic 恢复与堆栈日志）](https://pkg.go.dev/net/http#Server)
 - [cmd/fix](https://pkg.go.dev/cmd/fix)
 - [Google API 设计指南：错误](https://cloud.google.com/apis/design/errors)
 
@@ -44,6 +45,7 @@
 - [net/http（Server.ReadHeaderTimeout）](https://pkg.go.dev/net/http#Server.ReadHeaderTimeout)
 - [crypto/subtle](https://pkg.go.dev/crypto/subtle)
 - [crypto/hmac（Equal）](https://pkg.go.dev/crypto/hmac#Equal)
+- [Forwarded HTTP Extension（RFC 7239）](https://www.rfc-editor.org/rfc/rfc7239.html)
 
 ## 工具与检测
 

@@ -123,5 +123,11 @@
     "details": "unsafe belongs to specially reviewed low-level libraries.\n\n- Business code does not import `unsafe` to bypass type and bounds checks\n- Zero-copy scenarios are wrapped in reviewed low-level packages with invariants documented\n- Introducing unsafe gets the highest review severity",
     "rationale": "Go's memory safety rests on the compiler and GC; bypassing them with unsafe turns out-of-bounds and aliasing problems from compile failures or panics into undefined behavior, invisible to every static check — the payoff only suits the lowest-level scenarios.",
     "detect_note": "Grep for unsafe package usage"
+  },
+  "SEC-022": {
+    "summary": "Authorization uses the server-verified identity, never client request headers.",
+    "details": "A trusted identity can only come from a source the server verified itself.\n\n- Take identity and tenant from sessions, verified tokens, or mTLS certificates\n- `X-Forwarded-For`, `X-Real-IP`, and `X-Forwarded-Host` can be forged by any client and must not decide authorization or rate-limit identity\n- When the real client IP is needed, use it only where a trusted proxy overwrites that header\n- Audit logs and risk control take identity the same way",
+    "rationale": "Request headers are fully controlled by the client, and a proxy appends rather than overwrites by default, so `net/http`'s `Request.Header` hands you exactly what the client sent; deciding identity from `X-Forwarded-*` or a made-up header lets a single crafted request impersonate someone else. RFC 7239 writes in its security considerations that the Forwarded header cannot be relied upon, because every hop on the way to the server — including the client — can modify it, so identity must come from credentials the server verified.",
+    "detect_note": "Check where the auth middleware takes identity from"
   }
 }

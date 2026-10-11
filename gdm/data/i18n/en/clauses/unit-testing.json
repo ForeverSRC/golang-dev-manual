@@ -120,7 +120,7 @@
   },
   "TEST-022": {
     "summary": "Tests wait on synchronization primitives, never on time.Sleep.",
-    "details": "Wait for events, not fixed durations.\n\n- Await concurrent completion with channels, `WaitGroup`, or synctest\n- `time.Sleep` waiting for what should have happened is a flakiness source\n- Where framework limits (such as consumer-group rebalancing) prevent eventing, note the exception in the test",
+    "details": "Wait for events, not fixed durations.\n\n- Await concurrent completion with channels, `WaitGroup`, or synctest\n- `time.Sleep` waiting for what should have happened is a flakiness source\n- Event it where the client allows: sarama's `ConsumerGroupHandler` calls `Setup` and `Cleanup` at the start and end of each session, so waiting for `Setup` to return means the rebalance is done\n- When the client exposes no such event, fall back to waiting for the first message with a timeout, and note the limitation in the test",
     "rationale": "Sleep expresses a duration, not an event: on slow machines the duration is too short and the test fails, on fast machines it is wasted time, and both ends are unstable; waiting for an event to happen means waiting on the event itself (channels, WaitGroup, callbacks) — a duration can never replace it.",
     "detect_note": "Check the purpose of time.Sleep in tests"
   },
@@ -165,5 +165,19 @@
     "details": "The two assertion families split by post-failure behavior.\n\n- require stops on failure: once a precondition fails, later assertions are meaningless\n- assert continues on failure: result checks collect all failures at once\n- Do not mix the two styles for the same check point in one test",
     "rationale": "Continuing with assert after a precondition failure reports every assertion while there is only one root cause, drowning the signal in noise; the reverse — require for result checks — stops at the first failure and forces fix-then-hit-next rounds.",
     "detect_note": "Check the require/assert split in test bodies"
+  },
+  "TEST-030": {
+    "summary": "Packages with goroutines use goleak to check for leaks.",
+    "details": "The landing form wraps a project-local helper that carries the known leaky functions for this repository.\n\n- The helper calls `goleak.VerifyTestMain(m)`, which takes over `m.Run()` and `os.Exit`\n- Exemptions: `goleak.IgnoreTopFunction` (matches the top of the stack), `goleak.IgnoreAnyFunction` (matches anywhere in the stack), `goleak.IgnoreCurrent` (records the current goroutine first)\n- Common things to exempt: background goroutines started by dependencies, and runtime goroutines a given goleak version does not know about\n- `VerifyTestMain` only names the package; to pin down a case use `goleak.VerifyNone(t)` (incompatible with `t.Parallel()`)\n- goleak officially supports only the two most recent Go minor versions, so re-check exemptions after a Go upgrade",
+    "quote": {
+      "text": "VerifyTestMain can be used in a TestMain function for package tests to verify that there were no goroutine leaks.",
+      "source": "https://pkg.go.dev/go.uber.org/goleak#VerifyTestMain"
+    },
+    "rationale": "`-race` detects data races while goleak detects goroutine leaks, and their blind spots differ: a leaked goroutine that touches no shared memory makes `-race` silent while memory keeps growing. `VerifyTestMain` sweeps the live goroutines before the test process exits, moving that class of problem from production into the test phase; it needs `TestMain` to obtain the after-all-tests moment, and a plain `os.Exit` bypasses the check entirely.",
+    "examples": {
+      "good": "func TestMain(m *testing.M) {\n  testutils.GoleakVerifyTestMain(m)\n}",
+      "bad": "func TestMain(m *testing.M) {\n  os.Exit(m.Run())\n}"
+    },
+    "detect_note": "Check that TestMain wires in the leak check together with its exemption list"
   }
 }

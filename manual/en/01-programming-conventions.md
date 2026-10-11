@@ -2195,6 +2195,52 @@ defer pool.Put(buf)
 
 **Detection**: manual review (Check that Pool.Put sites Reset first)
 
+### 【SHOULD】CONC-017 Long-lived goroutine entry points recover and log panics.
+
+- Category: Programming Conventions/Concurrency
+- Since: Go 1.0
+- Tags: concurrency
+
+Goroutines that live for the process lifetime catch panics at their entry point.
+
+- Applies to background workers, consume loops, and scheduled jobs
+- Log both the panic value and the stack (`debug.Stack()`); recovering without logging hides the failure
+- A deliberate fail-fast setup (let it crash, let the orchestrator restart) may skip this, with the reason stated in code or review
+- One-off goroutines and goroutines managed by `errgroup` are out of scope
+
+**Why**
+
+> If ServeHTTP panics, the server (the caller of ServeHTTP) assumes that the effect of the panic was isolated to the active request. It recovers the panic, logs a stack trace to the server error log, and either closes the network connection or sends an HTTP/2 RST_STREAM, depending on the HTTP protocol.
+>
+> — https://pkg.go.dev/net/http#Server
+
+A panic can only be caught by a recover in the same goroutine. `net/http` catches handler panics for you and limits the damage to the active request; a self-started long-lived goroutine has no such safety net, so one nil dereference or slice bounds error takes the whole process down along with in-flight work. Recovering at the entry point and logging the stack downgrades a process-level failure to a single failed task while keeping the clue needed to locate it.
+
+**Good**
+
+```go
+go func() {
+  defer func() {
+    if r := recover(); r != nil {
+      slog.Error("worker panic", "panic", r, "stack", string(debug.Stack()))
+    }
+  }()
+  handle(req)
+}()
+```
+
+**Bad**
+
+```go
+go handle(req)
+```
+
+**References**
+
+- https://pkg.go.dev/net/http#Server
+
+**Detection**: manual review (Check that long-lived goroutine entry points recover and log the stack)
+
 ## (9) Control Flow
 
 ### 【MUST】CTRL-003 Do not defer resource release inside a loop body.
